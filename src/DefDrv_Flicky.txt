@@ -1,0 +1,114 @@
+; --- Flicky SMPS Driver Definition ---
+; SMPS Z80 Type 1
+
+[Settings]
+; Flicky Default values:
+; 1C00 - 00 80 - ROM Bank (008000h)
+; 1C02 - 00 12 - Global Pointer List Offset (1200h)
+; 1C04 - B4 00 - Timer A (63.11 Hz)
+; 1C06 - E6 - Timer B (128.05 Hz)
+; 1C07 - 80 - Timing Mode
+; 1C08 - 20 00
+
+; forced Default Values for Timing
+; default Mode (hex):
+;	00 - update all on Vertical Interrupt (NTSC: 60 Hz/PAL: 50 Hz)
+;	20 - update all when YM2612 Timer A expires [not in actual driver]
+;	40 - update all when YM2612 Timer B expires (Note: often used with Timer B = CBh)
+;	80 - update music when Timer A expires, update SFX when Timer B expires
+;	FF - don't set a default
+DefTimingMode = 80
+LockTimingMode = False
+; Default values for the YM2612 Timers (can be dec or hex)
+DefTimerA = 0B4h
+DefTimerB = E6h
+
+[Main]
+; Pointer Format
+;	68K - SMPS 68k
+;	RST - SMPS 68k/Ristar
+;	Z80 - SMPS Z80
+PtrFmt = Z80
+
+; Instrument Mode
+;	DEFAULT - default SMPS registers (B0 30 38 34 3C 50 ... 8C 40 48 44 4C)
+;	HARDWARE - hardware order for operators (B0 30 34 38 3C 50 ...)
+;	CUSTOM - custom instrument definition, needs additional InsRegs setting
+InsMode = Default
+; Instrument Register Order [optional]
+;InsRegs = B0 30 38 34 3C 50 58 54 5C 60 68 64 6C 70 78 74 7C 80 88 84 8C 40 48 44 4C
+
+; FM Channel Order [optional]
+;	Here you can rearrange the 6 FM channels. You'll need this if FM drums use the Special FM3 mode.
+;	Channels numbers are: 0..2 (FM 1..3), 4..6 (FM 4..6)
+;	Note: The drum channel is (10 + FM channel).
+;	Examples:
+;		16 0 1 2 4 5 6 (default)
+;		12 0 1 4 5 6 2 (commonly used from pre-SMPS Z80 to SMPS Z80 Type 1 with FM/PSG drums) 
+FMChnOrder = 12 0 1 4 5 6 2
+
+; Tempo Mode
+;	TIMEOUT - used by preSMPS, SMPS Z80 Type 1 and most SMPS 68k
+;	OVERFLOW - used by SMPS Z80 Type 2 and some late SMPS 68k
+;	OVERFLOW2 - used by Sonic 2
+TempoMode = Timeout
+
+; FM Base Note
+;	B - frequency table begins with a B note, so the table entry is (note - 80h) [SMPS 68k]
+;	C - frequency table begins with a C note, so the table entry is (note - 81h) [SMPS Z80]
+FMBaseNote = C
+; FM Base Octave - usually 0, can be 1 if the FM tables begin with a 0Axx frequency
+FMBaseOctave = 0
+; Octave Wrap for Detune (caused by PitchSlide routine)
+;	If enabled, frequencies <284h are moved to the next lower octave.
+DetuneOctWrap = True
+
+; prevent FM Note On from being sent when HOLD (SMPS Z80) or REST (SMPS 68k) flag is set.
+NoteOnPrevent = Hold
+
+; Note-Rest-Delay-Delay behaviour
+;	RESET - a Rest resets the note frequency, so the 2nd Delay plays nothing [most SMPS 68k]
+;	KEEP - a Rest keeps the note frequency, so the 2nd Delay replays the last Note [all SMPS Z80, some SMPS 68k]
+DelayFreq = Keep
+
+; Modulation Algorithm
+;	can be 68K or Z80
+ModAlgo = Z80
+
+; Envelope Multiplier Mode
+;	PRE - preSMPS 68k
+;	68K - SMPS 68k
+;	Z80 - SMPS Z80, preSMPS Z80
+EnvMult = Z80
+
+; Volume Mode
+;	ALGO - the FM Algorithm/Connection setting defines the TL operators affected by the channel volume [SMPS 68k]
+;	BIT7 - TL operators with Bit 7 set (value 80-FF) are affected by the channel volume [SMPS Z80]
+VolMode = Bit7
+
+; Frequency values
+;	Values can be decimal or hexadecimal (0xABC, $ABC or ABCh) and separates by spaces.
+;	All numbers on the line are read until something invalid is found.
+;	A multiline frequency list is possible by enclosing the block with curly brackets {}
+;	Note: Due to how the parser works, there must be a space before the closing bracket.
+;	
+;	You can also use these default frequency values:
+;	FMFreqs: DEF_68K, DEF_Z80
+;	PSGFreqs: DEF_PRE (pre-SMPS), DEF_68K, DEF_Z80_T1, DEF_Z80_T2
+FMFreqs = Def_Z80
+PSGFreqs = Def_Z80_T1
+FM3Freqs = 000h 132h 18Ah 1E4h	; Flicky uses a slightly modified set of FM3 frequencies.
+
+
+[EnvelopeCmds]
+; Possible commands:
+;	RESET - reset the Envelope Index to 0
+;	HOLD - hold the envelope at the current level
+;	LOOP - loop back to the Envelope Index set by the following byte
+;	STOP - stop the envelope and note
+;	CHG_MULT - change the Envelope Multiplier (Modulation Envelope only)
+80 = Reset
+81 = Hold
+82 = Loop
+83 = Stop
+84 = Chg_Mult

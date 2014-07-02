@@ -1,0 +1,344 @@
+SMPS Commands
+=============
+
+IGNORE - does nothing
+
+
+General Flags
+-------------
+PANAFMS - set Pan, AMS or FMS bits (YM2612 register B4)
+  PAFMS_PAN - set Pan bits
+	command E0, size 02
+  PAFMS_AMS - set tremolo (AMS) strength
+	command EA, size 02, early SMPS Z80
+  PAFMS_FMS - set vibrato (FMS) strength
+	command EB, size 02, early SMPS Z80
+  PAFMS_PAN_C - set to both speakers (center), no AMS/FMS
+	command FD, size 01, preSMPS
+  PAFMS_PAN_L - set to left speaker, no AMS/FMS
+	command FF, size 01, preSMPS
+  PAFMS_PAN_R - set to right speaker, no AMS/FMS
+	command FE, size 01, preSMPS
+
+DETUNE - set Finetuning value (value added to raw frequency)
+	command E1, size 02
+
+SET_COMM - set Communication Byte (read by the game to synchronize it with music)
+	command E2, size 02
+
+VOLUME - change or set channel volume
+	There are 3 common volume commands, which differ slightly between the drivers:
+  VOL_ab_FMP - change PSG or FM volume (depending on the curren channel mode)
+	command E5, size 03, parameters are PSG (first) and FM (second) volume increment
+  VOL_ab_FM - change FM volume
+	command E6, size 02
+  VOL_ab_PSG  - change PSG volume by a certain amount
+	command EC, size 02
+	Each of the "a" or "b" can be either "N" or "C".
+	a - check channel mode (N - don't check, C - check)
+	    If N (default for SMPS 68k) is used, FM commands on PSG channels and vice versa can cause bugs.
+	    If C (default for SMPS Z80) is used, command for a wrong channel type are ignored.
+	b - clip volume to chip limit (N - no clippig, C - clipping)
+	    C activates additional checks for overflowing or underflowing volume commands.
+	    This is the default for PSG volume changes on SMPS Z80 Type 2.
+	    SMPS 68k and SMPS Z80 Type 1 don't apply clipping.
+	    
+	    Sonic 3 & Knuckles additionally clips the FM volume.
+
+      Complete list:
+  VOL_NN_FMP - command E5, SMPS 68k
+  VOL_NN_FM - command E6, SMPS 68k
+  VOL_NN_PSG - command EC, SMPS 68k
+  VOL_NN_FMP1 - command E6, early SMPS Z80 (volume increment for PSG/FM, volume refresh for FM only)
+  VOL_CN_FMP - command E5, SMPS Z80
+  VOL_CN_FM - command E6, SMPS Z80 Type 1/2
+  VOL_CN_PSG - command EC, SMPS Z80 Type 1
+  VOL_CC_FMP - command E5
+  VOL_CC_FM - command E6, Sonic 3K
+  VOL_CC_PSG - command EC, SMPS Z80 Type 2
+  VOL_CC_FMP2 - command E5, Sonic 3K (broken, behaves like E6 with the first parameter being ignored)
+
+      Additional commands:
+  VOL_ABS - set volume
+	command F0, size 02, preSMPS (
+  VOL_ABS_S3K - set volume, range is 00 (min) .. 7F (max) and is scaled to match the FM/PSG volume range
+	command E4, size 02, Sonic 3K
+  VOL_ABS_HF - set volume
+	command FF 07, size 02, The Hybrid Front
+  VOL_ABS_HF2 - set volume
+	command E5, size 03, The Hybrid Front (broken, behaves like FF 07 with the first parameter being ignored)
+  VOL_ABS_TMP - set volume
+	command E4, size 02, Tempo 32x
+  VOL_SPC_TMP - change FM volume/set PSG volume
+	command E6, size 02, Tempo 32x
+
+HOLD - prevent next note from being retriggered, effectively holding it
+	command E7, size 01
+
+NOTE_STOP - stop notes after x frames (disabled if x == 0)
+	command E8, size 02
+  NSTOP_NORMAL - stop after x frames
+  NSTOP_MULT - stop after (x * track's tick multiplier) frames
+
+TRANSPOSE - changes or sets the value added to all notes
+  TRNSP_ADD - change transposition
+	command FB, size 02
+  TRNSP_SET - set transposition to parameter
+	command FA, size 02, Tempo 32x
+  TRNSP_SET_S3K - set transposition to (parameter - 40h)
+	command FD, size 02, Sonic 3K
+  TRNSP_ADD_ALL - change transposition of all Music channels (except for the drum channel)
+	command FF 05, size 02, Sorcerian
+  TRNSP_GADD - add global transposition value
+	command FC, size 01, Tempo 32x
+  TRNSP_GSET - set to global transposition value
+	command FE, size 01, Tempo 32x
+  TRNSP_RAND - set transposition to random value
+	command E9, size 01, Tempo 32x
+
+INSTRUMENT - sets the channel instrument
+  INS_a_FM - set FM instrument and send it to the FM chip
+	command EF, size 02 (SMPS 68k) / 82 (SMPS Z80)
+	Note: in SMPS Z80, the size is variable (indicated by size 80+)
+	      If the instrument is >= 80, the command has an additional parameter specifying
+	      the song ID with the instrument library to use.
+  INS_a_PSG - set PSG instrument (PSG volume envelope)
+	command F5, size 02
+	
+	a can be N or C. (see notes for VOLUME)
+	If set to N, the channel mode check is disabled. (INS_FM on PSG channel can cause bugs and vice versa)
+	If set to C, the channel mode check is enabled and commands for a wrong channel are ignored.
+
+PSG_NOISE
+  PNOIS_SET - put channel in "PSG noise" mode (set)
+	command F3, size 02, SMPS 68k
+  PNOIS_SET2 - put channel in "PSG noise" mode (set), force parameter into Noise Type range (ORs with E0h)
+	command F3, size 02, early SMPS Z80
+  PNOIS_SRES - put channel in "PSG noise" mode (set) or revert it back (reset)
+	command F3, size 02, SMPS Z80
+
+FM_COMMAND - send command to FM chip (2 parameters: register, data)
+  FMW_CHN - send to YM2612 Port 0 or 1, depending on the current channel
+	command ED, size 03
+  FMW_FM1 - send to YM2612 Port 0
+	command EE, size 03
+
+PLAY_DAC - play DAC sound
+	command EA, size 02, SMPS Z80 Type 2
+	command EA, size 03, Zaxxon Motherbase 2000 32X, sets DAC bank to first parameter, second parameter is the DAC sound
+
+PLAY_PWM - play PWM sample
+	command FD, size 03, Tempo 32x
+
+DAC_BANK - set DAC Bank
+	command ED, size 02, Mighty Morphin Power Rangers
+	command E9, size 02, preSMPS 68k
+
+Modulation Flags
+----------------
+MOD_SETUP - enable "Custom Modulation" and set its parameters
+	command F0, size 05
+
+MOD_SET - enable/disable "Custom Modulation"
+  MODS_ON - enable
+	command FC/F1, size 01, SMPS 68k
+  MODS_OFF - disable
+	command FD/F4, size 01, SMPS 68k
+
+MOD_ENV - set Modulation Envelope
+  MENV_GEN - set envelope (all channel types)
+	command F4, size 02
+  MENV_FMP - set PSG or FM modulation envelope (depending on the curren channel mode)
+	command F1, size 03, parameters are PSG (first) and FM (second)
+  MENV_GEN2 - set envelope to second parameter (all channel types)
+	command F1, size 03
+
+FM_VOLENV - set FM volume envelope (second parameter is the Total Level operator mask)
+	command FF 07/06, size 03, SMPS Z80
+
+LFO_MOD - set LFO/FMS Modulation
+	command E2, size 82, Ghostbusters
+	Note: The size is variable. (indicated by size 80+)
+	      If the first parameter (maximum FMS range) is 00, no parameters are following.
+	      If it is 01 or higher, 2 additional parameters (initial delay and speed) are following.
+
+Effect Flags
+------------
+PAN_ANIM - set Pan Animation
+	command E4, size 82 (SMPS 68k) / 06 (SMPS Z80)
+	Note: In SMPS 68k, the size is variable. (indicated by size 80+)
+	      If the first parameter (animation type) is 00, no parameters are following.
+	      If it is 01 or higher, 4 additional parameters describing the animation are following.
+	      In SMPS Z80, these are always there.
+
+SET_LFO - set LFO data (sets LFO speed (first parameter, YM2612 register 22h) and AMS/FMS bits)
+	command E9, size 03
+  LFO_NORMAL - do the above and nothing else
+  LFO_AMSEN - can additionally force the "AMS Enable" bit for certain operators (4 highest bits in first parameter)
+
+SET_LFO_SPD - set LFO speed (YM2612 register 22h)
+	command E9, size 02, preSMPS
+
+PITCH_SLIDE - enable/disable Pitch Slide mode (01 = enable, disable else)
+	command FC, size 02, SMPS Z80
+	Note: After every note (and before delays) there is an additional byte speficying the slide speed.
+
+RAW_FREQ - enable/disable Raw Frequency mode (01 = enable, disable else)
+	command FD, size 02, SMPS Z80
+
+SPC_FM3 - enable Special FM3 Mode
+	command FE, size 05/09
+	Note: size 05 causes the FM3 frequencies to be read from a global FM3Freq table
+	      size 09 means that the raw frequencies are part of the command (4 frequencies x 2-byte)
+
+SSG_EG - set SSG-EG registers (4 parameters for one operator each)
+  SEG_NORMAL - do the above and nothing else
+	command FF 06/05, size 05, SMPS Z80
+  SEG_FULLATK - also force the Attack Rate of all operators to MAX (1Fh)
+	command FF 00/01, size 05, SMPS 68k
+
+
+Tempo Flags
+-----------
+TEMPO - set/increment Tempo timeout value (Tempo increment on SMPS Z80 Type 2)
+  TEMPO_SET - set Tempo value
+	command EA (SMPS 68k), FF 00 (SMPS Z80 Type 2), size 02
+  TEMPO_ADD - increment Tempo value
+	command E4 (preSMPS), FF 01 (SMPS Z80 Type 1), size 02
+
+TICK_MULT - set Tick Multiplier (the length of all notes will be multiplied with this value)
+  TMULT_CUR - set it for the current track only
+	command FA, size 02
+  TMULT_ALL - set it for all music tracks
+	command FC (SMPS 68k) / FF 05/04 (SMPS Z80), size 02
+
+TIMING - set YM2612 Timers
+	size 02 - set/change Timer B
+	size 03 - set/change Timer A, SMPS Z80 Type 1/DAC
+	size 04 - set/change Timer A and B, SMPS Z80 Type 1/FM
+  TIME_SET - set Timer value
+	command EA, size 02/03/04
+  TIME_ADD - change to Timer value by adding the parameter values to it
+	command EB, size 02/03/04
+  TIME_SPC - set/change Timers depending on the 4 high bits [TODO: explain]
+	command EB, size 03/04, Magical Hat no Buttobi Turbo! Daibouken, Timer A and/or B only
+	command FF 08, size 02, Magical Hat no Buttobi Turbo! Daibouken, Timer B only
+
+TIMING_MODE - set update timing mode (use VInt or use YM2612 timers)
+	command FF 00, size 02, SMPS Z80 Type 1
+
+
+Driver Control Flags
+--------------------
+SND_CMD - play Sound ID (or put it into the sound queue)
+	command EB (SMPS 68k) / FF 01/02 (SMPS Z80), size 02
+
+MUS_PAUSE - Pause/Resume Music
+  MUSP_Z80 - Z80 version, always resumes all channels
+	FF 02/03 (SMPS Z80), size 02
+  MUSP_68K - 68k version, uses a separate bit to indicate paused channels (more safe) and sets the Pan bits to 0 when pausing
+	command FF 01 (SMPS 68k), size 02/82
+	Note: If size is 82 and the first parameter (Pause Mode) is negative, then the music will resume with a fade in.
+	      In that case there's an additional parameter following, describing the fade speed. (special Golden Axe III command)
+	
+	In SMPSPlay, the Z80 version will use an additional bit for the Pause state, too, to prevent crashing.
+
+COPY_MEM - copy Memory bytes
+	command FF 03/04 (SMPS Z80), size 84
+	This command copies data from a specified location into the sequence.
+	The first parameter (16-bit Little Endian) is the Z80 address, the second parameter is an 8-bit byte count.
+
+FADE_IN - Fades the music in
+  FDIN_START - starts the Fade In, 2 parameters (FM volume increment, PSG volume increment)
+	FF 03 (SMPS 68k), size 03
+  FDIN_CANCEL - cancels the Fade In
+	FF 04 (SMPS 68k), size 01
+
+
+Jump and Control Flags
+----------------------
+GOTO - jump to another offset
+	command F6, size 03
+
+LOOP - repeat a section a certain amount of times by jumping to a certain offset
+	command F7, size 05
+
+LOOP_EXIT - conditional jump, executed on the last iteration of a certain loop
+	command EB, size 04, SMPS Z80 Type 2
+
+COND_JUMP - Conditional Jump
+  CJMP_NZ - jump when global value is != 0
+	command FF 07, size 03, Ristar
+  CJMP_Z - jump when global value is == 0
+  CJMP_EQ - jump when global value is == parameter
+	command EE, size 04, Golden Axe III
+  CJMP_NZ_RESET - jump when global value is != 0 and reset it to 0
+  CJMP_Z_RESET - jump when global value is == 0 and reset it to 0
+	command E3, size 03, Tempo 32x
+
+GOSUB - subroutine jump: save the current offset to the stack and jump
+	command F8, size 03
+
+RETURN - subroutine return: jump the the offset at the top of the stack
+	command F9, size 01
+
+META_CF - execute command from a second command list
+	command FF, size 01 (size without additional command data)
+
+TRK_END - terminate the current track
+  TEND_STD - just finish the track
+	command F2, size 01
+  TEND_MUTE - mute the track and finish it then
+	command E3, size 01
+
+
+Special Game-Specific Flags
+---------------------------
+FADE_IN_SONG - fade the previous song in
+	command E4, size 01, Sonic 1 - stops the track and fades the previous song in
+	command E2, size 02, Sonic 3K - puts "fade previous song in" into the sound command queue
+
+SND_OFF - Sound Off (currently writes a "maximum release rate" setting to FM 3)
+	command F9, size 01, Sonic 1
+
+NOTE_STOP_REV - Reversed Note Stop, stops the note after (Note Length - x) frames
+  NSREV_RST - stop after (Note Length - x) frames, 0 disables the effect
+	command FF 06, size 02, Ristar
+  NSREV_CYMN - stop after (Note Length - x) frames (0 stops after 256 frames)
+	command FF 07, size 02, Chou Yakyuu Miracle Nine
+
+DAC_PS4 - special DAC flags for Phantasy Star IV
+	Note: DAC_VOLCTRL is present in every song and is used to trigger PS4's special mode for the DAC channel.
+  DAC_VOLCTRL - set Volume Control mode
+	command E3, size 02
+	Values:
+		00 - disable DAC
+		01 - normal (adjustable frequency, constant volume)
+		FF - volume control (fixed frequency, volume is controlled by DAC_VOLUME)
+  DAC_VOLUME - set DAC volume (range is linear: 00h .. 10h)
+	command FC, size 02
+  DAC_SET_SND - set DAC sound (SMPS note controls frequency)
+	command EE, size 02
+  DAC_LOOP - loop DAC sound (01 - enable, else - disable)
+	command E4, size 02
+  DAC_REVERSE - play DAC sound backwards (01 - enable, else - disable)
+	command FA, size 02
+  DAC_TRKMODE - set DAC track mode (01 - notes controls DAC sound, else - note controls DAC frequency)
+	command FD, size 02
+
+DAC_CYMN - special DAC flags for Chou Yakyuu Miracle Nine
+  CYMN_CHG_CH# - change DAC channel # volume (# can be 1 or 2)
+	command FF 0A/0B, size 02
+  CYMN_SET_CH# - set DAC channel # volume (# can be 1 or 2)
+	command FF 0C/0D, size 02
+
+DAC_GAXE3 - special DAC flags for Golden Axe III
+  GA3_2NOTE_TEMP - enable 2-note mode temporarily (disabled after reading the next set of notes)
+	command E5, size 01
+  GA3_2NOTE_PERM - enable 2-note mode permanently (it will read 2 notes, one for each DAC channel)
+	command E9, size 01
+  GA3_2NOTE_OFF - disable 2-note mode
+	command ED, size 01
+
+VOL_QUICK - set Volume to (CommandID & 07)
+	commands D8..DF, size 01, Master System SMPS

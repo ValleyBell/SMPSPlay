@@ -1,0 +1,17 @@
+; --- SMPS FM/PSG Drum Definition ---
+
+[Main]
+DrumMode = Dual
+; FM Drum Mask
+Mask1 = 0F	; FM drums
+Mask2 = 70	; PSG drums
+DrumIDBase = 00
+
+[Drums]
+;Note	Type	DrumID	Pitch
+81..8F	FM	00
+90	PSG	00
+A0	PSG	01
+B0	PSG	02
+C0	PSG	03
+D0	PSG	04

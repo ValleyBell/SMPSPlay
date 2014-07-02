@@ -1,0 +1,21 @@
+; --- SMPS Drum Definition ---
+
+[Main]
+; Drum Mode
+;	Normal - one note plays a single drum
+;	Dual - one note plays 2 drums (for FM/PSG)
+;		Drum 1: 80 + (Note & Mask1)
+;		Drum 2: 80 + (Note & Mask2)
+DrumMode = Normal
+; FM Drum Mask
+Mask1 = 0F
+; PSG Drum Mask
+Mask2 = 70
+; Drum ID Base - DrumID of first sound (usually 00 for FM/PSG and 81 for DAC)
+DrumIDBase = 81
+
+; Drum Definition
+;Note	Type    DrumID	Pitch	-> assign Note to drum DrumID (Pitch overrides the DAC sample rate)
+;N1..N2	Type	DrumID	Pitch	-> assign notes N1 to drum DrumID, N1+1 to drum DrumID+1, etc.
+[Drums]
+81..DF	DAC	81

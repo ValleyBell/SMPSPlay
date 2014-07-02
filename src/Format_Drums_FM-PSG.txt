@@ -1,0 +1,15 @@
+4 bytes - Signature "SDRM" (Smps DRuM)
+1 byte  - Type
+	00 - PSG (without Instruments)
+	01 - FM (with Instruments)
+1 byte  - Drum Count
+2 bytes - Data Pointer List File Offset
+2 bytes - Data Pointer Base
+1 byte  - reserved
+1 byte  - Instrument Count
+2 bytes - Instrument Pointer List File Offset
+2 bytes - Instrument Pointer Base
+
+Note: The pointer lists can not reference to any data with a lower offsets than themselves.
+
+All pointers are Little Endian.

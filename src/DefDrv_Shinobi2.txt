@@ -1,0 +1,29 @@
+; --- SMPS 68k Driver Definition ---
+
+[Settings]
+DefTimingMode = 00
+LockTimingMode = True
+
+[Main]
+PtrFmt = 68k
+InsMode = Default
+;FMChnOrder = 16 0 1 2 4 5 6
+TempoMode = Timeout
+FMBaseNote = B
+FMBaseOctave = 0
+DetuneOctWrap = False
+NoteOnPrevent = Rest
+DelayFreq = Reset
+ModAlgo = 68k
+EnvMult = 68k
+VolMode = Algo
+FMFreqs = Def_68k
+PSGFreqs = Def_68k
+FM3Freqs = $000 $180 $1F4 $260
+
+[EnvelopeCmds]
+80 = RESET
+81 = HOLD
+82 = LOOP
+83 = STOP
+84 = CHG_MULT

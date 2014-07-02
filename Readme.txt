@@ -1,0 +1,72 @@
+SMPS Player
+===========
+by Valley Bell
+
+Version 2.00 (2014-07-01)
+
+
+This program plays SMPS music files, a format commonly used in games for the Sega MegaDrive/Genesis.
+
+
+Features
+--------
+- accurate playback of MegaDrive SMPS files (maybe not 100% accurate for a few special driver variations, but the differences should be inaudible)
+- fully customizable SMPS commands and drums
+- many SMPS driver settings, incl. FM/PSG frequencies and modulation/volume envelope commands
+- separate SMPS settings for every file extention
+- support for a wide range of SMPS effects
+- support for FM, PSG and DAC on the drum channel and mixed drums (FM/PSG is common)
+- global FM instrument tables
+- clean DAC playback, with frequencies based on Z80 cycle calculations
+- multichannel DAC playback for games like Ristar, with adjustable DAC mixing volume
+- supports compressed (DPCM) and uncompressed (PCM) DAC sounds and DAC banks
+- VGM logging (v1.60) incl. automatic looping
+
+
+Keys
+----
+- Cursor Up/Down - change song
+- Enter - play
+- Space - pause/resume
+- N - next song
+- A - automatic progessing (plays the next song when a song is finished or played 2 full loops)
+- P - PAL mode on/off (affects only games that use VInt for timing)
+- S - stop and mute music (calls the StopAllSound SMPS routine)
+- F - fade music out (calls FadeOutMusic SMPS routine)
+- V - enable/disable VGM logging
+- ESC - quit
+
+
+In order to play the SMPS files of a certain game, you need to load that game's config.ini.
+This is done by editing the config.ini in the folder where the SMPSPlay executable lies.
+
+
+A note about offsets for SMPS Z80-based songs:
+In some cases, the autodetection for the in-ROM start offset of the song fails. Then you need to specify the original Z80 offset of the song. This can be done with the following file name format:
+Title.oooo.ext
+oooo is a 4-digit hexadecimal number and represents the original Z80 offset of the song. (It MUST be 4-digits long or it will be ignored.)
+This technique can also be used to specify the original start address of instrument tables.
+
+
+
+Credits
+-------
+This program was written by Valley Bell.
+
+The sound emulation uses sound cores from MAME.
+The wave playback code was taken from VGMPlay.
+The SMPS engine code is based on disassemblies of various SMPS sound drivers.
+
+A huge thanks to the developers of IDA, The Interactive Disassembler. Disassembling the SMPS sound drivers would've been a lot harder without this great tool.
+
+
+
+History
+-------
+2014-07-01
+	First real public release. v2.00
+2014-05-04
+	MainMemory releases SMPSOUT.DLL, a music DLL for Sonic & Knuckles PC Collection.
+	I lent him much of the code I had written for SMPSPlay at that time.
+2014-02-20
+	Begin of the project - a complete rewrite of SMPSPlay.

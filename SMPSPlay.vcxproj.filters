@@ -1,0 +1,144 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Ressourcendateien">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Sound Emulation">
+      <UniqueIdentifier>{f84ab307-ede8-4ff8-b11f-0a88f5583547}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Libraries">
+      <UniqueIdentifier>{0da5c457-5695-4ff7-be72-810eed024b2d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ReadMe.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\dirent.c">
+      <Filter>Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Stream.c">
+      <Filter>Sound Emulation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Sound.c">
+      <Filter>Sound Emulation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\chips\sn76496.c">
+      <Filter>Sound Emulation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\chips\sn764intf.c">
+      <Filter>Sound Emulation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\chips\fm2612.c">
+      <Filter>Sound Emulation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\chips\2612intf.c">
+      <Filter>Sound Emulation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\dac.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\loader_data.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\loader_def.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\smps.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\smps_commands.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\smps_drums.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\vgmwrite.c">
+      <Filter>Sound Emulation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\loader_smps.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\smps_extra.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\ini_lib.c">
+      <Filter>Libraries</Filter>
+    </ClCompile>
+    <ClCompile Include="src\loader_ini.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\stdtype.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\stdbool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\dirent.h">
+      <Filter>Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Stream.h">
+      <Filter>Sound Emulation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Sound.h">
+      <Filter>Sound Emulation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\chips\fm.h">
+      <Filter>Sound Emulation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\chips\2612intf.h">
+      <Filter>Sound Emulation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\chips\sn76496.h">
+      <Filter>Sound Emulation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\chips\sn764intf.h">
+      <Filter>Sound Emulation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\smps.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\smps_int.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\smps_structs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\smps_structs_int.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\dac.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\vgmwrite.h">
+      <Filter>Sound Emulation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\loader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\chips\mamedef.h">
+      <Filter>Sound Emulation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\ini_lib.h">
+      <Filter>Libraries</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\smps_commands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
