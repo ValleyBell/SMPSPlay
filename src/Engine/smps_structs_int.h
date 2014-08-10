@@ -35,6 +35,18 @@ typedef struct _lfo_modulation
 	UINT8 ToutInit;		// 15 - delay between FMS increments (reset value for Timeout)
 	UINT8 MaxFMS;		// 16 - destination FMS value
 } LFO_MOD;
+#define ADSRM_REPT_AD	0x08	// repeat Attack/Decay phase
+typedef struct _adsr_volume_data
+{
+	UINT8 State;		// 1D - ADSR Envelope State (current Phase and Mode bits)
+	UINT8 Mode;			// 1E
+	UINT8 Level;		// 1F - Volume Level
+	UINT8 AtkRate;		// 20 - Attack Rate
+	UINT8 DecRate;		// 21 - Decay Rate
+	UINT8 DecLvl;		// 22 - Decay Level
+	UINT8 SusRate;		// 23 - Sustain Rate
+	UINT8 RelRate;		// 24 - Release Rate
+} ADSR_DATA;
 
 #define TRK_STACK_SIZE		8
 #define PBKFLG_SPCMODE		0x01	// Bit 0 - Special Mode (Special FM 3 or Noise) [Z80 only]
@@ -46,6 +58,7 @@ typedef struct _lfo_modulation
 #define PBKFLG_LOCKFREQ		0x40	// Bit 6 - lock frequency [Z80 only]
 #define PBKFLG_ACTIVE		0x80	// Bit 7 - track is active
 #define PBKFLG_PAUSED		0x100	// Bit 8 - track was paused via coordination flags [68k only]
+#define PBKFLG_HOLD_ALL		0x200	// Bit 9 - hold all coming notes [preSMPS Z80 only]
 typedef struct _track_ram
 {
 	SMPS_CFG* SmpsCfg;
@@ -75,6 +88,7 @@ typedef struct _track_ram
 	INT16 Detune;		// 10 - Frequency Detune or Pitch Slide Speed
 	PAN_ANIM PanAni;	// 11-16 - Pan Animation
 	LFO_MOD LFOMod;		// 11-16 - LFO Modulation (Ghostbusters only)
+	ADSR_DATA ADSR;		// 1D-24 - ADSR Data (Sonic 2 SMS only)
 	UINT8 VolEnvIdx;	// 17 - Volume Envelope Index
 	UINT8 VolEnvCache;	// [not in driver]
 	union
@@ -180,7 +194,7 @@ typedef struct _sound_ram
 	UINT8 TimerBVal;	// 1C06 - YM2612 Timer B Value (for SFX Timing)
 	// 1C07 - Timing Mode:
 	//		00 - update all on Vertical Interrupt (NTSC: 60 Hz/PAL: 50 Hz)
-	//		20 - update all when YM2612 Timer A expires [not in actual driver]
+	//		20 - update all when YM2612 Timer A expires [SMPS Z80 Type 1/DAC only]
 	//		40 - update all when YM2612 Timer B expires (Note: often used with Timer B = CBh)
 	//		80 - update music when Timer A expires, update SFX when Timer B expires
 	UINT8 TimingMode;
@@ -194,7 +208,7 @@ typedef struct _sound_ram
 	UINT8 DacChVol[2];	// 1C07/1C08 - Chou Yakyuu Miracle Nine DAC channel volume
 	
 	// SMPS Z80 Type 2:
-	// 1C00/1C01 - ??? (unused)
+	// 1C00/1C01 - [unused]
 	// 1C02/1C03 - Pointer List Offset
 	// 1C04/1C05 - DAC Bank
 	// 1C06/1C07 - Music/SFX Data Bank
@@ -212,6 +226,7 @@ typedef struct _sound_ram
 	UINT8 MusicPaused;		// 1C11
 	// 1C11 - Music is paused via in-sequence commands
 	UINT8 SpcFM3Mode;		// 1C12 - Special FM3 Mode Bits (YM2612 Register 027)
+	UINT8 NoiseDrmVol;		// DD16 - Base Volume for Noise Drums [Master System SMPS only]
 	UINT8 MusMultUpdate;	// Music Multi-Update (number of times the music will get processed)
 	UINT8 TempoCntr;		// 1C13 - Tempo Counter/Tempo Timeout
 	UINT8 TempoInit;		// 1C14 - Initial Tempo Value

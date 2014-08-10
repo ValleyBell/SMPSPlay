@@ -19,7 +19,8 @@ struct _smps_extention_definition
 	
 	char* DriverFile;
 	char* CmdFile;
-	char* DrumFile;
+	char* DrumDefFile;
+	char* PSGDrumDefFile;
 	char* ModEnvFile;
 	char* VolEnvFile;
 	char* PanAniFile;
@@ -63,6 +64,9 @@ void FreeCommandDefinition(SMPS_CFG* SmpsCfg);
 
 void LoadDrumDefinition(const char* FileName, DRUM_LIB* DrumDef);
 void FreeDrumDefinition(DRUM_LIB* DrumDef);
+
+void LoadPSGDrumDefinition(const char* FileName, PSG_DRUM_LIB* DrumDef);
+void FreePSGDrumDefinition(PSG_DRUM_LIB* DrumDef);
 
 UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode);
 void FreeDrumTracks(DRUM_TRK_LIB* DrumLib);

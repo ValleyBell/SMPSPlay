@@ -34,6 +34,8 @@ static void ApplyCommandFlags(UINT8 FlagCnt, const UINT8* IDList, const CMD_FLAG
 //void LoadDrumDefinition(const char* FileName, DRUM_LIB* DrumDef);
 static UINT8 GetShiftFromMask(UINT8 Mask);
 //void FreeDrumDefinition(DRUM_LIB* DrumDef);
+//void LoadPSGDrumDefinition(const char* FileName, PSG_DRUM_LIB* DrumDef);
+//void FreePSGDrumDefinition(PSG_DRUM_LIB* DrumDef);
 
 
 
@@ -57,6 +59,10 @@ static const OPT_LIST OPT_TEMPOMODE[] =
 static const OPT_LIST OPT_FMBASENOTE[] =
 {	{"B", FMBASEN_B},
 	{"C", FMBASEN_C},
+	{NULL, 0}};
+static const OPT_LIST OPT_PSGBASENOTE[] =
+{	{"C", PSGBASEN_C},
+	{"B", PSGBASEN_B},
 	{NULL, 0}};
 static const OPT_LIST OPT_DELAYFREQ[] =
 {	{"RESET", DLYFREQ_RESET},
@@ -180,6 +186,8 @@ static const UINT8 PSGCHN_ORDER[3] = {0x80, 0xA0, 0xC0};
 
 static const OPT_LIST OPT_CFLAGS[] =
 {	{"IGNORE", CF_IGNORE},
+	{"INVALID", CF_INVALID},
+	
 	{"PANAFMS", CF_PANAFMS},
 	{"DETUNE", CF_DETUNE},
 	{"SET_COMM", CF_SET_COMM},
@@ -200,6 +208,7 @@ static const OPT_LIST OPT_CFLAGS[] =
 	{"MOD_ENV", CF_MOD_ENV},
 	{"FM_VOLENV", CF_FM_VOLENV},
 	{"LFO_MOD", CF_LFO_MOD},
+	{"ADSR", CF_ADSR},
 	
 	{"PAN_ANIM", CF_PAN_ANIM},
 	{"SET_LFO", CF_SET_LFO},
@@ -236,7 +245,7 @@ static const OPT_LIST OPT_CFLAGS[] =
 	
 	{"VOL_QUICK", CFSMS_VOL_QUICK},
 	
-	{NULL, CF_IGNORE}};
+	{NULL, CF_INVALID}};
 
 static const OPT_LIST OPT_CFLAGS_SUB[] =
 {	{"", 0x00},
@@ -265,6 +274,8 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"VOL_ABS_HF2", CFS_VOL_ABS_HF2},
 	{"VOL_ABS_TMP", CFS_VOL_ABS_TMP},
 	{"VOL_SPC_TMP", CFS_VOL_SPC_TMP},
+	{"VOL_ABS_PDRM", CFS_VOL_ABS_PDRM},
+	{"VOL_CHG_PDRM", CFS_VOL_CHG_PDRM},
 	
 	{"NSTOP_NORMAL", CFS_NSTOP_NORMAL},
 	{"NSTOP_MULT", CFS_NSTOP_MULT},
@@ -281,6 +292,7 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"INS_N_PSG", CFS_INS_N_PSG},
 	{"INS_C_FM", CFS_INS_C_FM},
 	{"INS_C_PSG", CFS_INS_C_PSG},
+	{"INS_C_FMP", CFS_INS_C_FMP},
 	
 	{"PNOIS_SET", CFS_PNOIS_SET},
 	{"PNOIS_SET2", CFS_PNOIS_SET2},
@@ -298,6 +310,9 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"MENV_GEN", CFS_MENV_GEN},
 	{"MENV_FMP", CFS_MENV_FMP},
 	{"MENV_GEN2", CFS_MENV_GEN2},
+	
+	{"ADSR_SETUP", CFS_ADSR_SETUP},
+	{"ADSR_MODE", CFS_ADSR_MODE},
 	
 	{"LFO_NORMAL", CFS_LFO_NORMAL},
 	{"LFO_AMSEN", CFS_LFO_AMSEN},
@@ -502,6 +517,8 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				SmpsCfg->FMBaseNote = GetOptionValue(OPT_FMBASENOTE, RToken1);
 			else if (! _stricmp(LToken, "FMBaseOctave"))
 				SmpsCfg->FMBaseOct = strtoul(RToken1, NULL, 0) & 7;
+			else if (! _stricmp(LToken, "PSGBaseNote"))
+				SmpsCfg->PSGBaseNote = GetOptionValue(OPT_PSGBASENOTE, RToken1);
 			else if (! _stricmp(LToken, "DelayFreq"))
 				SmpsCfg->DelayFreq = GetOptionValue(OPT_DELAYFREQ, RToken1);
 			else if (! _stricmp(LToken, "NoteOnPrevent"))
@@ -777,7 +794,7 @@ static void ApplyCommandFlags(UINT8 FlagCnt, const UINT8* IDList, const CMD_FLAG
 		}
 		else
 		{
-			TempCF->Type = CF_IGNORE;
+			TempCF->Type = CF_INVALID;
 			TempCF->Len = 0x01;
 		}
 	}
@@ -916,9 +933,8 @@ void LoadDrumDefinition(const char* FileName, DRUM_LIB* DrumDef)
 	char* RToken;
 	UINT8 Group;
 	UINT8 RetVal;
-	UINT8 CurCol;
-#define MAX_COLUMNS	5
-	char* ColumnPtrs[MAX_COLUMNS];
+#define DDEF_COLUMNS	5
+	char* ColumnPtrs[DDEF_COLUMNS];
 	UINT16 DrumIDBase;
 	DRUM_DATA* TempDrum;
 	UINT8 DrumNote;
@@ -949,6 +965,7 @@ void LoadDrumDefinition(const char* FileName, DRUM_LIB* DrumDef)
 		if (RetVal)
 			break;
 		
+		LToken = LineStr;
 		RetVal = GetTokenPtrs(LineStr, &LToken, &RToken);
 		if (*LToken == '[')
 		{
@@ -983,22 +1000,7 @@ void LoadDrumDefinition(const char* FileName, DRUM_LIB* DrumDef)
 		}
 		else if (Group == 0x01)	// [Drums] group
 		{
-			ColumnPtrs[0] = LineStr;
-			for (CurCol = 1; CurCol < MAX_COLUMNS; CurCol ++)
-			{
-				RetVal = GetNextToken_Tab(&ColumnPtrs[CurCol - 1], &ColumnPtrs[CurCol]);
-				if (RetVal || ColumnPtrs[CurCol] == NULL)
-					break;
-			}
-			if (CurCol < MAX_COLUMNS)
-			{
-				for (; CurCol < MAX_COLUMNS; CurCol ++)
-					ColumnPtrs[CurCol] = NULL;
-			}
-			else
-			{
-				TrimToken(ColumnPtrs[CurCol - 1]);
-			}
+			GetColumns_Tab(LineStr, DDEF_COLUMNS, ColumnPtrs);
 			if (ColumnPtrs[2] == NULL)
 				continue;	// need at least the Len column
 			
@@ -1070,6 +1072,100 @@ static UINT8 GetShiftFromMask(UINT8 Mask)
 }
 
 void FreeDrumDefinition(DRUM_LIB* DrumDef)
+{
+	DrumDef->DrumCount = 0x00;
+	free(DrumDef->DrumData);	DrumDef->DrumData = NULL;
+	
+	return;
+}
+
+void LoadPSGDrumDefinition(const char* FileName, PSG_DRUM_LIB* DrumDef)
+{
+	FILE* hFile;
+	char LineStr[0x100];
+	char* LToken;
+	char* RToken;
+	UINT8 Group;
+	UINT8 RetVal;
+#define PSG_DDEF_COLUMNS	7
+	char* ColumnPtrs[PSG_DDEF_COLUMNS];
+	PSG_DRUM_DATA* TempDrum;
+	UINT8 DrumNote;
+	
+	hFile = fopen(FileName, "rt");
+	if (hFile == NULL)
+	{
+		printf("Error opening %s\n", FileName);
+		return;
+	}
+	
+	DrumDef->DrumCount = 0x60;
+	DrumDef->DrumData = (PSG_DRUM_DATA*)malloc(DrumDef->DrumCount * sizeof(PSG_DRUM_DATA));
+	memset(DrumDef->DrumData, 0x00, DrumDef->DrumCount * sizeof(PSG_DRUM_DATA));
+	
+	Group = 0x01;
+	while(! feof(hFile))
+	{
+		RetVal = GetTextLine(0x100, LineStr, hFile);
+		if (RetVal)
+			break;
+		
+		// We inizialize LToken to ensure that we don't crash if the first line is a non-section line.
+		// In that case GetTokenPtrs() doesn't set LToken (and returns an 'invalid line' code).
+		LToken = LineStr;
+		RetVal = GetTokenPtrs(LineStr, &LToken, &RToken);
+		if (*LToken == '[')
+		{
+			// [Section]
+			/*if (! _stricmp(RToken, "Main"))
+				Group = 0x00;
+			else*/ if (! _stricmp(RToken, "Drums"))
+				Group = 0x01;
+			else
+				Group = 0xFF;
+			continue;
+		}
+		else if (Group == 0xFF)
+		{
+			continue;
+		}
+		
+		if (Group == 0x01)	// [Drums] group
+		{
+			GetColumns_Tab(LineStr, PSG_DDEF_COLUMNS, ColumnPtrs);
+			if (ColumnPtrs[3] == NULL)
+				continue;	// need at least the Noise Mode column
+			
+			DrumNote = (UINT8)strtoul(ColumnPtrs[0], &RToken, 0x10);
+			if (DrumNote < 0x80 || DrumNote >= 0x80 + DrumDef->DrumCount)
+				continue;
+			
+			TempDrum = &DrumDef->DrumData[DrumNote & 0x7F];
+			// main values for PSG noise channel
+			TempDrum->NoiseMode = (UINT8)strtoul(ColumnPtrs[1], NULL, 0x10);
+			TempDrum->VolEnv = (UINT8)strtoul(ColumnPtrs[2], NULL, 0x10);
+			TempDrum->Volume = (UINT8)strtoul(ColumnPtrs[3], NULL, 0x10);
+			// defaults for PSG 3 channel (i.e. not used)
+			TempDrum->Ch3Vol = 0xFF;
+			TempDrum->Ch3Freq = 0xFFFF;
+			TempDrum->Ch3Slide = 0x00;
+			// if the Ch3Freq column is present, handle Ch3 columns
+			if (ColumnPtrs[5] != NULL)
+			{
+				TempDrum->Ch3Vol = (UINT8)strtoul(ColumnPtrs[4], NULL, 0x10);
+				TempDrum->Ch3Freq = (UINT16)strtoul(ColumnPtrs[5], NULL, 0x10);
+				if (ColumnPtrs[6] != NULL)	// Ch3Slide is optional
+					TempDrum->Ch3Slide = (UINT8)strtoul(ColumnPtrs[6], NULL, 0x10);
+			}
+		}
+	}
+	
+	fclose(hFile);
+	
+	return;
+}
+
+void FreePSGDrumDefinition(PSG_DRUM_LIB* DrumDef)
 {
 	DrumDef->DrumCount = 0x00;
 	free(DrumDef->DrumData);	DrumDef->DrumData = NULL;

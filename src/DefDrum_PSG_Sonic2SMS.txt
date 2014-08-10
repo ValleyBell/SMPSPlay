@@ -1,0 +1,7 @@
+;Note	NMode	Env	Vol	Ch3Vol	Ch3Freq	Slide
+88	E4	3	2
+82	E4	3	2
+A0	E4	4	4
+90	E6	3	3
+84	E5	2	2
+81	E4	1	2

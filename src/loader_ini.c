@@ -70,7 +70,8 @@ static SMPS_EXT_DEF* GetNewExtentionData(EXT_LIST* ExtList, const char* ExtStr)
 	TempExt->EqualExt = NULL;
 	TempExt->DriverFile = NULL;
 	TempExt->CmdFile = NULL;
-	TempExt->DrumFile = NULL;
+	TempExt->DrumDefFile = NULL;
+	TempExt->PSGDrumDefFile = NULL;
 	TempExt->ModEnvFile = NULL;
 	TempExt->VolEnvFile = NULL;
 	TempExt->PanAniFile = NULL;
@@ -225,7 +226,9 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 				else if (! _stricmp(LToken, "Commands"))
 					strdup_free(&ExtData->CmdFile, PathBuf);
 				else if (! _stricmp(LToken, "Drums"))
-					strdup_free(&ExtData->DrumFile, PathBuf);
+					strdup_free(&ExtData->DrumDefFile, PathBuf);
+				else if (! _stricmp(LToken, "PSGDrumDef"))
+					strdup_free(&ExtData->PSGDrumDefFile, PathBuf);
 				else if (! _stricmp(LToken, "ModEnv"))
 					strdup_free(&ExtData->ModEnvFile, PathBuf);
 				else if (! _stricmp(LToken, "VolEnv"))
@@ -283,8 +286,10 @@ void FreeConfigurationFiles(CONFIG_DATA* CfgData)
 			free(ExtDef->DriverFile);
 		if (ExtDef->CmdFile != NULL)
 			free(ExtDef->CmdFile);
-		if (ExtDef->DrumFile != NULL)
-			free(ExtDef->DrumFile);
+		if (ExtDef->DrumDefFile != NULL)
+			free(ExtDef->DrumDefFile);
+		if (ExtDef->PSGDrumDefFile != NULL)
+			free(ExtDef->PSGDrumDefFile);
 		if (ExtDef->ModEnvFile != NULL)
 			free(ExtDef->ModEnvFile);
 		if (ExtDef->VolEnvFile != NULL)
@@ -329,9 +334,13 @@ static void LoadExtData_Single(SMPS_EXT_DEF* ExtDef)
 	{
 		LoadCommandDefinition(ExtDef->CmdFile, SmpsCfg);
 	}
-	if (ExtDef->DrumFile != NULL)
+	if (ExtDef->DrumDefFile != NULL)
 	{
-		LoadDrumDefinition(ExtDef->DrumFile, &SmpsCfg->DrumLib);
+		LoadDrumDefinition(ExtDef->DrumDefFile, &SmpsCfg->DrumLib);
+	}
+	if (ExtDef->PSGDrumDefFile != NULL)
+	{
+		LoadPSGDrumDefinition(ExtDef->PSGDrumDefFile, &SmpsCfg->PSGDrumLib);
 	}
 	if (ExtDef->ModEnvFile != NULL)
 	{
@@ -395,6 +404,7 @@ void FreeSMPSConfiguration(SMPS_CFG* SmpsCfg)
 	FreeDriverDefinition(SmpsCfg);
 	FreeCommandDefinition(SmpsCfg);
 	FreeDrumDefinition(&SmpsCfg->DrumLib);
+	FreePSGDrumDefinition(&SmpsCfg->PSGDrumLib);
 	FreeEnvelopeData(&SmpsCfg->ModEnvs);
 	FreeEnvelopeData(&SmpsCfg->VolEnvs);
 	FreePanAniData(&SmpsCfg->PanAnims);

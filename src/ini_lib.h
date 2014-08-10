@@ -11,8 +11,10 @@ UINT8 GetTokenPtrs(char* Buffer, char** TokenL, char** TokenR);
 UINT8 GetNextToken_Tab(char** Buffer_TokenL, char** TokenR);
 char* TrimToken(char* Buffer);
 void RevertTokenTrim(char* TokenL, const char* TokenR);
-UINT32 ParseNumber(char* Token, char** NextToken, char** RetParseEnd);
 
+void GetColumns(char* TextStr, UINT8 MaxCols, char** ColumnPtrs);
+void GetColumns_Tab(char* TextStr, UINT8 MaxCols, char** ColumnPtrs);
+UINT32 ParseNumber(char* Token, char** NextToken, char** RetParseEnd);
 UINT8 GetBoolValue(const char* Token, const char* StrTrue, const char* StrFalse);
 
 // Functions to handle paths in .ini-files

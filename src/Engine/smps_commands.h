@@ -5,6 +5,8 @@
 // ======================
 
 #define CF_IGNORE				0x00
+#define CF_INVALID				0xFF
+
 // General Flags
 // -------------
 #define CF_PANAFMS				0x01	// E0
@@ -41,6 +43,8 @@
 	#define CFS_VOL_ABS_HF2			0x82	// E5 [Hybrid Front] (broken, like FF 07 with first parameter ignored)
 	#define CFS_VOL_ABS_TMP			0x83	// E4 [Tempo 32x]
 	#define CFS_VOL_SPC_TMP			0x84	// E6 [Tempo 32x] (change FM volume, set PSG volume)
+	#define CFS_VOL_ABS_PDRM		0xC0
+	#define CFS_VOL_CHG_PDRM		0xC1	// E4 [Master System SMPS]
 #define CF_HOLD					0x05	// E7 (known as "no attack")
 #define CF_NOTE_STOP			0x06	// E8
 	#define CFS_NSTOP_NORMAL		0x00	// SMPS 68k
@@ -56,6 +60,7 @@
 #define CF_INSTRUMENT			0x08	// EF/F5
 	#define CFS_INS_FM				0x00	// EF
 	#define CFS_INS_PSG				0x01	// F5
+	#define CFS_INS_FMP				0x02	// EF [Sonic 3K]
 	#define CFS_INS_IMASK			0x0F
 	#define CFS_INS_N				0x00	// no channel check
 	#define CFS_INS_C				0x10	// with channel check
@@ -64,6 +69,7 @@
 	#define CFS_INS_N_PSG			(CFS_INS_N | CFS_INS_PSG)
 	#define CFS_INS_C_FM			(CFS_INS_C | CFS_INS_FM)
 	#define CFS_INS_C_PSG			(CFS_INS_C | CFS_INS_PSG)
+	#define CFS_INS_C_FMP			(CFS_INS_C | CFS_INS_FMP)
 #define CF_PSG_NOISE			0x09	// F3 (set PSG Noise)
 	#define CFS_PNOIS_SET			0x00	// F3 [SMPS 68k]
 	#define CFS_PNOIS_SET2			0x01	// F3 [early SMPS Z80]
@@ -87,6 +93,9 @@
 	#define CFS_MENV_GEN2			0x02	// F1 (broken, always uses second param) [Tempo 32x]
 #define CF_FM_VOLENV			0x23	// FF 07 [SMPS Z80] (enable FM volume envelope)
 #define CF_LFO_MOD				0x24	// E2 [Ghostbusters]
+#define CF_ADSR					0x25
+	#define CFS_ADSR_SETUP			0x00	// E0 [Sonic 2 SMS]
+	#define CFS_ADSR_MODE			0x01	// E5 [Sonic 2 SMS]
 
 // Effect Flags
 // ------------

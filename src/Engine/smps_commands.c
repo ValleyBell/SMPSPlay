@@ -205,7 +205,22 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		CmdLen = cfVolume(Trk, CFlag, &Data[0x00]);
 		break;
 	case CF_HOLD:		// E7 Hold Note
-		Trk->PlaybkFlags |= PBKFLG_HOLD;
+		if (CmdLen < 0x02)
+		{
+			Trk->PlaybkFlags |= PBKFLG_HOLD;
+		}
+		else
+		{
+			if (Data[0x00] == 0x01)
+			{
+				Trk->PlaybkFlags |= PBKFLG_HOLD_ALL;
+			}
+			else
+			{
+				Trk->PlaybkFlags &= ~PBKFLG_HOLD_ALL;
+				DoNoteOff(Trk);
+			}
+		}
 		break;
 	case CF_NOTE_STOP:	// E8 Note Stop
 		TempByt = Data[0x00];
@@ -245,10 +260,24 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		}
 		break;
 	case CF_INSTRUMENT:	// EF/F5 Set Instrument
-		if ((CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FM)	// EF Set FM Instrument
+		if ((CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FM ||	// EF Set FM Instrument
+			(CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FMP)
 		{
 			INS_LIB* InsLib = Trk->SmpsCfg->InsLib;
 			const UINT8* InsPtr;
+			
+			if ((CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FMP && (Trk->ChannelMask & 0x80))
+			{
+				// [Sonic 3K] The PSG instrument is set for the EF flag, too.
+				Trk->Instrument = Data[0x00];
+				if (Trk->Instrument > Trk->SmpsCfg->VolEnvs.EnvCount)
+				{
+					if (DebugMsgs & 0x01)
+						printf("Error: Invalid PSG instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
+					Trk->Instrument = 0x00;
+				}
+				// Then continue handling variable command length
+			}
 			
 			if (CmdLen & 0x80)
 			{
@@ -285,14 +314,20 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				if ((CFlag->SubType & CFS_INS_CMASK) == CFS_INS_C)
 				{
 					if (Trk->ChannelMask & 0x80)
-						break;	// PSG channel - return [Note: SMPS Z80 only]
+						break;	// PSG channel - return [SMPS Z80]
 				}
 				
 				Trk->Instrument = Data[0x00];
 				TempByt = Trk->Instrument;
 			}
-			if (InsLib == NULL || TempByt >= InsLib->InsCount)
+			if (InsLib == NULL)
 				break;
+			if (TempByt >= InsLib->InsCount)
+			{
+				if (DebugMsgs & 0x01)
+					printf("Error: Invalid FM instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
+				break;
+			}
 			InsPtr = InsLib->InsPtrs[TempByt];
 			SendFMIns(Trk, InsPtr);
 		}
@@ -301,7 +336,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			if ((CFlag->SubType & CFS_INS_CMASK) == CFS_INS_C)
 			{
 				if (! (Trk->ChannelMask & 0x80))
-					break;	// FM channel - return [Note: SMPS Z80 only]
+					break;	// FM channel - return [SMPS Z80]
 			}
 			
 			Trk->Instrument = Data[0x00];
@@ -310,7 +345,6 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				if (DebugMsgs & 0x01)
 					printf("Error: Invalid PSG instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
 				Trk->Instrument = 0x00;
-				//Trk->NStopInit = 2;
 			}
 		}
 		break;
@@ -621,6 +655,22 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			Trk->LFOMod.Timeout = Data[0x02];
 			Trk->LFOMod.ToutInit = Data[0x02];
 			CmdLen += 0x02;
+		}
+		break;
+	case CF_ADSR:
+		switch(CFlag->SubType)
+		{
+		case CFS_ADSR_SETUP:
+			Trk->Instrument = 0x80;	// enable ADSR
+			Trk->ADSR.AtkRate = Data[0x00];
+			Trk->ADSR.DecRate = Data[0x01];
+			Trk->ADSR.DecLvl  = Data[0x02];
+			Trk->ADSR.SusRate = Data[0x03];
+			Trk->ADSR.RelRate = Data[0x04];
+			break;
+		case CFS_ADSR_MODE:
+			Trk->ADSR.Mode = Data[0x00] ? ADSRM_REPT_AD : 0x00;
+			break;
 		}
 		break;
 	// Effect Flags
@@ -1249,6 +1299,13 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 				Trk->Volume += Params[0x00];	// FM channel - change volume
 				RefreshVolume(Trk);
 			}
+			break;
+		case CFS_VOL_ABS_PDRM:
+			SmpsRAM.NoiseDrmVol = Params[0x00];
+			break;
+		case CFS_VOL_CHG_PDRM:
+			SmpsRAM.NoiseDrmVol += Params[0x00];
+			//SmpsRAM.NoiseDrmVol &= 0x0F;	// done by the actual driver, but causes bugs with Fading
 			break;
 		}
 //		break;

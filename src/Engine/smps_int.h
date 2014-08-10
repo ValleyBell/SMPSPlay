@@ -20,14 +20,17 @@ void UpdateSFX(void);
 INLINE void UpdateTrack(TRK_RAM* Trk);
 static void UpdateFMTrack(TRK_RAM* Trk);
 static void UpdatePSGTrack(TRK_RAM* Trk);
+static void UpdatePSGVolume(TRK_RAM* Trk, UINT8 WasNewNote);
 static void UpdateDrumTrack(TRK_RAM* Trk);
 static void UpdatePWMTrack(TRK_RAM* Trk);
+static void UpdatePSGNoiseTrack(TRK_RAM* Trk);
 
 static void SendFMFrequency(TRK_RAM* Trk, UINT16 Freq);
 INLINE UINT16* GetFM3FreqPtr(void);
 static void SendPSGFrequency(TRK_RAM* Trk, UINT16 Freq);
 
 static void TrkUpdate_Proc(TRK_RAM* Trk);
+static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration);
 static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd);
 
 static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue);
@@ -40,9 +43,12 @@ static INT16 DoCustomModulation(TRK_RAM* Trk);
 static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID);
 static UINT8 DoVolumeEnvelope(TRK_RAM* Trk, UINT8 EnvID);
 static UINT8 DoEnvelope(const ENV_DATA* EnvData, const UINT8* EnvCmds, UINT8* EnvIdx, UINT8* EnvMult);
+static void PrepareADSR(TRK_RAM* Trk);
+static UINT8 DoADSR(TRK_RAM* Trk);
 
 void DoNoteOn(TRK_RAM* Trk);
 void DoNoteOff(TRK_RAM* Trk);
+static void DoPSGNoteOff(TRK_RAM* Trk);
 static UINT16 DoPitchSlide(TRK_RAM* Trk);
 void SendFMIns(TRK_RAM* Trk, const UINT8* InsData);
 void RefreshVolume(TRK_RAM* Trk);
@@ -79,6 +85,7 @@ void RefreshDACVolume(TRK_RAM* Trk, UINT8 DacMode, UINT8 DacChn, UINT8 Volume);
 // smps_drum.c
 void PlayDrumNote(TRK_RAM* Trk, UINT8 Note);
 void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note);
+void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note);
 
 
 #endif	// __SMPS_INT_H__

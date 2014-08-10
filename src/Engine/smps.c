@@ -262,7 +262,12 @@ INLINE void UpdateTrack(TRK_RAM* Trk)
 		return;
 	
 	if (Trk->ChannelMask & 0x80)
-		UpdatePSGTrack(Trk);
+	{
+		if (Trk->ChannelMask & 0x10)
+			UpdatePSGNoiseTrack(Trk);
+		else
+			UpdatePSGTrack(Trk);
+	}
 	else if (Trk->ChannelMask & 0x10)
 	{
 		if (Trk->ChannelMask & 0x08)
@@ -365,6 +370,7 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 			return;
 		
 		PrepareModulat(Trk);
+		PrepareADSR(Trk);
 		if (Trk->SmpsCfg->DelayFreq == DLYFREQ_RESET && (Trk->Frequency & 0x8000))
 		{
 			Trk->PlaybkFlags |= PBKFLG_ATREST;
@@ -403,9 +409,7 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 			Trk->NStopTout --;
 			if (! Trk->NStopTout)
 			{
-				//SetRest:
-				Trk->PlaybkFlags |= PBKFLG_ATREST;
-				DoNoteOff(Trk);
+				DoPSGNoteOff(Trk);
 				return;
 			}
 		}
@@ -420,45 +424,51 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 	if (WasNewNote || (Trk->PlaybkFlags & PBKFLG_PITCHSLIDE) || FreqUpdate == 0x01)
 		SendPSGFrequency(Trk, Freq);
 	
-	// Do PSG Volume:
+	UpdatePSGVolume(Trk, WasNewNote);
+	return;
+}
+
+static void UpdatePSGVolume(TRK_RAM* Trk, UINT8 WasNewNote)
+{
+	UINT8 FinalVol;
+	UINT8 EnvVol;
+	
+	FinalVol = Trk->Volume;
+	if (Trk->Instrument)
 	{
-		UINT8 FinalVol;
-		UINT8 EnvVol;
-		
-		FinalVol = Trk->Volume;
-		if (Trk->Instrument)
-		{
+		if (Trk->Instrument & 0x80)
+			EnvVol = DoADSR(Trk);
+		else
 			EnvVol = DoVolumeEnvelope(Trk, Trk->Instrument);
-			if (EnvVol & 0x80)
-			{
-				if (EnvVol == 0x81)	// SMPS Z80 does it for 0x80, too, but that breaks the Note Stop effect
-				{
-					Trk->PlaybkFlags |= PBKFLG_ATREST;
-					return;
-				}
-				else if (! WasNewNote)
-				{
-					return;
-				}
-				EnvVol = Trk->VolEnvCache;
-			}
-			FinalVol += EnvVol;
-		}
-		else if (! WasNewNote)
+		if (EnvVol & 0x80)
 		{
-			return;
+			if (EnvVol == 0x81)	// SMPS Z80 does it for 0x80 too, but that breaks my Note Stop effect implementation
+			{
+				Trk->PlaybkFlags |= PBKFLG_ATREST;
+				return;
+			}
+			else if (! WasNewNote)
+			{
+				return;
+			}
+			EnvVol = Trk->VolEnvCache;
 		}
-		
-		if (Trk->PlaybkFlags & PBKFLG_ATREST)
-			return;
-		
-		if (FinalVol >= 0x10)
-			FinalVol = 0x0F;
-		FinalVol |= (Trk->ChannelMask & 0xE0) | 0x10;
-		if (Trk->PlaybkFlags & PBKFLG_SPCMODE)
-			FinalVol |= 0x20;
-		WritePSG(FinalVol);
+		FinalVol += EnvVol;
 	}
+	else if (! WasNewNote)
+	{
+		return;
+	}
+	
+	if (Trk->PlaybkFlags & PBKFLG_ATREST)
+		return;
+	
+	if (FinalVol >= 0x10)
+		FinalVol = 0x0F;
+	FinalVol |= (Trk->ChannelMask & 0xE0) | 0x10;
+	if (Trk->PlaybkFlags & PBKFLG_SPCMODE)
+		FinalVol |= 0x20;
+	WritePSG(FinalVol);
 	
 	return;
 }
@@ -529,19 +539,8 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 			}
 		}
 		
-		if (! (Data[Trk->Pos] & 0x80))
-		{
-			//SetDuration:
-			Extra_LoopStartCheck(Trk);
-			Trk->NoteLen = Data[Trk->Pos] * Trk->TickMult;
-			Trk->Pos ++;
-		}
-		Trk->Timeout = Trk->NoteLen;
-		// actually the driver sets more values, but these are never read in UpdateDrumTrack
-		if (! (Trk->PlaybkFlags & PBKFLG_HOLD))
-		{
-			Trk->NStopTout = Trk->NStopInit;
-		}
+		// read Duration for 00..7F
+		FinishTrkUpdate(Trk, ! (Data[Trk->Pos] & 0x80));
 	}
 	else
 	{
@@ -595,16 +594,8 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 			Trk->DAC.Snd = Data[Trk->Pos];
 			Trk->Pos ++;
 		}
-		if (! (Data[Trk->Pos] & 0x80))
-		{
-			//SetDuration:
-			Extra_LoopStartCheck(Trk);
-			Trk->NoteLen = Data[Trk->Pos] * Trk->TickMult;
-			Trk->Pos ++;
-		}
-		
 		Note = Trk->DAC.Snd;
-		if (Note >= 0x81)
+		if (! (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN) && Note >= 0x80)
 		{
 			UINT8 VolValue;
 			
@@ -614,9 +605,8 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 			DAC_Play((Trk->ChannelMask & 0x06) >> 1, Note - 0x81);
 		}
 		
-		Trk->Timeout = Trk->NoteLen;
-		if (! (Trk->PlaybkFlags & PBKFLG_HOLD))
-			Trk->NStopTout = Trk->NStopInit;
+		// read Duration for 00..7F
+		FinishTrkUpdate(Trk, ! (Data[Trk->Pos] & 0x80));
 	}
 	else
 	{
@@ -633,6 +623,79 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 		}
 	}
 	
+	return;
+}
+
+static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
+{
+	UINT16 Freq;
+	UINT8 WasNewNote;
+	
+	Trk->Timeout --;
+	if (! Trk->Timeout)
+	{
+		const UINT8* Data = Trk->SmpsCfg->SeqData;
+		UINT8 Note;
+		
+		if (Trk->Pos >= Trk->SmpsCfg->SeqLength)
+		{
+			Trk->PlaybkFlags &= ~PBKFLG_ACTIVE;
+			return;
+		}
+		
+		Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
+		
+		while(Data[Trk->Pos] >= Trk->SmpsCfg->CmdList.FlagBase)
+		{
+			Extra_LoopStartCheck(Trk);
+			cfHandler(Trk, Data[Trk->Pos]);
+			if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
+				return;
+		}
+		
+		if (Data[Trk->Pos] & 0x80)
+		{
+			Extra_LoopStartCheck(Trk);
+			Trk->DAC.Snd = Data[Trk->Pos];
+			Trk->Pos ++;
+		}
+		Note = Trk->DAC.Snd;
+		if (! (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN) && Note >= 0x80)
+			PlayPSGDrumNote(Trk, Note);
+		
+		// read Duration for 00..7F
+		FinishTrkUpdate(Trk, ! (Data[Trk->Pos] & 0x80));
+		PrepareADSR(Trk);
+		
+		Freq = Trk->Frequency;
+		WasNewNote = 0x01;
+	}
+	else
+	{
+		// not in the driver, but why not?
+		if (Trk->NStopTout)
+		{
+			Trk->NStopTout --;
+			if (! Trk->NStopTout)
+			{
+				DoPSGNoteOff(Trk);
+				return;
+			}
+		}
+		Freq = DoPitchSlide(Trk);
+		WasNewNote = 0x00;
+	}
+	
+	if (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)
+		return;
+	
+	if (Trk->PlaybkFlags & PBKFLG_SPCMODE)
+	{
+		if (WasNewNote || (Trk->PlaybkFlags & PBKFLG_PITCHSLIDE))
+			SendPSGFrequency(Trk, Freq);
+	}
+	
+	UpdatePSGVolume(Trk, WasNewNote);
 	return;
 }
 
@@ -677,13 +740,18 @@ INLINE UINT16* GetFM3FreqPtr(void)
 
 static void SendPSGFrequency(TRK_RAM* Trk, UINT16 Freq)
 {
+	UINT8 ChnMask;
+	
 	if (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)
 		return;
-	if (Trk->ChannelMask == 0xE0)
-		Freq = 0xE5;
 	
-	WritePSG((Trk->ChannelMask & 0xE0) | (Freq & 0x0F));
-	if (~Trk->ChannelMask & 0xE0)	// if ChannelMask != E0
+	ChnMask = Trk->ChannelMask;
+	if (ChnMask == 0xF0)
+		ChnMask = 0xC0;
+	ChnMask &= 0xE0;
+	
+	WritePSG(ChnMask | (Freq & 0x0F));
+	if (ChnMask != 0xE0)
 		WritePSG((Freq >> 4) & 0x7F);
 	
 	return;
@@ -711,9 +779,14 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			return;
 	}
 	
-	DoNoteOff(Trk);
-	DoPanAnimation(Trk, 0);
-	InitLFOModulation(Trk);
+	if (! (Trk->ChannelMask & 0x80))
+	{
+		DoNoteOff(Trk);
+		DoPanAnimation(Trk, 0);
+		InitLFOModulation(Trk);
+	}
+	if (Trk->PlaybkFlags & PBKFLG_HOLD_ALL)
+		Trk->PlaybkFlags |= PBKFLG_HOLD;
 	
 	ReuseDelay = 0x00;
 	if (! (Trk->PlaybkFlags & PBKFLG_RAWFREQ))
@@ -725,12 +798,13 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			Trk->Pos ++;
 			if (Note == 0x80)
 			{
-				Trk->PlaybkFlags |= PBKFLG_ATREST;	// inlined SetRest
+				DoPSGNoteOff(Trk);
 				if (Trk->SmpsCfg->DelayFreq == DLYFREQ_RESET)
 					Trk->Frequency = (Trk->ChannelMask & 0x80) ? 0xFFFF : 0x0000;
 			}
 			else
 			{
+				Trk->ADSR.State &= 0x7F;
 				Trk->Frequency = GetNote(Trk, Note);
 			}
 			
@@ -756,7 +830,15 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			Trk->Frequency += Trk->Transpose;
 	}
 	
-	if (! ReuseDelay)
+	FinishTrkUpdate(Trk, ! ReuseDelay);
+	return;
+}
+
+static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
+{
+	const UINT8* Data = Trk->SmpsCfg->SeqData;
+	
+	if (ReadDuration)
 	{
 		//SetDuration:
 		Extra_LoopStartCheck(Trk);
@@ -788,6 +870,7 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			case 0x02:
 				if (Data[Trk->Pos] == 0xE7)
 					NewTout = 0;	// Ristar - the E7 flag disables the effect temporarily.
+				// maybe TODO: improve this and check for CFlag[Data[Trk->Pos]].Type == CF_HOLD
 				break;
 			}
 			Trk->NStopTout = (UINT8)NewTout;
@@ -814,6 +897,12 @@ static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 	Note += Trk->Transpose;
 	if (Trk->ChannelMask & 0x80)
 	{
+		// Sonic 2 SMS does (NoteCmd - 0x80), too
+		if (Trk->SmpsCfg->PSGBaseNote == PSGBASEN_B)
+			Note ++;
+		
+		if (Trk->Transpose == -36 && Note < -24)
+			return 0x6000;	// workaround for crappy xm#smps conversions that use an invalid PSG frequency for noise
 		if (Note < 0)
 			Note = 0;
 		else if (Note >= Trk->SmpsCfg->PSGFreqCnt)
@@ -1282,6 +1371,82 @@ static UINT8 DoEnvelope(const ENV_DATA* EnvData, const UINT8* EnvCmds, UINT8* En
 	return Data;
 }
 
+static void PrepareADSR(TRK_RAM* Trk)
+{
+	if (Trk->PlaybkFlags & PBKFLG_HOLD)
+		return;
+	if (! (Trk->Instrument & 0x80))
+		return;
+	
+	if (Trk->ADSR.State & 0x80)
+		return;
+	Trk->ADSR.Level = 0xFF;
+	Trk->ADSR.State = 0x10 | Trk->ADSR.Mode;
+	
+	return;
+}
+
+static UINT8 DoADSR(TRK_RAM* Trk)
+{
+	// Note: The original Z80 ASM code uses the carry bit to check for 8-bit overflowing additions.
+	//       But this can't be done in C and this is more readable anyway.
+	INT16 NewLvl;
+	
+	if (Trk->ADSR.State & 0x10)
+	{
+		// Attack Phase
+		NewLvl = Trk->ADSR.Level - Trk->ADSR.AtkRate;
+		if (NewLvl <= 0)
+		{
+			NewLvl = 0;
+			Trk->ADSR.State ^= 0x30;	// -> Decay Phase (10 -> 20)
+		}
+		Trk->ADSR.Level = (UINT8)NewLvl;
+	}
+	else if (Trk->ADSR.State & 0x20)
+	{
+		// Decay Phase
+		//loc_8580:
+		NewLvl = Trk->ADSR.Level + Trk->ADSR.DecRate;
+		if (NewLvl >= Trk->ADSR.DecLvl)
+		{
+			NewLvl = Trk->ADSR.DecLvl;
+			if (Trk->ADSR.State & 0x08)
+				Trk->ADSR.State ^= 0x30;	// return to Attack Phase (20 -> 10)
+			else
+				Trk->ADSR.State ^= 0x60;	// -> Sustain Phase (20 -> 40)
+		}
+		Trk->ADSR.Level = (UINT8)NewLvl;
+	}
+	else if (Trk->ADSR.State & 0x40)
+	{
+		// Sustain Phase
+		//loc_85B0:
+		NewLvl = Trk->ADSR.Level + Trk->ADSR.SusRate;
+		if (NewLvl >= 0xFF)
+		{
+			NewLvl = 0xFF;
+			Trk->ADSR.State &= ~0x70;	// -> Release Phase (40 -> 00)
+		}
+		Trk->ADSR.Level = (UINT8)NewLvl;
+	}
+	else
+	{
+		// Release Phase
+		//loc_85D2:
+		NewLvl = Trk->ADSR.Level + Trk->ADSR.RelRate;
+		if (NewLvl >= 0x100)
+		{
+			Trk->ADSR.State &= 0x0F;
+			Trk->ADSR.Level = 0xFF;
+			return 0x81;	// Note Off
+		}
+		Trk->ADSR.Level = (UINT8)NewLvl;
+	}
+	
+	return Trk->ADSR.Level >> 4;
+}
+
 
 void DoNoteOn(TRK_RAM* Trk)
 {
@@ -1322,13 +1487,33 @@ void DoNoteOff(TRK_RAM* Trk)
 	{
 		WritePSG((Trk->ChannelMask & 0xE0) | 0x10 | 0x0F);
 		if (Trk->PlaybkFlags & PBKFLG_SPCMODE)
-			WritePSG((Trk->ChannelMask & 0xE0) | 0x30 | 0x0F);	// mute Noise Channel
+			WritePSG((Trk->ChannelMask & 0xE0 ^ 0x20) | 0x10 | 0x0F);	// mute Noise Channel or PSG 3
 	}
 	else
 	{
 		if (Trk->ChannelMask & 0x10)	// skip Drum Tracks
 			return;
 		WriteFMI(0x28, Trk->ChannelMask);
+	}
+	
+	return;
+}
+
+static void DoPSGNoteOff(TRK_RAM* Trk)
+{
+	// also known as SetRest
+	if (Trk->PlaybkFlags & PBKFLG_HOLD)
+		return;
+	
+	if (Trk->Instrument & 0x80)
+	{
+		Trk->ADSR.State &= 0x0F;
+		Trk->ADSR.State |= 0x80;	// set Release Phase
+	}
+	else
+	{
+		Trk->PlaybkFlags |= PBKFLG_ATREST;
+		DoNoteOff(Trk);
 	}
 	
 	return;
@@ -1347,7 +1532,7 @@ static UINT16 DoPitchSlide(TRK_RAM* Trk)
 		UINT16 BaseFreq;
 		UINT16 OctFreq;	// frequency within octave
 		
-		BaseFreq = Trk->SmpsCfg->FMFreqs[0];
+		BaseFreq = Trk->SmpsCfg->FMFreqs[0] & 0x7FF;
 		OctFreq = NewFreq & 0x7FF;
 		if (OctFreq < BaseFreq)
 			NewFreq -= (0x7FF - BaseFreq);
@@ -1515,6 +1700,7 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 		TempTrk->PlaybkFlags = 0x00;
 		TempTrk->SmpsCfg = NULL;
 	}
+	SmpsRAM.NoiseDrmVol = 0x00;
 	ResetSpcFM3Mode();
 	SmpsRAM.FadeOut.Steps = 0x00;
 	
@@ -1614,12 +1800,6 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 		
 		if (TrkID == TRACK_MUS_DRUM)
 			WriteFMMain(TempTrk, 0xB4, 0xC0);	// force Pan bits to LR
-		
-		if (TempTrk->ChannelMask == 0xF0)
-		{
-			TempTrk->Instrument = 0x19;
-			TempTrk->Volume = 3;
-		}
 		
 		if (TempTrk->Pos >= SmpsFileConfig->SeqLength)
 		{
@@ -1999,6 +2179,7 @@ static void DoFadeOut(void)
 		return;
 	}
 	
+	SmpsRAM.NoiseDrmVol ++;
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];

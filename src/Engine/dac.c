@@ -401,7 +401,7 @@ void DAC_Stop(UINT8 Chn)
 	return;
 }
 
-void DAC_Play(UINT8 Chn, UINT16 SmplID)
+UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 {
 	UINT32 Rate;
 	DAC_TABLE* TempEntry;
@@ -410,30 +410,30 @@ void DAC_Play(UINT8 Chn, UINT16 SmplID)
 	UINT32 FreqHz;
 	
 	if (Chn >= MAX_DAC_CHNS || DACDrv == NULL)
-		return;
+		return 0xFF;
 	if (Chn >= DACDrv->Cfg.Channels)
-		return;
+		return 0xC0;
 	
 	if (SmplID == 0xFFFF)
 	{
 		DAC_Stop(Chn);
-		return;
+		return 0x00;
 	}
 	
 	DACChn = &DACChnState[Chn];
 	
 	SmplID += DACChn->BaseSmpl;	// do banked sounds
 	if (SmplID >= DACDrv->TblCount)
-		return;
+		return 0x10;
 	TempEntry = &DACDrv->SmplTbl[SmplID];
 	if (TempEntry->Sample == 0xFFFF || TempEntry->Sample >= DACDrv->SmplCount)
-		return;
+		return 0x11;
 	
 	TempSmpl = &DACDrv->Smpls[TempEntry->Sample];
 	if (! TempSmpl->Size)
 	{
 		DAC_Stop(Chn);
-		return;
+		return 0x00;
 	}
 	
 	DACChn->DACSmplPtr = TempSmpl;
@@ -485,7 +485,7 @@ void DAC_Play(UINT8 Chn, UINT16 SmplID)
 			vgm_write_stream_data_command(0x00, 0x05, TempSmpl->UsageID);
 	}
 	
-	return;
+	return 0x00;
 }
 
 void DAC_SetBank(UINT8 Chn, UINT8 BankID)

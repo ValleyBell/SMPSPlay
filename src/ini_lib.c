@@ -36,8 +36,8 @@ UINT8 GetTextLine(UINT32 BufSize, char* Buffer, FILE* hFile)
 		// fgets has set a null-terminator at char 0xFF
 		while(Buffer[strlen(Buffer) - 1] != '\n')
 		{
-			fgets(Buffer, BufSize, hFile);
-			if (Buffer[0x00] == '\0')
+			TempPtr = fgets(Buffer, BufSize, hFile);
+			if (TempPtr == NULL || Buffer[0x00] == '\0')
 				break;
 		}
 	}
@@ -170,6 +170,63 @@ void RevertTokenTrim(char* TokenL, const char* TokenR)
 	{
 		*TempPtr = ' ';
 		TempPtr ++;
+	}
+	
+	return;
+}
+
+// This function splits the line into several columns. Columns are separated with whitespaces.
+void GetColumns(char* TextStr, UINT8 MaxCols, char** ColumnPtrs)
+{
+	char* CurStr;
+	UINT8 CurCol;
+	
+	CurStr = TextStr;
+	for (CurCol = 0; CurCol < MaxCols; CurCol ++)
+	{
+		if (*CurStr == ';')
+			*CurStr = '\0';
+		if (*CurStr == '\0')
+			break;
+		
+		ColumnPtrs[CurCol] = CurStr;
+		while(*CurStr != '\0' && ! isspace(*CurStr))	// skip the word
+			CurStr ++;
+		while(isspace(*CurStr))		// skip the tab/space
+			CurStr ++;
+	}
+	if (CurCol < MaxCols && *CurStr != '\0')
+	{
+		ColumnPtrs[CurCol] = CurStr;
+		CurCol ++;
+	}
+	for (; CurCol < MaxCols; CurCol ++)
+		ColumnPtrs[CurCol] = NULL;
+	
+	return;
+}
+
+// This function splits the line into several columns. This function splits only at tabs.
+void GetColumns_Tab(char* TextStr, UINT8 MaxCols, char** ColumnPtrs)
+{
+	UINT8 CurCol;
+	UINT8 RetVal;
+	
+	ColumnPtrs[0] = TextStr;
+	for (CurCol = 1; CurCol < MaxCols; CurCol ++)
+	{
+		RetVal = GetNextToken_Tab(&ColumnPtrs[CurCol - 1], &ColumnPtrs[CurCol]);
+		if (RetVal || ColumnPtrs[CurCol] == NULL)
+			break;
+	}
+	if (CurCol < MaxCols)
+	{
+		for (; CurCol < MaxCols; CurCol ++)
+			ColumnPtrs[CurCol] = NULL;
+	}
+	else
+	{
+		TrimToken(ColumnPtrs[CurCol - 1]);
 	}
 	
 	return;

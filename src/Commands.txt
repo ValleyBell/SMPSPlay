@@ -2,6 +2,7 @@ SMPS Commands
 =============
 
 IGNORE - does nothing
+INVALID - does nothing, but prints a warning if enabled
 
 
 General Flags
@@ -71,6 +72,10 @@ VOLUME - change or set channel volume
 	command E4, size 02, Tempo 32x
   VOL_SPC_TMP - change FM volume/set PSG volume
 	command E6, size 02, Tempo 32x
+  VOL_ABS_PDRM - set volume of PSG Noise drums
+	size 02
+  VOL_CHG_PDRM - change volume of PSG Noise drums
+	command E4, size 02, Master System SMPS
 
 HOLD - prevent next note from being retriggered, effectively holding it
 	command E7, size 01
@@ -104,9 +109,11 @@ INSTRUMENT - sets the channel instrument
 	      the song ID with the instrument library to use.
   INS_a_PSG - set PSG instrument (PSG volume envelope)
 	command F5, size 02
+  INS_C_FMP - set FM/PSG instrument, behaves like INS_C_FM, but works on FM and PSG channels
+	command EF, size 82 (Sonic 3K)
 	
 	a can be N or C. (see notes for VOLUME)
-	If set to N, the channel mode check is disabled. (INS_FM on PSG channel can cause bugs and vice versa)
+	If set to N, the channel mode check is disabled. (INS_N_FM on PSG channel can cause bugs and vice versa)
 	If set to C, the channel mode check is enabled and commands for a wrong channel are ignored.
 
 PSG_NOISE
@@ -133,6 +140,7 @@ PLAY_PWM - play PWM sample
 DAC_BANK - set DAC Bank
 	command ED, size 02, Mighty Morphin Power Rangers
 	command E9, size 02, preSMPS 68k
+
 
 Modulation Flags
 ----------------
@@ -161,6 +169,13 @@ LFO_MOD - set LFO/FMS Modulation
 	Note: The size is variable. (indicated by size 80+)
 	      If the first parameter (maximum FMS range) is 00, no parameters are following.
 	      If it is 01 or higher, 2 additional parameters (initial delay and speed) are following.
+
+CF_ADSR - ADSR Envelope settings
+  ADSR_SETUP - set ADSR Envelope Data (Attack/Decay/... phases and levels)
+	command E0, size 06, Sonic 2 SMS
+  ADSR_MODE - set ADSR Mode
+	command E5, size 02, Sonic 2 SMS
+
 
 Effect Flags
 ------------

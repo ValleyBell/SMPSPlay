@@ -356,6 +356,9 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 			CurCmd = FileData[CurPos] - CmdList->FlagBase;
 			if (CurCmd >= CmdList->FlagCount)
 			{
+				if (DebugMsgs & 0x04)
+					printf("Unknown Coordination Flag 0x%02X in Track %u at 0x%04X\n",
+							CmdList->FlagBase + CurCmd, CurTrk, CurPos);
 				CurPos ++;
 				continue;
 			}
@@ -546,6 +549,11 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 			case CF_IGNORE:
 				if (CmdList->CmdData[CurCmd].JumpOfs && (DebugMsgs & 0x04))
 					printf("Unknown Conditional Jump (Pos 0x%04X)\n", CurPos);
+				break;
+			case CF_INVALID:
+				if (DebugMsgs & 0x04)
+					printf("Unknown Coordination Flag 0x%02X (Pos 0x%04X)\n",
+							CmdList->FlagBase + CurCmd, CurPos);
 				break;
 			}
 			

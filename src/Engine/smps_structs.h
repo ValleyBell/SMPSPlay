@@ -29,6 +29,9 @@
 #define FMBASEN_B		0x00	// table starts with B (note 81 is still a C)
 #define FMBASEN_C		0x01	// table starts with C
 
+#define PSGBASEN_C		0x00	// table starts with B (note 81 is still a C)
+#define PSGBASEN_B		0x01	// table starts with C
+
 // behaviour of rests (Note-Rest-Delay-Delay behaviour)
 #define DLYFREQ_RESET	0x00	// reset frequency (replay note)
 #define DLYFREQ_KEEP	0x01	// keep frequency (play rest)
@@ -117,13 +120,20 @@ typedef struct _drum_library
 	UINT8 DrumCount;
 	DRUM_DATA* DrumData;
 } DRUM_LIB;
-/*typedef struct _pan_envelope_library
+typedef struct _psg_drum_data
 {
-	UINT16 DataLen;
-	UINT8* Data;	// all Pan Animation bytes for all envelopes
-	UINT8 EnvCount;
-	UINT8** EnvPtr;	// points into EnvData
-} PAN_ENV_LIB;*/
+	UINT8 VolEnv;	// PSG instrument
+	UINT8 Volume;
+	UINT8 NoiseMode;
+	UINT8 Ch3Vol;
+	UINT8 Ch3Slide;	// PSG 3 pitch slide
+	UINT16 Ch3Freq;
+} PSG_DRUM_DATA;
+typedef struct _psg_drum_library
+{
+	UINT8 DrumCount;
+	PSG_DRUM_DATA* DrumData;
+} PSG_DRUM_LIB;
 typedef struct _smps_initial_settings
 {
 	UINT8 Timing_DefMode;
@@ -158,6 +168,7 @@ typedef struct _smps_settings
 	UINT8 FMBaseNote;
 	UINT8 FMBaseOct;
 	UINT8 FMOctWrap;
+	UINT8 PSGBaseNote;
 	UINT8 DelayFreq;
 	UINT8 NoteOnPrevent;
 	UINT8 FM6DACOff;	// turn DAC off when FM6 note is played
@@ -172,6 +183,7 @@ typedef struct _smps_settings
 	
 	INS_LIB* InsLib;
 	DRUM_LIB DrumLib;
+	PSG_DRUM_LIB PSGDrumLib;
 	UINT16 GlbInsBase;
 	UINT16 GlbInsLen;
 	UINT8* GlbInsData;
@@ -198,7 +210,6 @@ typedef struct _smps_settings
 	UINT8 EnvCmds[0x80];
 	ENV_LIB ModEnvs;
 	ENV_LIB VolEnvs;
-	//PAN_ENV_LIB PanAnims;
 	PAN_ANI_LIB PanAnims;
 	
 	DAC_CFG DACDrv;

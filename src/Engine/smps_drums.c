@@ -3,6 +3,7 @@
 // Written by Valley Bell, 2014
 
 #include <memory.h>
+#include <stdio.h>
 
 #include "stdtype.h"
 #include "../chips/mamedef.h"	// for INLINE
@@ -10,13 +11,15 @@
 #include "smps_structs_int.h"
 #include "smps.h"
 #include "smps_int.h"
-//#include "../Sound.h"
+#include "../Sound.h"
 #include "dac.h"
 
 //#define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, 0x00, Reg, Data)
+#define WritePSG(Data)			sn76496_psg_write(0x00, Data)
 
 
 extern SND_RAM SmpsRAM;
+extern UINT8 DebugMsgs;
 
 
 INLINE UINT16 ReadBE16(const UINT8* Data);
@@ -106,7 +109,13 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 			DAC_SetRateOverride(DrumData->DrumID, DrumData->PitchOvr);
 		if (! DrumData->ChnMask)
 		{
-			DAC_Play(Trk->ChannelMask & 0x01, DrumData->DrumID);
+			UINT8 RetVal;
+			
+			RetVal = DAC_Play(Trk->ChannelMask & 0x01, DrumData->DrumID);
+			if ((RetVal & 0xF0) == 0x10 && (DebugMsgs & 0x01))
+			{
+				printf("Warning: Unmapped DAC drum %02X at %04X!\n", DrumData->DrumID, Trk->Pos);
+			}
 		}
 		else
 		{
@@ -264,6 +273,53 @@ void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note)
 				return;	// DAC disabled - return
 			DAC_Play(0x00, Note - 0x01);
 		}
+	}
+	
+	return;
+}
+
+void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note)
+{
+	PSG_DRUM_LIB* DrumLib = &Trk->SmpsCfg->PSGDrumLib;
+	PSG_DRUM_DATA* TempDrum;
+	UINT8 TempVol;
+	
+	if (Note < 0x80)
+		return;
+	if (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)
+		return;
+	
+	Note &= 0x7F;
+	if (Note >= DrumLib->DrumCount)
+		return;
+	TempDrum = &DrumLib->DrumData[Note];
+	if (! TempDrum->NoiseMode)
+	{
+		if (TempDrum->NoiseMode && (DebugMsgs & 0x01))
+			printf("Warning: Unmapped PSG drum %02X at %04X!\n", 0x80 | Note, Trk->Pos);
+		Trk->PlaybkFlags |= PBKFLG_ATREST;
+		DoNoteOff(Trk);
+		Trk->PlaybkFlags &= ~PBKFLG_SPCMODE;
+		return;
+	}
+	
+	Trk->PlaybkFlags &= ~PBKFLG_SPCMODE;
+	// Note: Implementation based on Sonic 2 Master System
+	Trk->Instrument = TempDrum->VolEnv;
+	Trk->Volume = SmpsRAM.NoiseDrmVol + TempDrum->Volume;
+	WritePSG(TempDrum->NoiseMode);
+	
+	if (TempDrum->Ch3Freq != (UINT16)-1)
+	{
+		Trk->PlaybkFlags |= PBKFLG_SPCMODE;
+		// based on Space Harrier II (MegaDrive)
+		Trk->Frequency = TempDrum->Ch3Freq;
+		Trk->Detune = TempDrum->Ch3Slide;
+		
+		TempVol = SmpsRAM.NoiseDrmVol + TempDrum->Ch3Vol;
+		if (TempVol > 0x0F)
+			TempVol = 0x0F;
+		WritePSG(0xD0 | TempVol);
 	}
 	
 	return;

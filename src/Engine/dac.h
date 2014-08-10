@@ -73,7 +73,7 @@ void DAC_SetRateOverride(UINT16 SmplID, UINT32 Rate);
 void DAC_SetVolume(UINT8 Chn, UINT16 Volume);
 
 void DAC_Stop(UINT8 Chn);
-void DAC_Play(UINT8 Chn, UINT16 SmplID);
+UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID);
 void DAC_SetBank(UINT8 Chn, UINT8 BankID);
 void DAC_SetRate(UINT8 Chn, UINT32 Rate, UINT8 MidNote);
 void DAC_SetFrequency(UINT8 Chn, UINT32 Freq, UINT8 MidNote);
