@@ -230,7 +230,7 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 	for (CurTrk = 0x00; CurTrk < SmpsCfg->AddChnCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
 		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsCfg);
 	
-	if (InsPtr && InsPtr + SmpsCfg->InsRegCnt <= FileLen)
+	if (InsPtr && (UINT32)InsPtr + SmpsCfg->InsRegCnt <= FileLen)
 	{
 		INS_LIB* InsLib;
 		

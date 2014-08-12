@@ -61,6 +61,10 @@ static const UINT8 AlgoOutMask[0x08] =
 static const UINT8 OpList_DEF[] = {0x00, 0x08, 0x04, 0x0C};	// default SMPS operator order
 static const UINT8 OpList_HW[]  = {0x00, 0x04, 0x08, 0x0C};	// hardware operator order
 
+#define CHNMODE_DEF		0x00	// default (4 bytes per header)
+#define CHNMODE_PSG		0x01	// PSG (6 bytes per header)
+#define CHNMODE_DRM		0x10	// drum (can skip drum channels)
+
 
 INLINE UINT16 ReadBE16(const UINT8* Data)
 {
@@ -595,14 +599,15 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 			Trk->Pos ++;
 		}
 		Note = Trk->DAC.Snd;
-		if (! (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN) && Note >= 0x80)
+		if (! (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN) && Note >= 0x81)
 		{
 			UINT8 VolValue;
 			
 			VolValue  = 1 + ((Trk->Volume & 0x0F) >> 0);
 			VolValue += 1 + ((Trk->Volume & 0xF0) >> 4);
 			DAC_SetVolume((Trk->ChannelMask & 0x06) >> 1, VolValue * 0x10);
-			DAC_Play((Trk->ChannelMask & 0x06) >> 1, Note - 0x81);
+			if (! (Trk->PlaybkFlags & PBKFLG_HOLD))
+				DAC_Play((Trk->ChannelMask & 0x06) >> 1, Note - 0x81);
 		}
 		
 		// read Duration for 00..7F
@@ -1587,7 +1592,7 @@ void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
 		else if (*OpPtr == 0x40)
 			Trk->VolOpPtr = InsPtr;
 		
-		if ((*OpPtr & 0xF0) != 0x40)	// exclude the TL operators - RefreshVolume will do them
+		if ((*OpPtr & 0xF0) != 0x40)	// exclude the TL operators - RefreshFMVolume will do them
 		{
 			//WriteInsReg:
 			WriteFMMain(Trk, *OpPtr, *InsPtr);
@@ -1596,12 +1601,41 @@ void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
 	}
 	if (! HadB4)	// if it was in the list already, skip it
 		WriteFMMain(Trk, 0xB4, Trk->PanAFMS);
-	RefreshVolume(Trk);
+	RefreshFMVolume(Trk);
 	
 	return;
 }
 
 void RefreshVolume(TRK_RAM* Trk)
+{
+	UINT8 FinalVol;
+	
+	if (Trk->ChannelMask & 0x80)	// 80/A0/C0/E0 - PSG
+	{
+		if (Trk->PlaybkFlags & PBKFLG_ATREST)
+			return;
+		
+		FinalVol = Trk->Volume + Trk->VolEnvCache;
+		if (FinalVol >= 0x10)
+			FinalVol = 0x0F;
+		FinalVol |= (Trk->ChannelMask & 0xE0) | 0x10;
+		if (Trk->PlaybkFlags & PBKFLG_SPCMODE)
+			FinalVol |= 0x20;	// Noise Channel
+		WritePSG(FinalVol);
+	}
+	else if (Trk->ChannelMask & 0x10)	// 1x - FM drums
+	{
+		// do nothing
+	}
+	else	// 00/01/02/04/05/06 - FM
+	{
+		RefreshFMVolume(Trk);
+	}
+	
+	return;
+}
+
+void RefreshFMVolume(TRK_RAM* Trk)
 {
 	//const UINT8* OpPtr = (Trk->SmpsCfg->InsMode & 0x01) ? VolOperators_HW : VolOperators_DEF;
 	const UINT8* OpPtr = Trk->SmpsCfg->InsReg_TL;
@@ -1667,28 +1701,11 @@ void SendSSGEG(TRK_RAM* Trk, const UINT8* Data, UINT8 ForceMaxAtk)
 
 
 
-//static const UINT8 FMChnOrder[7] = {0x16, 0x00, 0x01, 0x02, 0x04, 0x05, 0x06};
-//static const UINT8 FMChnOrder[7] = {0x12, 0x00, 0x01, 0x04, 0x05, 0x06, 0x02};
-//static const UINT8 PSGChnOrder[3] = {0x80, 0xA0, 0xC0};
-
-void PlayMusic(SMPS_CFG* SmpsFileConfig)
+static void InitMusicPlay(SMPS_CFG* SmpsFileConfig)
 {
-	UINT8 FMChnCount;
-	const UINT8* FMChnOrder;
-	UINT8 PSGChnCount;
-	const UINT8* PSGChnOrder;
-	const SMPS_CFG_INIT* InitCfg;
-	const UINT8* Data;
-	UINT16 CurPos;
-	UINT8 FMChnCnt;
-	UINT8 PSGChnCnt;
-	UINT8 TickMult;
-	UINT8 TrkBase;
 	UINT8 CurTrk;
-	UINT8 TrkID;
 	TRK_RAM* TempTrk;
-	
-	//StopAllSound();	// in the driver, but I can do that in a better way
+	const SMPS_CFG_INIT* InitCfg;
 	
 	StopSignal();
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
@@ -1733,154 +1750,189 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 	SetDACDriver(&SmpsFileConfig->DACDrv);
 	DAC_ResetOverride();
 	
+	return;
+}
+
+static UINT8 CheckTrkRange(UINT8 TrkID, UINT8 BestTrkID, UINT8 FirstTrk, UINT8 TrkEnd)
+{
+	UINT8 CurTrk;
+	
+	if (TrkID >= FirstTrk && TrkID < TrkEnd)
+	{
+		// within the wanted range - check for usage
+		if (! (SmpsRAM.MusicTrks[TrkID].PlaybkFlags & PBKFLG_ACTIVE))
+			return TrkID;	// free - return
+		// else try the rest
+	}
+	
+	if (! (SmpsRAM.MusicTrks[BestTrkID].PlaybkFlags & PBKFLG_ACTIVE))
+		return BestTrkID;	// the best-fit one is free - accepted
+	
+	// else find the first free one
+	for (CurTrk = FirstTrk; CurTrk < TrkEnd; CurTrk ++)
+	{
+		if (! (SmpsRAM.MusicTrks[CurTrk].PlaybkFlags & PBKFLG_ACTIVE))
+			return CurTrk;
+	}
+	
+	return TrkID;	// no free track - return original ID
+}
+
+static UINT8 CheckTrkID(UINT8 TrkID, UINT8 ChnBits)
+{
+	UINT8 BestTrkID;
+	
+	if (ChnBits & 0x80)
+	{
+		BestTrkID = (ChnBits & 0x60) >> 5;
+		return CheckTrkRange(TrkID, TRACK_MUS_PSG1 + BestTrkID, TRACK_MUS_PSG1, TRACK_MUS_PSG_END);
+	}
+	else if ((ChnBits & 0xF8) == 0x18)
+	{
+		return CheckTrkRange(TrkID, TrkID, TRACK_MUS_PWM1, TRACK_MUS_PWM_END);
+	}
+	
+	return TrkID;
+}
+
+static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UINT8 Mode,
+						   UINT8 ChnListSize, const UINT8* ChnList, UINT8 TickMult, UINT8 TrkBase)
+{
+	SMPS_CFG* SmpsCfg = SmpsRAM.MusCfg;
+	const UINT8* Data = SmpsCfg->SeqData;
+	UINT16 HdrChnSize;
+	UINT16 CurPos;
+	UINT8 CurTrk;
+	UINT8 TrkID;
+	UINT8 NextTrkID;
+	TRK_RAM* TempTrk;
+	
+	if (! ChnCount)
+		return;
+	
+	HdrChnSize = 0x04;
+	if (Mode & CHNMODE_PSG)
+		HdrChnSize += 0x02;
+	
+	CurPos = *FilePos;
+	NextTrkID = TrkIDStart;
+	for (CurTrk = 0; CurTrk < ChnCount; CurTrk ++, CurPos += HdrChnSize)
+	{
+		if (Mode & CHNMODE_DRM)	// able to skip drum channels?
+		{
+			// skip Drum tracks unless Channel Bits are 0x10-0x17
+			while(NextTrkID < TRACK_MUS_FM1 && ! (ChnList[CurTrk] & 0x10))
+				NextTrkID ++;
+		}
+		TrkID = CheckTrkID(NextTrkID, ChnList[CurTrk]);
+		if (TrkID >= MUS_TRKCNT || CurTrk >= ChnListSize)
+			break;
+		if (TrkID == NextTrkID)
+			NextTrkID ++;
+		
+		TempTrk = &SmpsRAM.MusicTrks[TrkID];
+		memset(TempTrk, 0x00, sizeof(TRK_RAM));
+		TempTrk->SmpsCfg = SmpsCfg;
+		TempTrk->PlaybkFlags = PBKFLG_ACTIVE;
+		TempTrk->ChannelMask = ChnList[CurTrk];
+		TempTrk->TickMult = TickMult;
+		TempTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SmpsCfg);
+		TempTrk->Transpose = Data[CurPos + 0x02];
+		TempTrk->Volume = Data[CurPos + 0x03];
+		if (Mode & CHNMODE_PSG)
+		{
+			TempTrk->ModEnv = Data[CurPos + 0x04];
+			TempTrk->Instrument = Data[CurPos + 0x05];
+		}
+		else
+		{
+			//FinishFMTrkInit:
+			TempTrk->ModEnv = 0x00;
+			TempTrk->Instrument = 0x00;
+		}
+		//FinishTrkInit:
+		TempTrk->StackPtr = TRK_STACK_SIZE;
+		TempTrk->PanAFMS = 0xC0;
+		TempTrk->Timeout = 0x01;
+		if (SmpsCfg->LoopPtrs != NULL)
+			TempTrk->LoopOfs = SmpsCfg->LoopPtrs[TrkBase + CurTrk];
+		else
+			TempTrk->LoopOfs = 0x0000;
+		
+		if ((TempTrk->ChannelMask & 0xF8) == 0x10)	// DAC drum channels
+			TempTrk->SpcDacMode = SmpsCfg->DrumChnMode;
+		if ((TempTrk->ChannelMask & 0xF8) == 0x18)	// PWM channels
+			SmpsRAM.MusicTrks[TRACK_MUS_FM6].PlaybkFlags = 0x00;	// disable FM 6 for PWM simulation
+		
+		if (TrkID == TRACK_MUS_DRUM)
+			WriteFMMain(TempTrk, 0xB4, TempTrk->PanAFMS);	// force Pan bits to LR
+		
+		if (TempTrk->Pos >= SmpsCfg->SeqLength)
+		{
+			TempTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
+			//printf("Track XX points after EOF!\n");
+		}
+	}
+	// if we stopped early, go over all remaining channels
+	for (; CurTrk < ChnCount; CurTrk ++, CurPos += HdrChnSize)
+		;
+	
+	*FilePos = CurPos;
+	return;
+}
+
+//static const UINT8 FMChnOrder[7] = {0x16, 0x00, 0x01, 0x02, 0x04, 0x05, 0x06};
+//static const UINT8 FMChnOrder[7] = {0x12, 0x00, 0x01, 0x04, 0x05, 0x06, 0x02};
+//static const UINT8 PSGChnOrder[3] = {0x80, 0xA0, 0xC0};
+
+void PlayMusic(SMPS_CFG* SmpsFileConfig)
+{
+	const UINT8* Data;
+	UINT16 CurPos;
+	UINT8 FMChnCnt;
+	UINT8 PSGChnCnt;
+	UINT8 TickMult;
+	UINT8 TrkBase;
+	
+	//StopAllSound();	// in the driver, but I can do that in a better way
+	InitMusicPlay(SmpsFileConfig);
+	
 	SmpsRAM.MusCfg = SmpsFileConfig;
 	Data = SmpsFileConfig->SeqData;
 	CurPos = 0x00;
 	
-//	for (CurTrk = 0; CurTrk < 6; CurTrk ++)
-//		FMChnOrder[1 + CurTrk] = SmpsFileConfig->FMChnList[CurTrk];
-//	FMChnOrder[0] = 0x10 | FMChnOrder[6];
-	FMChnCount = SmpsFileConfig->FMChnCnt;
-	if (FMChnCount > TRACK_MUS_FM_END - TRACK_MUS_DRUM)
-		FMChnCount = TRACK_MUS_FM_END - TRACK_MUS_DRUM;
-	FMChnOrder = SmpsFileConfig->FMChnList;
-	
-	PSGChnCount = SmpsFileConfig->PSGChnCnt;
-	if (PSGChnCount > TRACK_MUS_PSG_END - TRACK_MUS_PSG1)
-		PSGChnCount = TRACK_MUS_PSG_END - TRACK_MUS_PSG1;
-	PSGChnOrder = SmpsFileConfig->PSGChnList;
-	
-	//InsLibPtr = ReadPtr(&Data[CurPos + 0x00], SmpsFileConfig);
+	//InsLibPtr = ReadPtr(&Data[CurPos + 0x00], SmpsFileConfig);	// done by the SMPS preparser
 	FMChnCnt = Data[CurPos + 0x02];
 	PSGChnCnt = Data[CurPos + 0x03];
-	if (FMChnCnt > FMChnCount || PSGChnCnt > PSGChnCount)
+	if (FMChnCnt + PSGChnCnt > SmpsFileConfig->FMChnCnt + SmpsFileConfig->PSGChnCnt)
 		return;	// invalid file
+	
 	TickMult = Data[CurPos + 0x04];
-	SmpsRAM.TempoCntr = Data[CurPos + 0x05];
 	SmpsRAM.TempoInit = Data[CurPos + 0x05];
+	SmpsRAM.TempoCntr = SmpsRAM.TempoInit;
 	if (SmpsFileConfig->TempoMode == TEMPO_TIMEOUT)
 		SmpsRAM.TempoCntr ++;	// DoTempo is called before PlayMusic, so simulate that behaviour
+	else if (SmpsFileConfig->TempoMode == TEMPO_TOUT_OFLW && ! (SmpsRAM.TempoInit & 0x80))
+		SmpsRAM.TempoCntr ++;
 	CurPos += 0x06;
 	
 	StartSignal();
 	
 	TrkBase = 0x00;
-	TrkID = TRACK_MUS_DRUM;
-	for (CurTrk = 0; CurTrk < FMChnCnt; CurTrk ++, CurPos += 0x04, TrkID ++)
-	{
-		// skip Drum tracks unless Channel Bits are 0x10-0x17
-		while(TrkID < TRACK_MUS_FM1 && ! (FMChnOrder[TrkID] & 0x10))
-			TrkID ++;
-		if (TrkID >= TRACK_MUS_PSG1 || CurTrk >= FMChnCnt)
-			continue;
-		
-		TempTrk = &SmpsRAM.MusicTrks[TrkID];
-		memset(TempTrk, 0x00, sizeof(TRK_RAM));
-		TempTrk->SmpsCfg = SmpsRAM.MusCfg;
-		TempTrk->PlaybkFlags = PBKFLG_ACTIVE;
-		TempTrk->ChannelMask = FMChnOrder[CurTrk];
-		TempTrk->TickMult = TickMult;
-		TempTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SmpsFileConfig);
-		TempTrk->Transpose = Data[CurPos + 0x02];
-		TempTrk->Volume = Data[CurPos + 0x03];
-		//FinishFMTrkInit:
-		TempTrk->ModEnv = 0x00;
-		TempTrk->Instrument = 0x00;
-		//FinishTrkInit:
-		TempTrk->StackPtr = TRK_STACK_SIZE;
-		TempTrk->PanAFMS = 0xC0;
-		TempTrk->Timeout = 0x01;
-		if (SmpsFileConfig->LoopPtrs != NULL)
-			TempTrk->LoopOfs = SmpsFileConfig->LoopPtrs[TrkBase + CurTrk];
-		else
-			TempTrk->LoopOfs = 0x0000;
-		
-		if ((TempTrk->ChannelMask & 0xF8) == 0x10)
-			TempTrk->SpcDacMode = SmpsFileConfig->DrumChnMode;
-		
-		if (TrkID == TRACK_MUS_DRUM)
-			WriteFMMain(TempTrk, 0xB4, 0xC0);	// force Pan bits to LR
-		
-		if (TempTrk->Pos >= SmpsFileConfig->SeqLength)
-		{
-			TempTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
-			//printf("Track XX points after EOF!\n");
-		}
-	}
-	TrkBase += CurTrk;
+	// FM channels
+	LoadChannelSet(TRACK_MUS_DRUM, FMChnCnt, &CurPos, CHNMODE_DEF | CHNMODE_DRM,
+					SmpsFileConfig->FMChnCnt, SmpsFileConfig->FMChnList, TickMult, TrkBase);
+	TrkBase += FMChnCnt;
 	
-	TrkID = TRACK_MUS_PSG1;
-	for (CurTrk = 0; CurTrk < PSGChnCnt; CurTrk ++, CurPos += 0x06, TrkID ++)
-	{
-		if (TrkID >= TRACK_MUS_PWM1 || CurTrk >= PSGChnCount)
-			continue;
-		
-		TempTrk = &SmpsRAM.MusicTrks[TrkID];
-		memset(TempTrk, 0x00, sizeof(TRK_RAM));
-		TempTrk->SmpsCfg = SmpsRAM.MusCfg;
-		TempTrk->PlaybkFlags = 0x80;
-		TempTrk->ChannelMask = SmpsFileConfig->PSGChnList[CurTrk];
-		TempTrk->TickMult = TickMult;
-		TempTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SmpsFileConfig);
-		TempTrk->Transpose = Data[CurPos + 0x02];
-		TempTrk->Volume = Data[CurPos + 0x03];
-		TempTrk->ModEnv = Data[CurPos + 0x04];
-		TempTrk->Instrument = Data[CurPos + 0x05];
-		//FinishTrkInit:
-		TempTrk->StackPtr = TRK_STACK_SIZE;
-		TempTrk->PanAFMS = 0xC0;
-		TempTrk->Timeout = 0x01;
-		if (SmpsFileConfig->LoopPtrs != NULL)
-			TempTrk->LoopOfs = SmpsFileConfig->LoopPtrs[TrkBase + CurTrk];
-		else
-			TempTrk->LoopOfs = 0x0000;
-		
-		if (TempTrk->Pos >= SmpsFileConfig->SeqLength)
-		{
-			TempTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
-			//printf("Track XX points after EOF!\n");
-		}
-	}
-	TrkBase += CurTrk;
+	// PSG channels
+	LoadChannelSet(TRACK_MUS_PSG1, PSGChnCnt, &CurPos, CHNMODE_PSG,
+					SmpsFileConfig->PSGChnCnt, SmpsFileConfig->PSGChnList, TickMult, TrkBase);
+	TrkBase += PSGChnCnt;
 	
-	TrkID = TRACK_MUS_PWM1;
-	for (CurTrk = 0; CurTrk < SmpsFileConfig->AddChnCnt; CurTrk ++, CurPos += 0x04, TrkID ++)
-	{
-		if (TrkID >= MUS_TRKCNT || CurTrk >= SmpsFileConfig->AddChnCnt)
-			continue;
-		
-		TempTrk = &SmpsRAM.MusicTrks[TrkID];
-		memset(TempTrk, 0x00, sizeof(TRK_RAM));
-		TempTrk->SmpsCfg = SmpsRAM.MusCfg;
-		TempTrk->PlaybkFlags = PBKFLG_ACTIVE;
-		TempTrk->ChannelMask = SmpsFileConfig->AddChnList[CurTrk];
-		TempTrk->TickMult = TickMult;
-		TempTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SmpsFileConfig);
-		TempTrk->Transpose = Data[CurPos + 0x02];
-		TempTrk->Volume = Data[CurPos + 0x03];
-		//FinishFMTrkInit:
-		TempTrk->ModEnv = 0x00;
-		TempTrk->Instrument = 0x00;
-		//FinishTrkInit:
-		TempTrk->StackPtr = TRK_STACK_SIZE;
-		TempTrk->PanAFMS = 0xC0;
-		TempTrk->Timeout = 0x01;
-		if (SmpsFileConfig->LoopPtrs != NULL)
-			TempTrk->LoopOfs = SmpsFileConfig->LoopPtrs[TrkBase + CurTrk];
-		else
-			TempTrk->LoopOfs = 0x0000;
-		
-		if ((TempTrk->ChannelMask & 0xF8) == 0x10)
-			TempTrk->SpcDacMode = SmpsFileConfig->DrumChnMode;
-		
-		SmpsRAM.MusicTrks[TRACK_MUS_FM6].PlaybkFlags = 0x00;
-		
-		if (TempTrk->Pos >= SmpsFileConfig->SeqLength)
-		{
-			TempTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
-			//printf("Track XX points after EOF!\n");
-		}
-	}
+	// additional channels that don't have "channel count" values in the header (i.e. PWM channels)
+	LoadChannelSet(TRACK_MUS_PWM1, SmpsFileConfig->AddChnCnt, &CurPos, CHNMODE_DEF,
+					SmpsFileConfig->AddChnCnt, SmpsFileConfig->AddChnList, TickMult, TrkBase);
+	TrkBase += SmpsFileConfig->AddChnCnt;
 	
 	//SetSFXOverrideBits();
 	
@@ -2143,7 +2195,7 @@ static void DoFadeOut(void)
 	FADE_OUT_INF* Fade = &SmpsRAM.FadeOut;
 	UINT8 CurTrk;
 	TRK_RAM* TempTrk;
-	UINT8 FinalVol;
+	UINT8 PrevVol;
 	
 	if (! Fade->Steps)
 		return;	// Fading disabled - return
@@ -2191,34 +2243,13 @@ static void DoFadeOut(void)
 #endif
 		// This gets more complicated for the few idiotic homebrew SMPS files
 		// which use negative volumes that overflow into a positive range.
-		FinalVol = TempTrk->Volume;
+		PrevVol = TempTrk->Volume;
 		TempTrk->Volume ++;
-		if ((TempTrk->Volume & 0x80) && ! (FinalVol & 0x80))
+		if ((TempTrk->Volume & 0x80) && ! (PrevVol & 0x80))
 			TempTrk->Volume --;	// prevent overflow
 		
-		if (TempTrk->PlaybkFlags & PBKFLG_ACTIVE)
-		{
-			if (! (TempTrk->PlaybkFlags & PBKFLG_OVERRIDDEN))
-			{
-				if (TempTrk->ChannelMask & 0x80)
-				{
-					if (TempTrk->PlaybkFlags & PBKFLG_ATREST)
-						continue;
-					
-					FinalVol = TempTrk->Volume + TempTrk->VolEnvCache;
-					if (FinalVol >= 0x10)
-						FinalVol = 0x0F;
-					FinalVol |= TempTrk->ChannelMask | 0x10;
-					if (TempTrk->PlaybkFlags & PBKFLG_SPCMODE)
-						FinalVol |= 0x20;
-					WritePSG(FinalVol);
-				}
-				else if (! (TempTrk->ChannelMask & 0xF0))
-				{
-					RefreshVolume(TempTrk);
-				}
-			}
-		}
+		if ((TempTrk->PlaybkFlags & PBKFLG_ACTIVE) && ! (TempTrk->PlaybkFlags & PBKFLG_OVERRIDDEN))
+			RefreshVolume(TempTrk);
 	}
 	
 	return;
@@ -2272,12 +2303,12 @@ static void DoFadeOut_GoldenAxeIII(void)
 	{
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
 		if (TempTrk->PlaybkFlags & PBKFLG_ACTIVE)
-			RefreshVolume(TempTrk);	// RefreshVolume sends (Trk->Volume + Fade005)
+			RefreshFMVolume(TempTrk);	// RefreshFMVolume sends (Trk->Volume + Fade005)
 		CurTrk ++;
 		
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
 		if (TempTrk->PlaybkFlags & PBKFLG_ACTIVE)
-			RefreshVolume(TempTrk);
+			RefreshFMVolume(TempTrk);
 	}
 	else
 	{

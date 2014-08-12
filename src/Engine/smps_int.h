@@ -52,8 +52,14 @@ static void DoPSGNoteOff(TRK_RAM* Trk);
 static UINT16 DoPitchSlide(TRK_RAM* Trk);
 void SendFMIns(TRK_RAM* Trk, const UINT8* InsData);
 void RefreshVolume(TRK_RAM* Trk);
+void RefreshFMVolume(TRK_RAM* Trk);
 void SendSSGEG(TRK_RAM* Trk, const UINT8* Data, UINT8 ForceMaxAtk);
 
+static void InitMusicPlay(SMPS_CFG* SmpsFileConfig);
+static UINT8 CheckTrkRange(UINT8 TrkID, UINT8 BestTrkID, UINT8 FirstTrk, UINT8 TrkEnd);
+static UINT8 CheckTrkID(UINT8 TrkID, UINT8 ChnBits);
+static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UINT8 Mode,
+						   UINT8 ChnListSize, const UINT8* ChnList, UINT8 TickMult, UINT8 TrkBase);
 //void PlayMusic(SMPS_CFG* SmpsFileConfig);
 //void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX);
 void GetSFXChnPtrs(UINT8 ChannelMask, UINT8* MusicTrk, UINT8* SFXTrk, UINT8* SpcSFXTrk);

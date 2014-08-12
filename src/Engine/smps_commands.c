@@ -1156,13 +1156,13 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 				RefreshDACVolume(Trk, Trk->SpcDacMode, 0x00, Trk->Volume);
 				break;
 			}
-			RefreshVolume(Trk);
+			RefreshFMVolume(Trk);
 			break;
 		case CFS_VOL_NN_FMP1:	// E6 (early SMPS Z80)
 			Trk->Volume += Params[0x00];
 			if (Trk->ChannelMask & 0xF8)
 				break;
-			RefreshVolume(Trk);
+			RefreshFMVolume(Trk);
 			break;
 		case CFS_VOL_NN_PSG:	// EC
 			Trk->Volume += Params[0x00];
@@ -1187,7 +1187,7 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 			}
 			if (Trk->ChannelMask & 0x78)
 				break;	// Drum/PWM channel - return
-			RefreshVolume(Trk);
+			RefreshFMVolume(Trk);
 			break;
 		case CFS_VOL_CN_PSG:	// EC
 			if (! (Trk->ChannelMask & 0x80))
@@ -1227,7 +1227,7 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 			}
 			if (Trk->ChannelMask & 0x78)
 				break;	// Drum/PWM channel - return
-			RefreshVolume(Trk);
+			RefreshFMVolume(Trk);
 			break;
 		case CFS_VOL_CC_PSG:	// EC
 			if (! (Trk->ChannelMask & 0x80))
@@ -1252,7 +1252,7 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 			}
 			if (Trk->ChannelMask & 0xF8)
 				break;	// Drum/PWM/PSG channel - return
-			RefreshVolume(Trk);
+			RefreshFMVolume(Trk);
 			break;
 		case CFS_VOL_ABS_S3K:
 			// scale 00 (min) .. 7F (max) to
@@ -1271,7 +1271,7 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 				TempByt &= 0x7F;
 				TempByt ^= 0x7F;
 				Trk->Volume = TempByt;
-				RefreshVolume(Trk);
+				RefreshFMVolume(Trk);
 			}
 			break;
 		case CFS_VOL_ABS_HF2:	// The Hybrid Front: E5
@@ -1283,11 +1283,11 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 			Trk->Volume = Params[0x00];
 			if (Trk->Volume >= 0x80)
 				Trk->Volume = 0x7F;
-			RefreshVolume(Trk);
+			RefreshFMVolume(Trk);
 			break;
 		case CFS_VOL_ABS_TMP:
 			Trk->Volume = Params[0x00];
-			RefreshVolume(Trk);
+			RefreshFMVolume(Trk);
 			break;
 		case CFS_VOL_SPC_TMP:
 			if (Trk->ChannelMask & 0x80)
@@ -1297,7 +1297,7 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 			else
 			{
 				Trk->Volume += Params[0x00];	// FM channel - change volume
-				RefreshVolume(Trk);
+				RefreshFMVolume(Trk);
 			}
 			break;
 		case CFS_VOL_ABS_PDRM:
