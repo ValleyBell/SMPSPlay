@@ -25,6 +25,7 @@ static const UINT8 DefDPCMData[0x10] =
 static const char* SIG_ENV = "LST_ENV";
 static const char* SIG_DRUM = "SDRM";
 static const char* SIG_PANI = "SPAN";
+static const char* SIG_INS = "SINS";
 
 typedef struct _dac_new_smpl
 {
@@ -46,6 +47,9 @@ static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, 
 //UINT8 LoadPanAniData(const char* FileName, PAN_ANI_LIB* PAniLib);
 //void FreePanAniData(PAN_ANI_LIB* PAniLib);
 //UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg);
+static UINT8 LoadSimpleInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg);
+static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg);
+//void FreeGlobalInstrumentLib(SMPS_CFG* SmpsCfg);
 INLINE UINT16 ReadLE16(const UINT8* Data);
 INLINE UINT16 ReadBE16(const UINT8* Data);
 
@@ -697,10 +701,8 @@ UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg)
 {
 	FILE* hFile;
 	UINT32 FileLen;
+	UINT8* FileData;
 	UINT8 RetVal;
-	UINT16 InsCount;
-	UINT16 CurIns;
-	UINT16 CurPos;
 	
 	hFile = fopen(FileName, "rb");
 	if (hFile == NULL)
@@ -708,21 +710,41 @@ UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg)
 	
 	fseek(hFile, 0x00, SEEK_END);
 	FileLen = ftell(hFile);
-	if (! FileLen)
+	if (FileLen < 0x10)
 	{
 		fclose(hFile);	// empty file == no file
 		return 0xFF;
 	}
-	if (FileLen > 0x2000)
-		FileLen = 0x2000;
+	if (FileLen > 0x4000)
+		FileLen = 0x4000;	// This is enough for 315 instruments with register-data interleaving.
 	
-	SmpsCfg->GlbInsLen = FileLen;
-	SmpsCfg->GlbInsData = (UINT8*)malloc(FileLen);
+	FileData = (UINT8*)malloc(FileLen);
 	fseek(hFile, 0x00, SEEK_SET);
-	fread(SmpsCfg->GlbInsData, 0x01, FileLen, hFile);
+	fread(FileData, 0x01, FileLen, hFile);
 	
 	fclose(hFile);
 	
+	if (! memcmp(&FileData[0x00], SIG_INS, 0x04))
+	{
+		RetVal = LoadAdvancedInstrumentLib(FileLen, FileData, SmpsCfg);
+	}
+	else
+	{
+		RetVal = LoadSimpleInstrumentLib(FileLen, FileData, SmpsCfg);
+		RetVal = SmpsOffsetFromFilename(FileName, &SmpsCfg->GlbInsBase);
+	}
+	
+	return 0x00;
+}
+
+static UINT8 LoadSimpleInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg)
+{
+	UINT16 InsCount;
+	UINT16 CurIns;
+	UINT16 CurPos;
+	
+	SmpsCfg->GlbInsLen = FileLen;
+	SmpsCfg->GlbInsData = FileData;
 	InsCount = FileLen / SmpsCfg->InsRegCnt;
 	SmpsCfg->GlbInsLib.InsCount = InsCount;
 	SmpsCfg->GlbInsLib.InsPtrs = NULL;
@@ -731,11 +753,58 @@ UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg)
 		SmpsCfg->GlbInsLib.InsPtrs = (UINT8**)malloc(InsCount * sizeof(UINT8*));
 		CurPos = 0x0000;
 		for (CurIns = 0x00; CurIns < InsCount; CurIns ++, CurPos += SmpsCfg->InsRegCnt)
-			SmpsCfg->GlbInsLib.InsPtrs[CurIns] = &SmpsCfg->GlbInsData[CurPos];
+			SmpsCfg->GlbInsLib.InsPtrs[CurIns] = &FileData[CurPos];
 	}
 	
 	SmpsCfg->GlbInsBase = 0x0000;
-	RetVal = SmpsOffsetFromFilename(FileName, &SmpsCfg->GlbInsBase);
+	return 0x00;
+}
+
+static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg)
+{
+	UINT8 Flags;
+	UINT16 InsCount;
+	UINT16 CurIns;
+	UINT16 InsOfs;
+	UINT16 InsBase;
+	UINT16 CurPos;
+	UINT16 InsPos;
+	
+	Flags = FileData[0x04];
+	if ((Flags & ~0x11) != 0x00)
+		return 0xC0;	// wrong mode
+	
+	InsCount = FileData[0x05];
+	InsOfs = ReadLE16(&FileData[0x06]);
+	if (! (Flags & 0x10))
+		InsBase = ReadLE16(&FileData[0x08]);
+	else
+		InsBase = ReadBE16(&FileData[0x08]);
+	// For now I'll ignore the Register array. It is specified in DefDrv.txt.
+	if (! InsOfs)
+		return 0xC1;	// invalid drum offset
+	
+	SmpsCfg->GlbInsLen = FileLen;
+	SmpsCfg->GlbInsData = FileData;
+	SmpsCfg->GlbInsLib.InsCount = InsCount;
+	SmpsCfg->GlbInsLib.InsPtrs = NULL;
+	if (InsCount)
+	{
+		SmpsCfg->GlbInsLib.InsPtrs = (UINT8**)malloc(InsCount * sizeof(UINT8*));
+		CurPos = InsOfs;
+		for (CurIns = 0x00; CurIns < InsCount; CurIns ++, CurPos += 0x02)
+		{
+			if (! (Flags & 0x10))
+				InsPos = ReadLE16(&FileData[CurPos]);
+			else
+				InsPos = ReadBE16(&FileData[CurPos]);
+			InsPos = InsPos - InsBase + InsOfs;
+			if (InsPos >= InsOfs && InsPos < FileLen)
+				SmpsCfg->GlbInsLib.InsPtrs[CurIns] = &FileData[InsPos];
+			else
+				SmpsCfg->GlbInsLib.InsPtrs[CurIns] = NULL;
+		}
+	}
 	
 	return 0x00;
 }

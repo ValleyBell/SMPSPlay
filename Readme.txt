@@ -10,7 +10,7 @@ This program plays SMPS music files, a format commonly used in games for the Seg
 
 Features
 --------
-- accurate playback of MegaDrive SMPS files (maybe not 100% accurate for a few special driver variations, but the differences should be inaudible)
+- accurate playback of SMPS files used in MegaDrive and Master System games (maybe not 100% accurate for a few special driver variations, but the differences should be inaudible)
 - fully customizable SMPS commands and drums
 - many SMPS driver settings, incl. FM/PSG frequencies and modulation/volume envelope commands
 - separate SMPS settings for every file extention
@@ -63,6 +63,8 @@ A huge thanks to the developers of IDA, The Interactive Disassembler. Disassembl
 
 History
 -------
+2014-0?-??
+	added proper support for Master System SMPS (incl. PSG drums, additional commands)
 2014-07-01
 	First real public release. v2.00
 2014-05-04

@@ -174,6 +174,26 @@ UINT8 SmpsOffsetFromFilename(const char* FileName, UINT16* RetOffset)
 	return 0x00;
 }
 
+static void CreateInstrumentTable(SMPS_CFG* SmpsCfg, UINT32 FileLen, UINT8* FileData, UINT32 StartOfs)
+{
+	INS_LIB* InsLib;
+	UINT32 CurPos;
+	UINT16 TempOfs;
+	
+	InsLib = (INS_LIB*)malloc(sizeof(INS_LIB));
+	InsLib->InsCount = (FileLen - StartOfs) / SmpsCfg->InsRegCnt;
+	if (InsLib->InsCount > 0x100)
+		InsLib->InsCount = 0x100;
+	InsLib->InsPtrs = (UINT8**)malloc(InsLib->InsCount * sizeof(UINT8*));
+	
+	CurPos = StartOfs;
+	for (TempOfs = 0; TempOfs < InsLib->InsCount; TempOfs ++, CurPos += SmpsCfg->InsRegCnt)
+		InsLib->InsPtrs[TempOfs] = &FileData[CurPos];
+	
+	SmpsCfg->InsLib = InsLib;
+	return;
+}
+
 UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 {
 	UINT32 FileLen;
@@ -230,18 +250,15 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 	for (CurTrk = 0x00; CurTrk < SmpsCfg->AddChnCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
 		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsCfg);
 	
-	if (InsPtr && (UINT32)InsPtr + SmpsCfg->InsRegCnt <= FileLen)
+	if (SmpsCfg->InsMode & INSMODE_INT)
 	{
-		INS_LIB* InsLib;
-		
-		InsLib = (INS_LIB*)malloc(sizeof(INS_LIB));
-		SmpsCfg->InsLib = InsLib;
-		InsLib->InsCount = (FileLen - InsPtr) / SmpsCfg->InsRegCnt;
-		if (InsLib->InsCount > 0x100)
-			InsLib->InsCount = 0x100;
-		InsLib->InsPtrs = (UINT8**)malloc(InsLib->InsCount * sizeof(UINT8*));
-		for (TempOfs = 0; TempOfs < InsLib->InsCount; TempOfs ++)
-			InsLib->InsPtrs[TempOfs] = &FileData[InsPtr + TempOfs * SmpsCfg->InsRegCnt];
+		// interleaved instruments ALWAYS use external files
+		// (requires instrument pointers due to variable instrument size)
+		SmpsCfg->InsLib = &SmpsCfg->GlbInsLib;
+	}
+	else if (InsPtr && (UINT32)InsPtr + SmpsCfg->InsRegCnt <= FileLen)
+	{
+		CreateInstrumentTable(SmpsCfg, FileLen, FileData, InsPtr);
 	}
 	else if (SmpsCfg->GlbInsData != NULL)
 	{
@@ -250,21 +267,13 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 			InsPtr = 0x0000;
 		if (InsPtr > SmpsCfg->GlbInsBase && InsPtr < SmpsCfg->GlbInsBase + SmpsCfg->GlbInsLen)
 		{
-			INS_LIB* InsLib;
 			UINT16 BaseOfs;
 			
-			// read from the middle of the Instrument Table, of the song's Table Offset is
+			// read from the middle of the Instrument Table, if the song's Table Offset is
 			// TblStart < SongTblOfs < TblEnd
 			// (TblStart == SongTblOfs is done in the else block)
 			BaseOfs = InsPtr - SmpsCfg->GlbInsBase;
-			InsLib = (INS_LIB*)malloc(sizeof(INS_LIB));
-			SmpsCfg->InsLib = InsLib;
-			InsLib->InsCount = (SmpsCfg->GlbInsLen - BaseOfs) / SmpsCfg->InsRegCnt;
-			if (InsLib->InsCount > 0x100)
-				InsLib->InsCount = 0x100;
-			InsLib->InsPtrs = (UINT8**)malloc(InsLib->InsCount * sizeof(UINT8*));
-			for (TempOfs = 0; TempOfs < InsLib->InsCount; TempOfs ++)
-				InsLib->InsPtrs[TempOfs] = &SmpsCfg->GlbInsData[BaseOfs + TempOfs * SmpsCfg->InsRegCnt];
+			CreateInstrumentTable(SmpsCfg, SmpsCfg->GlbInsLen, SmpsCfg->GlbInsData, BaseOfs);
 		}
 		else
 		{

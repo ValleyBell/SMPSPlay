@@ -2,6 +2,8 @@
 #define __SMPS_INT_H__
 
 // --- Internal SMPS functions ---
+// Note: I know that "static" functions are out of place here,
+//       but this way I have a nice list of all functions.
 
 #include "stdtype.h"
 #include "smps_structs.h"

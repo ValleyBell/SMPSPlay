@@ -1,0 +1,11 @@
+4 bytes - Signature "SINS" (Smps INStrument library)
+1 byte  - Type
+	Bit 0 - separate register array (on) / Interleaved Registers/Data (off)
+	Bit 4 - Big Endian pointers (on) / Little Endian pointers (off)
+1 byte  - Instrument Count
+2 bytes - Data Pointer List File Offset [always Little Endian]
+2 bytes - Data Pointer Base [Little/Big Endian]
+2 bytes - Register Array File Offset (terminated by 00 or 83) [always Little Endian, required if Type bit 0 is set]
+4 bytes - reserved, must be 00
+
+Note: The pointer lists can not reference to any data with a lower offsets than themselves.

@@ -5,6 +5,6 @@
 1 byte  - Animation Count
 2 bytes - Data Pointer List File Offset [always 2-byte Little Endian]
 2 bytes - Data Pointer Base [always 2-byte Little/Big Endian]
-6 byte  - reserved, must be 00
+6 bytes - reserved, must be 00
 
 Note: The pointer lists can not reference to any data with a lower offsets than themselves.

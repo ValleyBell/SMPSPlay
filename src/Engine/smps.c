@@ -1079,6 +1079,7 @@ static void DoFMVolEnv(TRK_RAM* Trk)
 		return;
 	if (OpPtr == NULL || VolPtr == NULL)
 		return;
+	// TODO: support interleaved mode (not important, because preSMPS games don't have this feature)
 	
 	AlgoMask = Trk->FMVolEnv.OpMask;
 	for (CurOp = 0x00; CurOp < 0x04; CurOp ++, AlgoMask >>= 1)
@@ -1576,28 +1577,62 @@ void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
 	const UINT8* InsPtr = InsData;
 	UINT8 HadB4;
 	
-	if (OpPtr == NULL || InsData == NULL)
-		return;
-	
-	HadB4 = 0x00;
-	while(*OpPtr)
+	if (! (Trk->SmpsCfg->InsMode & INSMODE_INT))
 	{
-		if (*OpPtr == 0xB0)
-			Trk->FMAlgo = *InsPtr;
-		else if (*OpPtr == 0xB4)
-		{
-			Trk->PanAFMS = *InsPtr;
-			HadB4 = 0x01;
-		}
-		else if (*OpPtr == 0x40)
-			Trk->VolOpPtr = InsPtr;
+		if (OpPtr == NULL || InsData == NULL)
+			return;
 		
-		if ((*OpPtr & 0xF0) != 0x40)	// exclude the TL operators - RefreshFMVolume will do them
+		HadB4 = 0x00;
+		while(*OpPtr)
 		{
-			//WriteInsReg:
-			WriteFMMain(Trk, *OpPtr, *InsPtr);
+			if (*OpPtr == 0xB0)
+				Trk->FMAlgo = *InsPtr;
+			else if (*OpPtr == 0xB4)
+			{
+				Trk->PanAFMS = *InsPtr;
+				HadB4 = 0x01;
+			}
+			else if (*OpPtr == 0x40)
+				Trk->VolOpPtr = InsPtr;
+			
+			if ((*OpPtr & 0xF0) != 0x40)	// exclude the TL operators - RefreshFMVolume will do them
+			{
+				//WriteInsReg:
+				WriteFMMain(Trk, *OpPtr, *InsPtr);
+			}
+			*OpPtr ++;	*InsPtr ++;
 		}
-		*OpPtr ++;	*InsPtr ++;
+	}
+	else
+	{
+		if (InsData == NULL)
+			return;
+		
+		// preSMPS style (interleaved register/data)
+		HadB4 = 0x00;
+		Trk->VolOpPtr = NULL;
+		while(*InsPtr)
+		{
+			if (*InsPtr == 0x83)
+				break;	// terminator
+			
+			if (*InsPtr == 0xB0)
+				Trk->FMAlgo = InsPtr[0x01];
+			else if (*InsPtr == 0xB4)
+			{
+				Trk->PanAFMS = InsPtr[0x01];
+				HadB4 = 0x01;
+			}
+			else if ((*InsPtr & 0xF0) == 0x40 && Trk->VolOpPtr == NULL)
+				Trk->VolOpPtr = InsPtr;
+			
+			if ((*InsPtr & 0xF0) != 0x40)	// exclude the TL operators - RefreshFMVolume will do them
+			{
+				//WriteInsReg:
+				WriteFMMain(Trk, InsPtr[0x00], InsPtr[0x01]);
+			}
+			InsPtr += 0x02;
+		}
 	}
 	if (! HadB4)	// if it was in the list already, skip it
 		WriteFMMain(Trk, 0xB4, Trk->PanAFMS);
@@ -1635,45 +1670,74 @@ void RefreshVolume(TRK_RAM* Trk)
 	return;
 }
 
+static UINT8 ApplyOutOperatorVol(TRK_RAM* Trk, UINT8 AlgoMask, UINT8 Reg, UINT8 CurTL)
+{
+	UINT8 IsOutputOp;
+	
+	if (Trk->SmpsCfg->VolMode & VOLMODE_BIT7)
+	{
+		IsOutputOp = (CurTL & 0x80);
+	}
+	else // VOLMODE_ALGO
+	{
+		IsOutputOp = (Reg & 0x0C) >> 2;	// 40/44/48/4C -> Bit 0/1/2/3
+		IsOutputOp = AlgoMask & (1 << IsOutputOp);
+	}
+	if (! IsOutputOp)
+		return CurTL;
+	
+	if (Trk->SmpsCfg->VolMode & VOLMODE_SETVOL)
+		CurTL = Trk->Volume;
+	else
+		CurTL += Trk->Volume;
+	CurTL &= 0x7F;
+	
+	return CurTL;
+}
+
 void RefreshFMVolume(TRK_RAM* Trk)
 {
-	//const UINT8* OpPtr = (Trk->SmpsCfg->InsMode & 0x01) ? VolOperators_HW : VolOperators_DEF;
-	const UINT8* OpPtr = Trk->SmpsCfg->InsReg_TL;
-	const UINT8* VolPtr = Trk->VolOpPtr;
+	const UINT8* OpPtr;
+	const UINT8* VolPtr;
 	UINT8 AlgoMask;
 	UINT8 CurOp;
 	UINT8 CurTL;
-	UINT8 IsOutputOp;
 	
-	if (OpPtr == NULL || VolPtr == NULL)
-		return;
 	if (Trk->ChannelMask & 0x10)
 		return;	// don't refresh on DAC/Drum tracks
 	
 	AlgoMask = AlgoOutMask[Trk->FMAlgo & 0x07];
-	for (CurOp = 0x00; CurOp < 0x04; CurOp ++)
+	if (! (Trk->SmpsCfg->InsMode & INSMODE_INT))
 	{
-		CurTL = VolPtr[CurOp];
+		OpPtr = Trk->SmpsCfg->InsReg_TL;
+		VolPtr = Trk->VolOpPtr;
+		if (OpPtr == NULL || VolPtr == NULL)
+			return;
 		
-		if (Trk->SmpsCfg->VolMode & VOLMODE_BIT7)
+		// normal mode - OpPtr has the Registers, VolPtr their values
+		for (CurOp = 0x00; CurOp < 0x04; CurOp ++)
 		{
-			IsOutputOp = (CurTL & 0x80);
+			CurTL = ApplyOutOperatorVol(Trk, AlgoMask, OpPtr[CurOp], VolPtr[CurOp]);
+			WriteFMMain(Trk, OpPtr[CurOp], CurTL);
 		}
-		else // VOLMODE_ALGO
+	}
+	else
+	{
+		// interleaved mode - VolPtr has Reg, Data, Reg, Data, ...
+		// Note that it the registers can be in a random order or, like for drum instruments, partly missing.
+		// (preSMPS uses the Special FM3 mode to play 2x 2op drums)
+		// So I iterate through the whole instrument and search for the volume data.
+		VolPtr = Trk->VolOpPtr;
+		while(*VolPtr && *VolPtr != 0x83)
 		{
-			IsOutputOp = (OpPtr[CurOp] & 0x0C) >> 2;	// 40/44/48/4C -> Bit 0/1/2/3
-			IsOutputOp = AlgoMask & (1 << IsOutputOp);
+			CurOp = *VolPtr;	VolPtr ++;
+			if ((CurOp & 0xF0) == 0x40)
+			{
+				CurTL = ApplyOutOperatorVol(Trk, AlgoMask, CurOp, *VolPtr);
+				WriteFMMain(Trk, CurOp, CurTL);
+			}
+			VolPtr ++;
 		}
-		if (IsOutputOp)
-		{
-			if (Trk->SmpsCfg->VolMode & VOLMODE_SETVOL)
-				CurTL = Trk->Volume;
-			else
-				CurTL += Trk->Volume;
-		}
-		CurTL &= 0x7F;
-		
-		WriteFMMain(Trk, OpPtr[CurOp], CurTL);
 	}
 	
 	return;
@@ -2254,6 +2318,7 @@ static void DoFadeOut(void)
 	
 	return;
 }
+
 #if 0
 static void DoFadeOut_GoldenAxeIII(void)
 {
