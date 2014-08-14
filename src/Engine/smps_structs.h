@@ -74,6 +74,7 @@
 #define DRMTYPE_FM		0x01
 #define DRMTYPE_PSG		0x02
 #define DRMTYPE_DAC		0x03
+#define DRMTYPE_FM2OP	0x04
 #define DRMTYPE_NONE	0x00
 
 typedef struct _command_flags

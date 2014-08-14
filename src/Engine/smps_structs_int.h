@@ -73,7 +73,7 @@ typedef struct _track_ram
 	UINT8 Instrument;	// 08 - FM/PSG Instrument
 	UINT8 StackPtr;		// 09 - GoSub Stack Pointer
 	UINT8 PanAFMS;		// 0A - Pan/AMS/FMS bits (YM2612 Register B4)
-	UINT8 Timeout;		// 0B - current Note Timeout
+	UINT8 RemTicks;		// 0B - current Note Timeout
 	UINT8 NoteLen;		// 0C - last Note Length (Timeout gets set to NoteLen when playing a note)
 	union
 	{
@@ -123,7 +123,20 @@ typedef struct _track_ram
 	UINT8 LoopStack[TRK_STACK_SIZE];	// 28-2F - Loop Data and GoSub Stack
 	UINT16 LoopOfs;		// [not in driver] Loop Offset (for loop detection)
 } TRK_RAM;
-
+typedef struct _drum_track_ram
+{
+	TRK_RAM* Trk;
+	
+	UINT8 PlaybkFlags;		// 00 - Playback Flags
+	const UINT8* InsPtr;	// 01/02 - Instrument Pointer
+	UINT8 Freq1MSB;			// 03 - Frequency MSB, 1st Operator
+	UINT8 Freq1LSB;			// 04 - Frequency LSB, 1st Operator
+	UINT8 Freq2MSB;			// 05 - Frequency MSB, 2nd Operator
+	UINT8 Freq2LSB;			// 06 - Frequency LSB, 2nd Operator
+	UINT8 Freq1Inc;			// 07 - Frequency Increment, 1st Operator
+	UINT8 Freq2Inc;			// 08 - Frequency Increment, 2nd Operator
+	UINT8 RemTicks;			// 09 - Ticks until Note Off
+} DRUM_TRK_RAM;
 
 enum MUSIC_TRACKS
 {
@@ -254,6 +267,7 @@ typedef struct _sound_ram
 	// 1C3D - DAC sound Bank Number
 	// 1C3E-3F - unused
 	
+	DRUM_TRK_RAM MusDrmTrks[2];			// 1819/1829 - preSMPS FM3 2-op Drum Tracks
 	TRK_RAM MusicTrks[MUS_TRKCNT];		// 1C40 - Music Tracks
 	TRK_RAM SFXTrks[SFX_TRKCNT];		// 1DF0 - SFX Tracks
 	TRK_RAM SpcSFXTrks[SPCSFX_TRKCNT];	// 1F40 - Special SFX Tracks

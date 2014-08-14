@@ -117,11 +117,12 @@ static const OPT_LIST OPT_ENVCMD[] =
 static const OPT_LIST OPT_DRUMMODE[] =
 {	{"Normal", DRMMODE_NORMAL},
 	{"Dual", DRMMODE_DUAL},
-	{NULL, DRMMODE_DUAL}};
+	{NULL, DRMMODE_NORMAL}};
 static const OPT_LIST OPT_DRUMTYPE[] =
 {	{"FM", DRMTYPE_FM},
 	{"PSG", DRMTYPE_PSG},
 	{"DAC", DRMTYPE_DAC},
+	{"2OpFM", DRMTYPE_FM2OP},
 	{NULL, DRMTYPE_NONE}};
 
 static const UINT16 DEF_FMFREQ_VAL[13] =

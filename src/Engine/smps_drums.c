@@ -14,7 +14,7 @@
 #include "../Sound.h"
 #include "dac.h"
 
-//#define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, 0x00, Reg, Data)
+#define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, 0x00, Reg, Data)
 #define WritePSG(Data)			sn76496_psg_write(0x00, Data)
 
 
@@ -97,6 +97,7 @@ void PlayDrumNote(TRK_RAM* Trk, UINT8 Note)
 static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 {
 	TRK_RAM* DrumTrk;
+	DRUM_TRK_RAM* DrumTrk2Op;
 	const DRUM_TRK_LIB* DTrkLib;
 	SMPS_CFG* DTrkCfg;
 	const UINT8* DTrkData;
@@ -105,6 +106,9 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 	switch(DrumData->Type)
 	{
 	case DRMTYPE_DAC:
+		if (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)
+			return;
+		
 		if (DrumData->PitchOvr)
 			DAC_SetRateOverride(DrumData->DrumID, DrumData->PitchOvr);
 		if (! DrumData->ChnMask)
@@ -162,7 +166,7 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 		//FinishTrkInit:
 		DrumTrk->StackPtr = TRK_STACK_SIZE;
 		DrumTrk->PanAFMS = 0xC0;
-		DrumTrk->Timeout = 0x01;
+		DrumTrk->RemTicks = 0x01;
 		
 		if (DrumTrk->Instrument < DTrkLib->InsLib.InsCount)
 			SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument]);
@@ -206,10 +210,51 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 		//FinishTrkInit:
 		DrumTrk->StackPtr = TRK_STACK_SIZE;
 		DrumTrk->PanAFMS = 0xC0;
-		DrumTrk->Timeout = 0x01;
+		DrumTrk->RemTicks = 0x01;
 		
 		if (DrumTrk->Pos >= DTrkCfg->SeqLength)
 			DrumTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
+		break;
+	case DRMTYPE_FM2OP:
+		if (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)
+			return;
+		
+		if (DrumData->ChnMask >= 0x02)
+			return;
+		DrumTrk2Op = &SmpsRAM.MusDrmTrks[DrumData->ChnMask];
+		DrumTrk2Op->PlaybkFlags &= 0x01;	// mask all bits but the Channel Select out
+		Do2OpNote();						// refresh Note State
+		
+		DTrkLib = &Trk->SmpsCfg->FMDrums;
+		if (DrumData->DrumID >= DTrkLib->DrumCount)
+			return;
+		
+		if (! (SmpsRAM.SpcFM3Mode & 0x40))
+		{
+			SmpsRAM.SpcFM3Mode |= 0x40;
+			WriteFMI(0x27, SmpsRAM.SpcFM3Mode);
+			Trk->Volume = 0x00;
+		}
+		
+		// Initialize configuration structures
+		DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
+		DTrkData = &DTrkLib->Data[DrumOfs];
+		
+		memset(DrumTrk2Op, 0x00, sizeof(DRUM_TRK_RAM));
+		DrumTrk2Op->Trk = Trk;
+		DrumTrk2Op->PlaybkFlags = DTrkData[0x00];
+		DrumTrk2Op->Freq1MSB = DTrkData[0x03];
+		DrumTrk2Op->Freq1LSB = DTrkData[0x04];
+		DrumTrk2Op->Freq2MSB = DTrkData[0x05];
+		DrumTrk2Op->Freq2LSB = DTrkData[0x06];
+		DrumTrk2Op->Freq1Inc = DTrkData[0x07];
+		DrumTrk2Op->Freq2Inc = DTrkData[0x08];
+		DrumTrk2Op->RemTicks = DTrkData[0x09];
+		
+		DrumOfs = ReadLE16(&DTrkData[0x01]) - DTrkLib->DrumBase;
+		if (DrumOfs < DTrkLib->DataLen)
+			SendFMIns(Trk, &DTrkLib->Data[DrumOfs]);
+		Do2OpNote();
 		break;
 	}
 }
@@ -291,7 +336,10 @@ void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note)
 	
 	Note &= 0x7F;
 	if (Note >= DrumLib->DrumCount)
+	{
+		Trk->PlaybkFlags |= PBKFLG_ATREST;
 		return;
+	}
 	TempDrum = &DrumLib->DrumData[Note];
 	if (! TempDrum->NoiseMode)
 	{

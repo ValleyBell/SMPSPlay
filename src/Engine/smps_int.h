@@ -24,6 +24,7 @@ static void UpdateFMTrack(TRK_RAM* Trk);
 static void UpdatePSGTrack(TRK_RAM* Trk);
 static void UpdatePSGVolume(TRK_RAM* Trk, UINT8 WasNewNote);
 static void UpdateDrumTrack(TRK_RAM* Trk);
+static void Update2OpDrumTrack(DRUM_TRK_RAM* Trk);
 static void UpdatePWMTrack(TRK_RAM* Trk);
 static void UpdatePSGNoiseTrack(TRK_RAM* Trk);
 
@@ -51,6 +52,7 @@ static UINT8 DoADSR(TRK_RAM* Trk);
 void DoNoteOn(TRK_RAM* Trk);
 void DoNoteOff(TRK_RAM* Trk);
 static void DoPSGNoteOff(TRK_RAM* Trk);
+void Do2OpNote(void);
 static UINT16 DoPitchSlide(TRK_RAM* Trk);
 INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID);
 void SendFMIns(TRK_RAM* Trk, const UINT8* InsData);

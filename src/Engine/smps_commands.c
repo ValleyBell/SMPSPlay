@@ -212,14 +212,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		else
 		{
 			if (Data[0x00] == 0x01)
-			{
 				Trk->PlaybkFlags |= PBKFLG_HOLD_ALL;
-			}
 			else
-			{
-				Trk->PlaybkFlags &= ~PBKFLG_HOLD_ALL;
-				DoNoteOff(Trk);
-			}
+				Trk->PlaybkFlags &= ~(PBKFLG_HOLD_ALL | PBKFLG_HOLD);	// DoNoteOff() is done when processing the next note
 		}
 		break;
 	case CF_NOTE_STOP:	// E8 Note Stop

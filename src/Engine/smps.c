@@ -61,6 +61,10 @@ static const UINT8 AlgoOutMask[0x08] =
 static const UINT8 OpList_DEF[] = {0x00, 0x08, 0x04, 0x0C};	// default SMPS operator order
 static const UINT8 OpList_HW[]  = {0x00, 0x04, 0x08, 0x0C};	// hardware operator order
 
+static const UINT8 FreqReg_2Op[2][4] =
+{	{0xAD, 0xA9, 0xAE, 0xAA},
+	{0xAC, 0xA8, 0xA6, 0xA2}};
+
 #define CHNMODE_DEF		0x00	// default (4 bytes per header)
 #define CHNMODE_PSG		0x01	// PSG (6 bytes per header)
 #define CHNMODE_DRM		0x10	// drum (can skip drum channels)
@@ -239,6 +243,9 @@ void UpdateMusic(void)
 		SmpsRAM.MusMultUpdate --;
 		for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 			UpdateTrack(&SmpsRAM.MusicTrks[CurTrk]);
+		
+		for (CurTrk = 0; CurTrk < 2; CurTrk ++)
+			Update2OpDrumTrack(&SmpsRAM.MusDrmTrks[CurTrk]);
 	}
 	
 	return;
@@ -290,8 +297,8 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 	UINT16 Freq;
 	UINT8 FreqUpdate;
 	
-	Trk->Timeout --;
-	if (! Trk->Timeout)
+	Trk->RemTicks --;
+	if (! Trk->RemTicks)
 	{
 		TrkUpdate_Proc(Trk);
 		if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
@@ -364,8 +371,8 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 	UINT8 FreqUpdate;
 	UINT8 WasNewNote;
 	
-	Trk->Timeout --;
-	if (! Trk->Timeout)
+	Trk->RemTicks --;
+	if (! Trk->RemTicks)
 	{
 		TrkUpdate_Proc(Trk);
 		if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
@@ -479,8 +486,8 @@ static void UpdatePSGVolume(TRK_RAM* Trk, UINT8 WasNewNote)
 
 static void UpdateDrumTrack(TRK_RAM* Trk)
 {
-	Trk->Timeout --;
-	if (! Trk->Timeout)
+	Trk->RemTicks --;
+	if (! Trk->RemTicks)
 	{
 		const UINT8* Data = Trk->SmpsCfg->SeqData;
 		UINT8 Note;
@@ -568,10 +575,42 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 	return;
 }
 
+static void Update2OpDrumTrack(DRUM_TRK_RAM* Trk)
+{
+	const UINT8* FreqList;
+	
+	if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
+		return;
+	if (Trk->Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)	// parent track has "overridden" bit set
+		return;
+	
+	Trk->RemTicks --;
+	if (! Trk->RemTicks)
+	{
+		//StopDrumNote:
+		Trk->PlaybkFlags &= ~PBKFLG_ACTIVE;
+		Do2OpNote();
+		return;
+	}
+	
+	FreqList = FreqReg_2Op[Trk->PlaybkFlags & 0x01];
+	WriteFMI(FreqList[0x00], Trk->Freq1MSB);
+	WriteFMI(FreqList[0x01], Trk->Freq1LSB);
+	WriteFMI(FreqList[0x02], Trk->Freq2MSB);
+	WriteFMI(FreqList[0x03], Trk->Freq2LSB);
+	
+	Trk->Freq1LSB += Trk->Freq1Inc;
+	Trk->Freq2LSB += Trk->Freq2Inc;
+	// Space Harrier II's code is slightly buggy and does this instead:
+	//Trk->Freq2MSB = Trk->Freq2LSB + Trk->Freq2Inc;
+	
+	return;
+}
+
 static void UpdatePWMTrack(TRK_RAM* Trk)
 {
-	Trk->Timeout --;
-	if (! Trk->Timeout)
+	Trk->RemTicks --;
+	if (! Trk->RemTicks)
 	{
 		const UINT8* Data = Trk->SmpsCfg->SeqData;
 		UINT8 Note;
@@ -636,8 +675,8 @@ static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 	UINT16 Freq;
 	UINT8 WasNewNote;
 	
-	Trk->Timeout --;
-	if (! Trk->Timeout)
+	Trk->RemTicks --;
+	if (! Trk->RemTicks)
 	{
 		const UINT8* Data = Trk->SmpsCfg->SeqData;
 		UINT8 Note;
@@ -775,6 +814,8 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 	}
 	
 	Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
+	if (Trk->PlaybkFlags & PBKFLG_HOLD_ALL)
+		Trk->PlaybkFlags |= PBKFLG_HOLD;
 	
 	while(Data[Trk->Pos] >= /*0xE0*/Trk->SmpsCfg->CmdList.FlagBase)
 	{
@@ -790,8 +831,6 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 		DoPanAnimation(Trk, 0);
 		InitLFOModulation(Trk);
 	}
-	if (Trk->PlaybkFlags & PBKFLG_HOLD_ALL)
-		Trk->PlaybkFlags |= PBKFLG_HOLD;
 	
 	ReuseDelay = 0x00;
 	if (! (Trk->PlaybkFlags & PBKFLG_RAWFREQ))
@@ -851,7 +890,7 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 		Trk->Pos ++;
 	}
 	
-	Trk->Timeout = Trk->NoteLen;
+	Trk->RemTicks = Trk->NoteLen;
 	if (! (Trk->PlaybkFlags & PBKFLG_HOLD) || (Trk->NStopRevMode & 0x80))	// Mode 0x80 == execute always
 	{
 		if (! Trk->NStopRevMode)
@@ -1525,6 +1564,20 @@ static void DoPSGNoteOff(TRK_RAM* Trk)
 	return;
 }
 
+void Do2OpNote(void)
+{
+	UINT8 OffOnBits;
+	
+	OffOnBits = 0x02;
+	if (SmpsRAM.MusDrmTrks[0].PlaybkFlags & PBKFLG_ACTIVE)
+		OffOnBits |= 0x30;
+	if (SmpsRAM.MusDrmTrks[1].PlaybkFlags & PBKFLG_ACTIVE)
+		OffOnBits |= 0xC0;
+	WriteFMI(0x28, OffOnBits);
+	
+	return;
+}
+
 static UINT16 DoPitchSlide(TRK_RAM* Trk)
 {
 	UINT16 NewFreq;
@@ -1617,7 +1670,7 @@ void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
 		
 		// preSMPS style (interleaved register/data)
 		HadB4 = 0x00;
-		Trk->VolOpPtr = NULL;
+		Trk->VolOpPtr = InsPtr;
 		while(*InsPtr)
 		{
 			if (*InsPtr == 0x83)
@@ -1710,8 +1763,8 @@ void RefreshFMVolume(TRK_RAM* Trk)
 	UINT8 CurOp;
 	UINT8 CurTL;
 	
-	if (Trk->ChannelMask & 0x10)
-		return;	// don't refresh on DAC/Drum tracks
+//	if (Trk->ChannelMask & 0x10)
+//		return;	// don't refresh on DAC/Drum tracks
 	
 	AlgoMask = AlgoOutMask[Trk->FMAlgo & 0x07];
 	if (! (Trk->SmpsCfg->InsMode & INSMODE_INT))
@@ -1788,6 +1841,8 @@ static void InitMusicPlay(SMPS_CFG* SmpsFileConfig)
 		TempTrk->PlaybkFlags = 0x00;
 		TempTrk->SmpsCfg = NULL;
 	}
+	for (CurTrk = 0; CurTrk < 2; CurTrk ++)
+		SmpsRAM.MusDrmTrks[CurTrk].PlaybkFlags &= ~PBKFLG_ACTIVE;
 	SmpsRAM.NoiseDrmVol = 0x00;
 	ResetSpcFM3Mode();
 	SmpsRAM.FadeOut.Steps = 0x00;
@@ -1924,7 +1979,7 @@ static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UI
 		//FinishTrkInit:
 		TempTrk->StackPtr = TRK_STACK_SIZE;
 		TempTrk->PanAFMS = 0xC0;
-		TempTrk->Timeout = 0x01;
+		TempTrk->RemTicks = 0x01;
 		if (SmpsCfg->LoopPtrs != NULL)
 			TempTrk->LoopOfs = SmpsCfg->LoopPtrs[TrkBase + CurTrk];
 		else
@@ -2069,7 +2124,7 @@ void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX)
 		//FinishTrkInit:
 		SFXTrk->StackPtr = TRK_STACK_SIZE;
 		SFXTrk->PanAFMS = 0xC0;
-		SFXTrk->Timeout = 0x01;
+		SFXTrk->RemTicks = 0x01;
 		
 		if (SFXTrk->Pos >= SmpsFileConfig->SeqLength)
 			SFXTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
@@ -2245,7 +2300,7 @@ static void DoTempo(void)
 	
 	// Delay all tracks by 1 frame.
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
-		SmpsRAM.MusicTrks[CurTrk].Timeout ++;
+		SmpsRAM.MusicTrks[CurTrk].RemTicks ++;
 	
 	return;
 }
@@ -2420,6 +2475,8 @@ void StopAllSound(void)
 	// TODO: Clear all memory?
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 		SmpsRAM.MusicTrks[CurTrk].PlaybkFlags = 0x00;
+	for (CurTrk = 0; CurTrk < 2; CurTrk ++)
+		SmpsRAM.MusDrmTrks[CurTrk].PlaybkFlags = 0x00;
 	for (CurTrk = 0; CurTrk < SFX_TRKCNT; CurTrk ++)
 		SmpsRAM.SFXTrks[CurTrk].PlaybkFlags = 0x00;
 	for (CurTrk = 0; CurTrk < SPCSFX_TRKCNT; CurTrk ++)
