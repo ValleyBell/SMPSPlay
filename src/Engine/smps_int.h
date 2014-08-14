@@ -52,6 +52,7 @@ void DoNoteOn(TRK_RAM* Trk);
 void DoNoteOff(TRK_RAM* Trk);
 static void DoPSGNoteOff(TRK_RAM* Trk);
 static UINT16 DoPitchSlide(TRK_RAM* Trk);
+INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID);
 void SendFMIns(TRK_RAM* Trk, const UINT8* InsData);
 void RefreshVolume(TRK_RAM* Trk);
 void RefreshFMVolume(TRK_RAM* Trk);
@@ -78,6 +79,7 @@ void DisableSSGEG(TRK_RAM* Trk);
 void SilenceFMChn(TRK_RAM* Trk);
 static void SilenceAll(void);
 static void SilencePSG(void);
+void RestoreBGMChannel(TRK_RAM* Trk);
 
 //void SetDACState(UINT8 DacOn);
 

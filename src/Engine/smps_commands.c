@@ -279,6 +279,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				// Then continue handling variable command length
 			}
 			
+			Trk->FMInsSong = 0x00;	// [not in the driver] reset Instrument Song ID (checked when restoring BGM track)
 			if (CmdLen & 0x80)
 			{
 				// EF ii [ss] - Set FM Instrument ii (can use instrument library of song ss)
@@ -303,9 +304,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				{
 					Trk->FMInsSong = Data[0x01];
 					TempByt &= 0x7F;
-					//Ptr = GetMusicInsPtr(Data[0x01] - 0x81);
-					//InsLib = GetSongInsLib(Trk->FMInsSong);
-					InsLib = &Trk->SmpsCfg->GlbInsLib;
+					InsLib = GetSongInsLib(Trk, Trk->FMInsSong);
 				}
 			}
 			else
@@ -790,12 +789,13 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	case CF_SSG_EG:			// FF 06 SSG-EG
 		if (Trk->SmpsCfg->SeqData != Trk->SmpsCfg->FMDrums.Data && (DebugMsgs & 0x02))
 			print_msg(Trk, CmdLen, "SSG-EG Enable");
-		Trk->SSGEG.Type = 0x80;
-		Trk->SSGEG.DataPtr = Trk->Pos + 0x01;
+		
 		if (CFlag->SubType == CFS_SEG_FULLATK)
-			SendSSGEG(Trk, Data, 0x01);
+			Trk->SSGEG.Type = 0x81;
 		else
-			SendSSGEG(Trk, Data, 0x00);
+			Trk->SSGEG.Type = 0x80;
+		Trk->SSGEG.DataPtr = Trk->Pos + 0x01;
+		SendSSGEG(Trk, Data, Trk->SSGEG.Type & 0x01);
 		break;
 	// Tempo Flags
 	// -----------
@@ -1018,19 +1018,8 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		
 		if (SmpsRAM.TrkMode != TRKMODE_MUSIC)
 		{
-			UINT8 MusTrkID;
-			UINT8 SFXTrkID;
-			UINT8 SpcSFXTrkID;
-			TRK_RAM* MusTrk;
-			TRK_RAM* SFXTrk;
-			TRK_RAM* SpcSFXTrk;
-			
-			GetSFXChnPtrs(Trk->ChannelMask, &MusTrkID, &SpcSFXTrkID, &SFXTrkID);
-			MusTrk = (MusTrkID == 0xFF) ? NULL : &SmpsRAM.MusicTrks[MusTrkID];
-			SFXTrk = (SFXTrkID == 0xFF) ? NULL : &SmpsRAM.SFXTrks[SFXTrkID];
-			SpcSFXTrk = (SpcSFXTrkID == 0xFF) ? NULL : &SmpsRAM.SpcSFXTrks[SpcSFXTrkID];
-			
 			SmpsRAM.CurSFXPrio = 0x00;
+			RestoreBGMChannel(Trk);
 		}
 		break;
 	// Special Game-Specific Flags

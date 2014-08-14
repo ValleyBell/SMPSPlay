@@ -1571,6 +1571,13 @@ static UINT16 DoPitchSlide(TRK_RAM* Trk)
 	return NewFreq;
 }
 
+INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID)
+{
+	// placeholder function
+	// If it should be possible to define song IDs sometime, this will return the instrument table of another song.
+	return &Trk->SmpsCfg->GlbInsLib;
+}
+
 void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
 {
 	const UINT8* OpPtr = Trk->SmpsCfg->InsRegs;
@@ -2498,6 +2505,71 @@ static void SilencePSG(void)
 	PSGVal = 0x9F;
 	for (CurChn = 0x00; CurChn < 0x04; CurChn ++, PSGVal += 0x20)
 		WritePSG(PSGVal);
+	
+	return;
+}
+
+void RestoreBGMChannel(TRK_RAM* Trk)
+{
+	UINT8 MusTrkID;
+	UINT8 SFXTrkID;
+	UINT8 SpcSFXTrkID;
+	TRK_RAM* MusTrk;
+	TRK_RAM* SFXTrk;
+	TRK_RAM* SpcSFXTrk;
+	TRK_RAM* RstTrk;	// Restored Track
+	
+	GetSFXChnPtrs(Trk->ChannelMask, &MusTrkID, &SpcSFXTrkID, &SFXTrkID);
+	MusTrk = (MusTrkID == 0xFF) ? NULL : &SmpsRAM.MusicTrks[MusTrkID];
+	SFXTrk = (SFXTrkID == 0xFF) ? NULL : &SmpsRAM.SFXTrks[SFXTrkID];
+	SpcSFXTrk = (SpcSFXTrkID == 0xFF) ? NULL : &SmpsRAM.SpcSFXTrks[SpcSFXTrkID];
+	
+	if (SpcSFXTrk->PlaybkFlags & PBKFLG_ACTIVE)
+		RstTrk = SpcSFXTrk;
+	else
+		RstTrk = MusTrk;
+	RstTrk->PlaybkFlags &= ~PBKFLG_OVERRIDDEN;
+	if (! (RstTrk->PlaybkFlags & PBKFLG_ACTIVE))
+		return;
+	
+	if (! (RstTrk->ChannelMask & 0xF8))
+	{
+		INS_LIB* InsLib;
+		const UINT8* InsPtr;
+		UINT8 InsID;
+		
+		// restore FM channel
+		if (RstTrk->ChannelMask == 0x02)	// is FM 3?
+		{
+			if (RstTrk->PlaybkFlags & PBKFLG_SPCMODE)
+				SmpsRAM.SpcFM3Mode = 0x4F;
+			else
+				SmpsRAM.SpcFM3Mode = 0x0F;
+			WriteFMI(0x27, SmpsRAM.SpcFM3Mode);
+		}
+		
+		// restore Instrument
+		//if (Trk->Instrument & 0x80)	// That's what the actual driver does.
+		if (Trk->FMInsSong)	// But this is safer in our case, since we're supporting large instrument tables.
+			InsLib = GetSongInsLib(Trk, Trk->FMInsSong);
+		else
+			InsLib = Trk->SmpsCfg->InsLib;
+		InsID = Trk->Instrument & 0x7F;
+		if (InsLib != NULL && InsID < InsLib->InsCount)
+		{
+			InsPtr = InsLib->InsPtrs[InsID];
+			SendFMIns(Trk, InsPtr);
+		}
+		
+		if (Trk->SSGEG.Type & 0x80)
+			SendSSGEG(Trk, &Trk->SmpsCfg->SeqData[Trk->SSGEG.DataPtr], Trk->SSGEG.Type & 0x01);
+	}
+	else if (RstTrk->ChannelMask & 0x80)
+	{
+		// restore PSG channel
+		if (Trk->NoiseMode & 0x0)
+			WritePSG(Trk->NoiseMode);
+	}
 	
 	return;
 }
