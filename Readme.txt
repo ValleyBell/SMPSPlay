@@ -2,7 +2,7 @@ SMPS Player
 ===========
 by Valley Bell
 
-Version 2.00 (2014-07-01)
+Version 2.01 (2014-08-17)
 
 
 This program plays SMPS music files, a format commonly used in games for the Sega MegaDrive/Genesis.
@@ -63,8 +63,10 @@ A huge thanks to the developers of IDA, The Interactive Disassembler. Disassembl
 
 History
 -------
-2014-0?-??
+2014-08-17
 	added proper support for Master System SMPS (incl. PSG drums, additional commands)
+	added preSMPS instrument format (register-data pairs)
+	added support for 2x 2op drums (used in early preSMPS Z80)
 2014-07-01
 	First real public release. v2.00
 2014-05-04

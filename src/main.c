@@ -2,7 +2,7 @@
 // -----------
 // Written by Valley Bell, 2014
 
-#define SMPSPLAY_VER	"2.00"
+#define SMPSPLAY_VER	"2.01"
 //#define BETA
 
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds

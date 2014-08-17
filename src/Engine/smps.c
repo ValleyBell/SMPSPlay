@@ -31,6 +31,7 @@ void StartSignal(void);
 void StopSignal(void);
 //void LoopStartSignal(void);
 //void LoopEndSignal(void);
+void Extra_LoopInit(void);
 void Extra_LoopStartCheck(TRK_RAM* Trk);
 //void Extra_LoopEndCheck(TRK_RAM* Trk);
 
@@ -2059,6 +2060,8 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 	LoadChannelSet(TRACK_MUS_PWM1, SmpsFileConfig->AddChnCnt, &CurPos, CHNMODE_DEF,
 					SmpsFileConfig->AddChnCnt, SmpsFileConfig->AddChnList, TickMult, TrkBase);
 	TrkBase += SmpsFileConfig->AddChnCnt;
+	
+	Extra_LoopInit();
 	
 	//SetSFXOverrideBits();
 	

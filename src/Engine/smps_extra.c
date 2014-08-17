@@ -42,22 +42,9 @@ static struct loop_state
 
 void StartSignal(void)
 {
-	UINT8 CurTrk;
-	
 	PlayingTimer = -1;
 	LoopCntr = 0;
 	StoppedTimer = -1;
-	
-	LoopState.Activated = 0xFF;
-	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
-	{
-		if (SmpsRAM.MusicTrks[CurTrk].LoopOfs)
-		{
-			LoopState.Activated = 0x00;
-			break;
-		}
-	}
-	LoopState.TrkMask = 0x0000;
 	
 	vgm_dump_start();
 	DumpDACSounds(&SmpsRAM.MusCfg->DACDrv);
@@ -111,6 +98,24 @@ void Extra_StopCheck(void)
 	
 	if (! TrkMask)
 		StopSignal();
+	
+	return;
+}
+
+void Extra_LoopInit(void)
+{
+	UINT8 CurTrk;
+	
+	LoopState.Activated = 0xFF;
+	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
+	{
+		if (SmpsRAM.MusicTrks[CurTrk].LoopOfs)
+		{
+			LoopState.Activated = 0x00;
+			break;
+		}
+	}
+	LoopState.TrkMask = 0x0000;
 	
 	return;
 }
