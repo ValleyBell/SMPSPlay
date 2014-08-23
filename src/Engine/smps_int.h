@@ -28,6 +28,7 @@ static void Update2OpDrumTrack(DRUM_TRK_RAM* Trk);
 static void UpdatePWMTrack(TRK_RAM* Trk);
 static void UpdatePSGNoiseTrack(TRK_RAM* Trk);
 
+static void SendDACFrequency(TRK_RAM* Trk, UINT16 Freq);
 static void SendFMFrequency(TRK_RAM* Trk, UINT16 Freq);
 INLINE UINT16* GetFM3FreqPtr(void);
 static void SendPSGFrequency(TRK_RAM* Trk, UINT16 Freq);

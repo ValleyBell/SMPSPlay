@@ -21,4 +21,8 @@ void StopAllSound(void);
 void SetDACState(UINT8 DacOn);
 UINT8 SmpsIsRunning(void);
 
+#define SMPSVAR_COMMUNICATION	0x00
+#define SMPSVAR_CONDIT_JUMP		0x01
+UINT8* SmpsGetVariable(UINT8 Type);
+
 #endif	// __SMPS_H__

@@ -28,8 +28,8 @@ typedef struct _dac_state
 	UINT16 Volume;
 	INT16 OutSmpl;		// needs to be 16-bit to allow volumes > 100%
 	UINT8 Compr;
-	UINT8 PbFlags;
 	UINT8 PbBaseFlags;
+	UINT8 PbFlags;
 	UINT8 DPCMState;
 	UINT8 DPCMNibble;
 	UINT16 BaseSmpl;	// for banked sounds
@@ -248,7 +248,19 @@ void UpdateDAC(UINT32 Samples)
 				
 				if (! ChnState->SmplLen)
 				{
-					if (ChnState->PbFlags & DACFLAG_LOOP)
+					UINT8 RestartSmpl;
+					
+					RestartSmpl = (ChnState->PbFlags & DACFLAG_LOOP);
+					if (ChnState->PbFlags & DACFLAG_FLIP_FLOP)
+					{
+						if (! (ChnState->PbFlags & DACFLAG_FF_STATE))
+							RestartSmpl = 0x01;
+						else if (ChnState->PbFlags & DACFLAG_LOOP)
+							RestartSmpl = 0x01;
+						ChnState->PbFlags ^= (DACFLAG_REVERSE | DACFLAG_FF_STATE);
+					}
+					
+					if (RestartSmpl)
 					{
 						ChnState->SmplLen = ChnState->DACSmplPtr->Size;
 						if (ChnState->PbFlags & DACFLAG_REVERSE)
@@ -256,6 +268,15 @@ void UpdateDAC(UINT32 Samples)
 						else
 							ChnState->Pos = 0x00;
 						ChnState->DPCMState = 0x80;
+						
+						RestartSmpl = ChnState->DACSmplPtr->UsageID;
+						if (RestartSmpl < 0xFE)
+						{
+							if (ChnState->PbFlags & DACFLAG_REVERSE)
+								vgm_write_stream_data_command(0x00, 0x05, RestartSmpl | 0x100000);
+							else
+								vgm_write_stream_data_command(0x00, 0x05, RestartSmpl);
+						}
 					}
 					else
 					{
@@ -305,8 +326,8 @@ void DAC_Reset(void)
 	for (CurChn = 0; CurChn < MAX_DAC_CHNS; CurChn ++)
 	{
 		DACChnState[CurChn].DACSmplPtr = NULL;
-		DACChnState[CurChn].PbBaseFlags = 0x00;
-		DACChnState[CurChn].Volume = 0x100;
+		//DACChnState[CurChn].PbBaseFlags = 0x00;
+		//DACChnState[CurChn].Volume = 0x100;
 	}
 	
 	DAC_ResetOverride();
@@ -329,7 +350,9 @@ void DAC_ResetOverride(void)
 	{
 		DACChnState[CurChn].FreqForce = 0;
 		DACChnState[CurChn].RateForce = 0;
-		DACChnState[CurChn].PbFlags = 0x00;
+		DACChnState[CurChn].PbBaseFlags = 0x00;
+		//DACChnState[CurChn].PbFlags = 0x00;
+		DACChnState[CurChn].Volume = 0x100;
 		DACChnState[CurChn].BaseSmpl = 0x00;
 	}
 	
@@ -448,6 +471,11 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 	DACChn->PbFlags = TempEntry->Flags;
 	DACChn->PbFlags |= (DACChn->PbBaseFlags & ~DACFLAG_REVERSE);
 	DACChn->PbFlags ^= (DACChn->PbBaseFlags & DACFLAG_REVERSE);	// 'reverse' needs XOr
+	if (DACChn->PbFlags & DACFLAG_FLIP_FLOP)
+	{
+		if (DACChn->PbFlags & DACFLAG_FF_STATE)
+			DACChn->PbFlags ^= DACFLAG_REVERSE;
+	}
 	
 	DACChn->SmplLen = TempSmpl->Size;
 	if (DACChn->PbFlags & DACFLAG_REVERSE)

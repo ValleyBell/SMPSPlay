@@ -355,5 +355,8 @@ DAC_GAXE3 - special DAC flags for Golden Axe III
   GA3_2NOTE_OFF - disable 2-note mode
 	command ED, size 01
 
-VOL_QUICK - set Volume to (CommandID & 07)
+DAC_PLAY_MODE - set DAC Play Mode
+	command FA, size 02, Sonic 2 Recreation - sets various DAC flags like reversed play, looping or flip-flop
+
+VOL_QUICK - set Volume to (Command ID & 07)
 	commands D8..DF, size 01, Master System SMPS

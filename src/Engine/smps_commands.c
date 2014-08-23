@@ -31,6 +31,8 @@ static const UINT8 AlgoOutMask[0x08] =
 static const UINT8 ChouYMN_Vols[0x10] =
 	{0x08, 0x0A, 0x0C, 0x10, 0x14, 0x19, 0x20, 0x28, 0x32, 0x40, 0x50, 0x65, 0x80, 0xA0, 0xCA, 0xFF};
 
+static const UINT16 S2R_Vols[0x04] = {0x100, 0xD7, 0xB5, 0x98};	// 0 db, -1.5 db, -3.0 db, -4.5 db
+
 
 
 // from smps_extra.c
@@ -1078,6 +1080,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	case CF_DAC_GAXE3:
 		CmdLen = cfSpecialDAC(Trk, CFlag);
 		break;
+	case CF_DAC_PLAY_MODE:
+		Trk->DAC.Unused = Data[0x00];
+		break;
 	}
 	
 	Trk->Pos += CmdLen;
@@ -1316,7 +1321,7 @@ static UINT8 cfSpecialDAC(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		{
 		case CFS_PS4_VOLCTRL:
 			Trk->SpcDacMode = DCHNMODE_PS4;
-			Trk->PlaybkFlags |= PBKFLG_SPCMODE;
+			//Trk->PlaybkFlags |= PBKFLG_SPCMODE;
 			Trk->PS4_DacMode = (INT8)Data[0x00];
 			if (! Trk->PS4_DacMode)			// 00 - DAC disabled
 				DAC_Stop(0x00);
@@ -1381,6 +1386,8 @@ static UINT8 cfSpecialDAC(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 
 void RefreshDACVolume(TRK_RAM* Trk, UINT8 DacMode, UINT8 DacChn, UINT8 Volume)
 {
+	UINT16 CurVolume;
+	
 	switch(DacMode)
 	{
 	case DCHNMODE_PS4:
@@ -1393,12 +1400,25 @@ void RefreshDACVolume(TRK_RAM* Trk, UINT8 DacMode, UINT8 DacChn, UINT8 Volume)
 		break;
 	case DCHNMODE_CYMN:
 		// The volume table has 0x80 as 100%
-		DAC_SetVolume(DacChn, ChouYMN_Vols[Volume & 0x0F] * 2);
+		CurVolume = ChouYMN_Vols[Volume & 0x0F] * 2;
+		DAC_SetVolume(DacChn, CurVolume);
 		break;
 	case DCHNMODE_VRDLX:
-		Volume &= 0x0F;
-		Volume <<= 4;
-		DAC_SetVolume(DacChn, 0x100 - Volume);
+		CurVolume = (Volume & 0x0F) << 4;
+		CurVolume = 0x100 - CurVolume;
+		DAC_SetVolume(DacChn, Volume);
+		break;
+	case DCHNMODE_S2R:
+		if (Volume < 0x10)
+		{
+			CurVolume = S2R_Vols[Volume & 0x03];
+			CurVolume >>= (Volume >> 2);
+			DAC_SetVolume(DacChn, CurVolume);
+		}
+		else
+		{
+			DAC_SetVolume(DacChn, 0x00);
+		}
 		break;
 	}
 	

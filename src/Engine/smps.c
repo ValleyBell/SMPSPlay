@@ -510,6 +510,7 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 			
 			if (Trk->SpcDacMode == DCHNMODE_GAXE3)
 			{
+				// Golden Axe III: Special 2-ch DAC mode (2 separate notes, one for each channel)
 				Trk->DAC.Unused = 0x00;
 				if (Trk->GA3_DacMode & 0x01)
 				{
@@ -520,45 +521,79 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 					Trk->GA3_DacMode &= ~0x01;
 			}
 		}
-		Note = Trk->DAC.Snd;
-		if (! (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN))
-		{
-			if (! (Trk->PlaybkFlags & PBKFLG_SPCMODE))
-			{
-				if (Trk->SpcDacMode == DCHNMODE_CYMN)
-				{
-					SmpsRAM.DacChVol[0x00] = 0x80 | (Trk->Volume & 0x0F);
-					RefreshDACVolume(Trk, Trk->SpcDacMode, 0x00, SmpsRAM.DacChVol[0x00]);
-					if (Trk->PlaybkFlags & PBKFLG_HOLD)
-						Note = 0x00;	// not in the driver, but seems to be intended
-				}
-				
-				if (Note >= 0x80)
-					PlayDrumNote(Trk, Note);
-				if (Trk->SpcDacMode == DCHNMODE_GAXE3 && Trk->DAC.Unused >= 0x80)
-					PlayDrumNote(Trk, Trk->DAC.Unused);
-			}
-			else
-			{
-				PlayPS4DrumNote(Trk, Note);
-			}
-		}
 		
 		// read Duration for 00..7F
 		FinishTrkUpdate(Trk, ! (Data[Trk->Pos] & 0x80));
+		
+		if (! (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN))
+		{
+			switch(Trk->SpcDacMode)
+			{
+			case DCHNMODE_NORMAL:
+			case DCHNMODE_VRDLX:
+				if (Trk->DAC.Snd >= 0x80)
+					PlayDrumNote(Trk, Trk->DAC.Snd);
+				break;
+			case DCHNMODE_PS4:
+				if (Note >= 0x80)
+					PlayPS4DrumNote(Trk, Trk->DAC.Snd);
+				break;
+			case DCHNMODE_GAXE3:
+				if (Trk->DAC.Snd >= 0x80)
+					PlayDrumNote(Trk, Trk->DAC.Snd);
+				if (Trk->DAC.Unused >= 0x80)
+					PlayDrumNote(Trk, Trk->DAC.Unused);
+				break;
+			case DCHNMODE_CYMN:
+				SmpsRAM.DacChVol[0x00] = 0x80 | (Trk->Volume & 0x0F);
+				RefreshDACVolume(Trk, Trk->SpcDacMode, 0x00, SmpsRAM.DacChVol[0x00]);
+				if (Trk->DAC.Snd >= 0x80)
+				{
+					if (! (Trk->PlaybkFlags & PBKFLG_HOLD))	// not in the driver, but seems to be intended
+						PlayDrumNote(Trk, Trk->DAC.Snd);
+				}
+				break;
+			case DCHNMODE_S2R:
+				PrepareModulat(Trk);
+				if (Trk->DAC.Snd >= 0x80)
+				{
+					RefreshDACVolume(Trk, Trk->SpcDacMode, 0x00, Trk->Volume);
+					SendDACFrequency(Trk, Trk->Detune & 0xFF);
+					DAC_SetFeature(0x00, DACFLAG_REVERSE, Trk->DAC.Unused & 0x01);
+					DAC_SetFeature(0x00, DACFLAG_LOOP, Trk->DAC.Unused & 0x02);
+					DAC_SetFeature(0x00, DACFLAG_FLIP_FLOP, Trk->DAC.Unused & 0x04);
+					DAC_SetFeature(0x00, DACFLAG_FF_STATE, Trk->DAC.Unused & 0x40);
+					if (! (Trk->PlaybkFlags & PBKFLG_HOLD))
+						PlayDrumNote(Trk, Trk->DAC.Snd);
+				}
+				break;
+			}
+		}
 	}
 	else
 	{
 		// Phantasy Star IV - special DAC handling
 		if (DoNoteStop(Trk))
 		{
-			if (Trk->PlaybkFlags & PBKFLG_SPCMODE)
+			if (Trk->SpcDacMode == DCHNMODE_PS4 || Trk->SpcDacMode == DCHNMODE_S2R)
 			{
 				Trk->PlaybkFlags |= PBKFLG_ATREST;
 				DoNoteOff(Trk);
 				DAC_Stop(0x00);
 			}
 			return;
+		}
+		
+		if (Trk->SpcDacMode == DCHNMODE_S2R)
+		{
+			UINT16 Freq;
+			UINT8 FreqUpdate;
+			
+			Freq = Trk->Detune << 4;
+			FreqUpdate = DoModulation(Trk, &Freq);
+			Freq >>= 4;
+			if (FreqUpdate == 0x01)
+				SendDACFrequency(Trk, Freq & 0xFF);
 		}
 	}
 	
@@ -722,6 +757,16 @@ static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 	}
 	
 	UpdatePSGVolume(Trk, WasNewNote);
+	return;
+}
+
+static void SendDACFrequency(TRK_RAM* Trk, UINT16 Freq)
+{
+	if (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)
+		return;
+	
+	DAC_SetRate(0x00, Freq, 0x01);
+	
 	return;
 }
 
@@ -2687,4 +2732,16 @@ UINT8 SmpsIsRunning(void)
 		IsRunning |= SmpsRAM.MusicTrks[CurTrk].PlaybkFlags;
 	
 	return IsRunning & PBKFLG_ACTIVE;
+}
+
+UINT8* SmpsGetVariable(UINT8 Type)
+{
+	switch(Type)
+	{
+	case SMPSVAR_COMMUNICATION:
+		return &SmpsRAM.CommData;
+	case SMPSVAR_CONDIT_JUMP:
+		return &SmpsRAM.CondJmpVal;
+	}
+	return NULL;
 }

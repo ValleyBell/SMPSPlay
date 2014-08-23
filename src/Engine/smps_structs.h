@@ -63,6 +63,7 @@
 #define DCHNMODE_GAXE3	0x02	// Golden Axe III
 #define DCHNMODE_CYMN	0x03	// Chou Yakyuu Miracle Nine
 #define DCHNMODE_VRDLX	0x04	// Virtua Racing Deluxe 32x
+#define DCHNMODE_S2R	0x05	// Sonic 2 Recreation
 
 #define ENVCMD_DATA		0x00	// not a command, but usual envelope data
 #define ENVCMD_RESET	0x01	// reset Envelope (set env. index to 0)

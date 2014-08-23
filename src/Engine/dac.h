@@ -59,8 +59,10 @@ typedef struct _dac_config
 } DAC_CFG;
 
 
-#define DACFLAG_LOOP	0x01
-#define DACFLAG_REVERSE	0x02
+#define DACFLAG_LOOP		0x01
+#define DACFLAG_REVERSE		0x02
+#define DACFLAG_FLIP_FLOP	0x04
+#define DACFLAG_FF_STATE	0x08
 
 
 void SetDACDriver(DAC_CFG* DACSet);

@@ -79,12 +79,12 @@ UINT8 VGM_DataBlkCompress = 1;
 static UINT8 LastLineState;
 
 extern UINT16 AUDIOBUFFERU;
+static UINT8* CondJumpVar;
 
 CONFIG_DATA Config;
 
 int main(int argc, char* argv[])
 {
-	UINT8 loaded_mode;
 	UINT8 RetVal;
 	int inkey;
 	UINT32 NewSeqLen;
@@ -148,6 +148,7 @@ int main(int argc, char* argv[])
 	StartAudioOutput();
 	
 	InitDriver();
+	CondJumpVar = SmpsGetVariable(SMPSVAR_CONDIT_JUMP);
 	PlayingTimer = 0;
 	LoopCntr = -1;
 	StoppedTimer = -1;
@@ -281,9 +282,9 @@ int main(int argc, char* argv[])
 			FadeOutMusic();
 			break;
 		case 'J':
-			loaded_mode = /*smps_SetCondJmpValue(0xFF)*/ 0x00;
+			(*CondJumpVar) ^= 0x01;
 			ClearLine();
-			printf("Conditional Jump Variable: 0x%02X\r", loaded_mode);
+			printf("Conditional Jump Variable: 0x%02X\r", *CondJumpVar);
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);
 			break;
