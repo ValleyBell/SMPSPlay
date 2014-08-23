@@ -344,14 +344,11 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 		
 		DoFMVolEnv(Trk);
 		
-		if (Trk->NStopTout)
+		if (DoNoteStop(Trk))
 		{
-			Trk->NStopTout --;
-			if (! Trk->NStopTout)
-			{
-				DoNoteOff(Trk);
-				return;
-			}
+			//Trk->PlaybkFlags |= PBKFLG_ATREST;
+			DoNoteOff(Trk);
+			return;
 		}
 		
 		Freq = DoPitchSlide(Trk);
@@ -416,14 +413,10 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 		//if (Trk->PlaybkFlags & PBKFLG_ATREST)
 		//	return;
 		
-		if (Trk->NStopTout)
+		if (DoNoteStop(Trk))
 		{
-			Trk->NStopTout --;
-			if (! Trk->NStopTout)
-			{
-				DoPSGNoteOff(Trk);
-				return;
-			}
+			DoPSGNoteOff(Trk);
+			return;
 		}
 		Freq = DoPitchSlide(Trk);
 		FreqUpdate = DoModulation(Trk, &Freq);
@@ -557,19 +550,15 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 	else
 	{
 		// Phantasy Star IV - special DAC handling
-		if (Trk->NStopTout)
+		if (DoNoteStop(Trk))
 		{
-			Trk->NStopTout --;
-			if (! Trk->NStopTout)
+			if (Trk->PlaybkFlags & PBKFLG_SPCMODE)
 			{
-				if (Trk->PlaybkFlags & PBKFLG_SPCMODE)
-				{
-					Trk->PlaybkFlags |= PBKFLG_ATREST;
-					DoNoteOff(Trk);
-					DAC_Stop(0x00);
-				}
-				return;
+				Trk->PlaybkFlags |= PBKFLG_ATREST;
+				DoNoteOff(Trk);
+				DAC_Stop(0x00);
 			}
+			return;
 		}
 	}
 	
@@ -656,15 +645,11 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 	else
 	{
 		// not in the driver, but why not?
-		if (Trk->NStopTout)
+		if (DoNoteStop(Trk))
 		{
-			Trk->NStopTout --;
-			if (! Trk->NStopTout)
-			{
-				Trk->PlaybkFlags |= PBKFLG_ATREST;
-				DoNoteOff(Trk);
-				return;
-			}
+			Trk->PlaybkFlags |= PBKFLG_ATREST;
+			DoNoteOff(Trk);
+			return;
 		}
 	}
 	
@@ -718,14 +703,10 @@ static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 	else
 	{
 		// not in the driver, but why not?
-		if (Trk->NStopTout)
+		if (DoNoteStop(Trk))
 		{
-			Trk->NStopTout --;
-			if (! Trk->NStopTout)
-			{
-				DoPSGNoteOff(Trk);
-				return;
-			}
+			DoPSGNoteOff(Trk);
+			return;
 		}
 		Freq = DoPitchSlide(Trk);
 		WasNewNote = 0x00;
@@ -894,7 +875,7 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 	Trk->RemTicks = Trk->NoteLen;
 	if (! (Trk->PlaybkFlags & PBKFLG_HOLD) || (Trk->NStopRevMode & 0x80))	// Mode 0x80 == execute always
 	{
-		if (! Trk->NStopRevMode)
+		if (! (Trk->NStopRevMode & 0x7F))
 		{
 			Trk->NStopTout = Trk->NStopInit;
 			// Note: A few earlier SMPS Z80 driver have a bug and do
@@ -906,7 +887,7 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 			INT16 NewTout;
 			
 			NewTout = (INT16)Trk->NoteLen - Trk->NStopInit;
-			switch(Trk->NStopRevMode & 0x0F)
+			switch(Trk->NStopRevMode & 0x7F)
 			{
 			case 0x01:
 				if (NewTout <= 0)
@@ -916,6 +897,12 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 				if (Data[Trk->Pos] == 0xE7)
 					NewTout = 0;	// Ristar - the E7 flag disables the effect temporarily.
 				// maybe TODO: improve this and check for CFlag[Data[Trk->Pos]].Type == CF_HOLD
+				break;
+			case 0x11:
+				NewTout = Trk->NStopInit;
+				break;
+			case 0x12:
+				NewTout = Trk->NoteLen - (Trk->NoteLen * Trk->NStopInit / 0x80);
 				break;
 			}
 			Trk->NStopTout = (UINT8)NewTout;
@@ -933,6 +920,26 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 	return;
 }
 
+static UINT8 DoNoteStop(TRK_RAM* Trk)
+{
+	if (! Trk->NStopTout)
+		return 0x00;
+	
+	if (! (Trk->NStopRevMode & 0x10))
+	{
+		Trk->NStopTout --;
+		if (! Trk->NStopTout)
+			return 0x01;
+	}
+	else
+	{
+		if (Trk->RemTicks == Trk->NStopTout)
+			return 0x01;
+	}
+	
+	return 0x00;
+}
+
 static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 {
 	INT16 Note;
@@ -943,8 +950,9 @@ static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 	if (Trk->ChannelMask & 0x80)
 	{
 		// Sonic 2 SMS does (NoteCmd - 0x80), too
-		if (Trk->SmpsCfg->PSGBaseNote == PSGBASEN_B)
-			Note ++;
+		//if (Trk->SmpsCfg->PSGBaseNote == PSGBASEN_B)
+		//	Note ++;
+		Note += Trk->SmpsCfg->PSGBaseNote;
 		
 		if (Trk->Transpose == -36 && Note < -24)
 			return 0x6000;	// workaround for crappy xm#smps conversions that use an invalid PSG frequency for noise
@@ -957,8 +965,9 @@ static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 	else //if (! (Trk->ChannelMask & 0x70))
 	{
 		// SMPS 68k drivers do (NoteCmd - 0x80) instead, so add 1 again.
-		if (Trk->SmpsCfg->FMBaseNote == FMBASEN_B)
-			Note ++;
+		//if (Trk->SmpsCfg->FMBaseNote == FMBASEN_B)
+		//	Note ++;
+		Note += Trk->SmpsCfg->FMBaseNote;
 		
 		if (Trk->SmpsCfg->FMFreqCnt == 12)
 		{
@@ -2037,10 +2046,35 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 	TickMult = Data[CurPos + 0x04];
 	SmpsRAM.TempoInit = Data[CurPos + 0x05];
 	SmpsRAM.TempoCntr = SmpsRAM.TempoInit;
-	if (SmpsFileConfig->TempoMode == TEMPO_TIMEOUT)
-		SmpsRAM.TempoCntr ++;	// DoTempo is called before PlayMusic, so simulate that behaviour
-	else if (SmpsFileConfig->TempoMode == TEMPO_TOUT_OFLW && ! (SmpsRAM.TempoInit & 0x80))
-		SmpsRAM.TempoCntr ++;
+	if (SmpsRAM.MusCfg->Tempo1Tick == T1TICK_NOTEMPO)
+	{
+		// DoTempo is called before PlayMusic and thus isn't executed during the first tick.
+		// So we undo one DoTempo.
+		switch(SmpsRAM.MusCfg->TempoMode)
+		{
+		case TEMPO_TIMEOUT:
+			SmpsRAM.TempoCntr ++;
+			break;
+		case TEMPO_OVERFLOW:
+			SmpsRAM.TempoCntr -= SmpsRAM.TempoInit;	// prevent overflow
+			break;
+		case TEMPO_OVERFLOW2:
+			// This is not 100% correct, but all games with this algorithm execute PlayMusic first anyway.
+			SmpsRAM.TempoCntr = (UINT8)(0x100 - SmpsRAM.TempoInit);
+			break;
+		case TEMPO_TOUT_OFLW:
+			if (! (SmpsRAM.TempoInit & 0x80))
+				SmpsRAM.TempoCntr ++;
+			else
+				SmpsRAM.TempoCntr -= (SmpsRAM.TempoInit & 0x7F);	// prevent overflow
+			break;
+		case TEMPO_OFLW_MULT:
+			SmpsRAM.TempoCntr -= SmpsRAM.TempoInit;	// prevent overflow
+			if (SmpsRAM.TempoInit & 0x80)
+				SmpsRAM.MusMultUpdate --;	// The first tick won't overflow and add 1 to the counter.
+			break;
+		}
+	}
 	CurPos += 0x06;
 	
 	StartSignal();

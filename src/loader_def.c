@@ -26,6 +26,7 @@ typedef struct _option_list
 
 static UINT8 GetOptionValue(const OPT_LIST* OptList, const char* ValueStr);
 //void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg);
+static INT8 GetBaseNote(const OPT_LIST* OptList, const char* ValueStr);
 static void LoadRegisterList(SMPS_CFG* SmpsCfg, UINT8 CstRegCnt, const UINT8* CstRegList);
 //void FreeDriverDefinition(SMPS_CFG* SmpsCfg);
 static void ApplyCommandFlags(UINT8 FlagCnt, const UINT8* IDList, const CMD_FLAGS* CFBuffer, CMD_LIB* CFLib);
@@ -56,6 +57,10 @@ static const OPT_LIST OPT_TEMPOMODE[] =
 	{"OVERFLOW2", TEMPO_OVERFLOW2},
 	{"TOUT+OFLW", TEMPO_TOUT_OFLW},
 	{"OFLW_MULTI", TEMPO_OFLW_MULT},
+	{NULL, 0}};
+static const OPT_LIST OPT_TEMP1TICK[] =
+{	{"DoTempo", T1TICK_NOTEMPO},
+	{"PlayMusic", T1TICK_DOTEMPO},
 	{NULL, 0}};
 static const OPT_LIST OPT_FMBASENOTE[] =
 {	{"B", FMBASEN_B},
@@ -241,6 +246,7 @@ static const OPT_LIST OPT_CFLAGS[] =
 	{"FADE_IN_SONG", CF_FADE_IN_SONG},
 	{"SND_OFF", CF_SND_OFF},
 	{"NOTE_STOP_REV", CF_NOTE_STOP_REV},
+	{"NOTE_STOP_MODE", CF_NOTE_STOP_MODE},
 	{"DAC_PS4", CF_DAC_PS4},
 	{"DAC_CYMN", CF_DAC_CYMN},
 	{"DAC_GAXE3", CF_DAC_GAXE3},
@@ -515,12 +521,14 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 			}
 			else if (! _stricmp(LToken, "TempoMode"))
 				SmpsCfg->TempoMode = GetOptionValue(OPT_TEMPOMODE, RToken1);
+			else if (! _stricmp(LToken, "Tempo1Tick"))
+				SmpsCfg->Tempo1Tick = GetOptionValue(OPT_TEMP1TICK, RToken1);
 			else if (! _stricmp(LToken, "FMBaseNote"))
-				SmpsCfg->FMBaseNote = GetOptionValue(OPT_FMBASENOTE, RToken1);
+				SmpsCfg->FMBaseNote = GetBaseNote(OPT_FMBASENOTE, RToken1);
 			else if (! _stricmp(LToken, "FMBaseOctave"))
 				SmpsCfg->FMBaseOct = strtoul(RToken1, NULL, 0) & 7;
 			else if (! _stricmp(LToken, "PSGBaseNote"))
-				SmpsCfg->PSGBaseNote = GetOptionValue(OPT_PSGBASENOTE, RToken1);
+				SmpsCfg->PSGBaseNote = GetBaseNote(OPT_PSGBASENOTE, RToken1);
 			else if (! _stricmp(LToken, "DelayFreq"))
 				SmpsCfg->DelayFreq = GetOptionValue(OPT_DELAYFREQ, RToken1);
 			else if (! _stricmp(LToken, "NoteOnPrevent"))
@@ -647,6 +655,31 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 		free(CstRegList);
 	
 	return;
+}
+
+static INT8 GetBaseNote(const OPT_LIST* OptList, const char* ValueStr)
+{
+	const OPT_LIST* CurOpt;
+	char* EndStr;
+	INT32 Value;
+	
+	if (ValueStr == NULL)
+		ValueStr = "";
+	
+	CurOpt = OptList;
+	while(CurOpt->Text != NULL)
+	{
+		if (! _stricmp(CurOpt->Text, ValueStr))
+			return (INT8)CurOpt->Value;
+		
+		CurOpt ++;
+	}
+	Value = strtol(ValueStr, &EndStr, 10);
+	if (EndStr != ValueStr)
+		return (INT8)Value;
+	
+	printf("GetBaseNote: Unknown value: %s.\n", ValueStr);
+	return CurOpt->Value;	//0x00;
 }
 
 static void LoadRegisterList(SMPS_CFG* SmpsCfg, UINT8 CstRegCnt, const UINT8* CstRegList)

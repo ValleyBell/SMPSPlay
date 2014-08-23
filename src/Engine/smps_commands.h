@@ -162,6 +162,7 @@
 #define CF_NOTE_STOP_REV		0x83	// FF 06 [Ristar] (Reversed Note Stop)
 	#define CFS_NSREV_CYMN			0x00
 	#define CFS_NSREV_RST			0x01
+#define CF_NOTE_STOP_MODE		0x84	// FC [Sonic 2 Recreation]
 
 #define CF_DAC_PS4				0x90
 	#define CFS_PS4_VOLCTRL			0x00

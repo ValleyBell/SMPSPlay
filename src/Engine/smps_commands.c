@@ -224,7 +224,8 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		
 		Trk->NStopTout = TempByt;
 		Trk->NStopInit = TempByt;
-		Trk->NStopRevMode = 0x00;	// disable Reversed Note Stop
+		if (! (Trk->NStopRevMode & 0x70))
+			Trk->NStopRevMode = 0x00;	// disable Reversed Note Stop
 		break;
 	case CF_TRANSPOSE:	// FB Transpose
 		switch(CFlag->SubType)
@@ -1068,6 +1069,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				Trk->NStopRevMode = 0x00;	// parameter byte 00 disables it
 			break;
 		}
+		break;
+	case CF_NOTE_STOP_MODE:
+		Trk->NStopRevMode = Data[0x00] ? (0x10 | Data[0x00]) : 0x00;
 		break;
 	case CF_DAC_PS4:
 	case CF_DAC_CYMN:

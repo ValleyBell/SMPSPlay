@@ -23,15 +23,18 @@
 
 #define TEMPO_TIMEOUT	0x00	// preSMPS, most SMPS 68k, SMPS Z80 Type 1
 #define TEMPO_OVERFLOW	0x01	// SMPS Z80 Type 2
-#define TEMPO_OVERFLOW2	0x02	// Sonic 2
+#define TEMPO_OVERFLOW2	0x02	// Sonic 2/OutRunners
 #define TEMPO_TOUT_OFLW	0x03	// Golden Axe III
 #define TEMPO_OFLW_MULT	0x04	// Shadow Squadron 32x
 
-#define FMBASEN_B		0x00	// table starts with B (note 81 is still a C)
-#define FMBASEN_C		0x01	// table starts with C
+#define T1TICK_NOTEMPO	0x00	// DoTempo before PlayMusic (not executed during first tick after PlayMusic) (most SMPS 68k/Z80)
+#define T1TICK_DOTEMPO	0x01	// PlayMusic before DoTempo
 
-#define PSGBASEN_C		0x00	// table starts with B (note 81 is still a C)
-#define PSGBASEN_B		0x01	// table starts with C
+#define FMBASEN_B		+1		// table starts with B (note 81 is still a C)
+#define FMBASEN_C		 0		// table starts with C
+
+#define PSGBASEN_C		 0		// table starts with C
+#define PSGBASEN_B		+1		// table starts with B (note 81 is still a C)
 
 // behaviour of rests (Note-Rest-Delay-Delay behaviour)
 #define DLYFREQ_RESET	0x00	// reset frequency (replay note)
@@ -167,10 +170,11 @@ typedef struct _smps_settings
 	UINT8 PtrFmt;
 	UINT8 InsMode;
 	UINT8 TempoMode;
-	UINT8 FMBaseNote;
+	UINT8 Tempo1Tick;	// order of PlayMusic and DoTempo in the first tick
+	INT8 FMBaseNote;
 	UINT8 FMBaseOct;
 	UINT8 FMOctWrap;
-	UINT8 PSGBaseNote;
+	INT8 PSGBaseNote;
 	UINT8 DelayFreq;
 	UINT8 NoteOnPrevent;
 	UINT8 FM6DACOff;	// turn DAC off when FM6 note is played

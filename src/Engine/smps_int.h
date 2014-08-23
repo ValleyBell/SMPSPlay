@@ -34,6 +34,7 @@ static void SendPSGFrequency(TRK_RAM* Trk, UINT16 Freq);
 
 static void TrkUpdate_Proc(TRK_RAM* Trk);
 static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration);
+static UINT8 DoNoteStop(TRK_RAM* Trk);
 static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd);
 
 static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue);
