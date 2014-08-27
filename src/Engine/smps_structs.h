@@ -81,6 +81,8 @@
 #define DRMTYPE_FM2OP	0x04
 #define DRMTYPE_NONE	0x00
 
+#define SEQFLG_NEED_SAVE	0x01
+
 typedef struct _command_flags
 {
 	UINT8 Type;
@@ -184,6 +186,7 @@ typedef struct _smps_settings
 	UINT8 VolMode;
 	UINT8 DrumChnMode;
 	
+	UINT8 SeqFlags;
 	UINT16 SeqBase;		// Z80 only: Sequence Base Offset
 	UINT16 SeqLength;
 	UINT8* SeqData;

@@ -484,7 +484,6 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 	if (! Trk->RemTicks)
 	{
 		const UINT8* Data = Trk->SmpsCfg->SeqData;
-		UINT8 Note;
 		
 		if (Trk->Pos >= Trk->SmpsCfg->SeqLength)
 		{
@@ -520,6 +519,14 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 				if (! (Trk->GA3_DacMode & 0x02))
 					Trk->GA3_DacMode &= ~0x01;
 			}
+			else if (Trk->SpcDacMode == DCHNMODE_S2R)
+			{
+				Trk->DAC.Snd -= 0x80;
+				if (! Trk->DAC.Snd)
+					Trk->PlaybkFlags |= PBKFLG_ATREST;
+				else
+					Trk->DAC.Snd += Trk->Transpose;
+			}
 		}
 		
 		// read Duration for 00..7F
@@ -535,7 +542,7 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 					PlayDrumNote(Trk, Trk->DAC.Snd);
 				break;
 			case DCHNMODE_PS4:
-				if (Note >= 0x80)
+				if (Trk->DAC.Snd >= 0x80)
 					PlayPS4DrumNote(Trk, Trk->DAC.Snd);
 				break;
 			case DCHNMODE_GAXE3:
@@ -555,16 +562,21 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 				break;
 			case DCHNMODE_S2R:
 				PrepareModulat(Trk);
-				if (Trk->DAC.Snd >= 0x80)
+				if (Trk->PlaybkFlags & (PBKFLG_ATREST | PBKFLG_OVERRIDDEN))
+					break;
+				
+				RefreshDACVolume(Trk, Trk->SpcDacMode, 0x00, Trk->Volume);
+				SendDACFrequency(Trk, Trk->Detune & 0xFF);
+				DAC_SetFeature(0x00, DACFLAG_REVERSE, Trk->DAC.Unused & 0x01);
+				DAC_SetFeature(0x00, DACFLAG_LOOP, Trk->DAC.Unused & 0x02);
+				DAC_SetFeature(0x00, DACFLAG_FLIP_FLOP, Trk->DAC.Unused & 0x04);
+				DAC_SetFeature(0x00, DACFLAG_FF_STATE, Trk->DAC.Unused & 0x40);
+				if (! (Trk->PlaybkFlags & PBKFLG_HOLD))
 				{
-					RefreshDACVolume(Trk, Trk->SpcDacMode, 0x00, Trk->Volume);
-					SendDACFrequency(Trk, Trk->Detune & 0xFF);
-					DAC_SetFeature(0x00, DACFLAG_REVERSE, Trk->DAC.Unused & 0x01);
-					DAC_SetFeature(0x00, DACFLAG_LOOP, Trk->DAC.Unused & 0x02);
-					DAC_SetFeature(0x00, DACFLAG_FLIP_FLOP, Trk->DAC.Unused & 0x04);
-					DAC_SetFeature(0x00, DACFLAG_FF_STATE, Trk->DAC.Unused & 0x40);
-					if (! (Trk->PlaybkFlags & PBKFLG_HOLD))
-						PlayDrumNote(Trk, Trk->DAC.Snd);
+					if (Trk->DAC.Snd < Trk->SmpsCfg->DrumLib.DrumCount)
+						PlayDrumNote(Trk, 0x80 | Trk->DAC.Snd);
+					else
+						DAC_Play(0x00, Trk->DAC.Snd - 0x01);
 				}
 				break;
 			}
@@ -572,6 +584,9 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 	}
 	else
 	{
+		if (Trk->PlaybkFlags & PBKFLG_ATREST)
+			return;
+		
 		// Phantasy Star IV - special DAC handling
 		if (DoNoteStop(Trk))
 		{

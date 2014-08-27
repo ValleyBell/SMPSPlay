@@ -63,6 +63,9 @@ A huge thanks to the developers of IDA, The Interactive Disassembler. Disassembl
 
 History
 -------
+2014-##-##
+	added "Tempo1Tick" setting, allowing for more accurate jitter emulation
+	added full support for the SMPS variant used in Sonic 2 Recreation
 2014-08-17
 	added proper support for Master System SMPS (incl. PSG drums, additional commands)
 	added preSMPS instrument format (register-data pairs)

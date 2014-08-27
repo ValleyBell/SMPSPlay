@@ -290,6 +290,8 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 	for (TempOfs = 0x00; TempOfs < DACDrv->SmplCount; TempOfs ++)
 		DACDrv->Smpls[TempOfs].UsageID = 0xFF;
 	
+	SmpsCfg->SeqFlags = 0x00;
+	
 	FileMask = (UINT8*)malloc(FileLen);
 	for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++)
 	{
@@ -563,6 +565,11 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 				if (DebugMsgs & 0x04)
 					printf("Unknown Coordination Flag 0x%02X (Pos 0x%04X)\n",
 							CmdList->FlagBase + CurCmd, CurPos);
+				break;
+			case CF_FADE_IN_SONG:
+				if (CmdList->CmdData[CurCmd].Len == 0x01)
+					TrkMode = 0x00;	// Sonic 1's Fade In command also terminates the song.
+				SmpsCfg->SeqFlags |= SEQFLG_NEED_SAVE;
 				break;
 			}
 			

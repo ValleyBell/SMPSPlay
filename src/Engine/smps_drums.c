@@ -117,9 +117,7 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 			
 			RetVal = DAC_Play(Trk->ChannelMask & 0x01, DrumData->DrumID);
 			if ((RetVal & 0xF0) == 0x10 && (DebugMsgs & 0x01))
-			{
 				printf("Warning: Unmapped DAC drum %02X at %04X!\n", DrumData->DrumID, Trk->Pos);
-			}
 		}
 		else
 		{
