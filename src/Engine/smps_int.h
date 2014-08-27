@@ -85,6 +85,9 @@ static void SilenceAll(void);
 static void SilencePSG(void);
 void RestoreBGMChannel(TRK_RAM* Trk);
 
+void BackupMusic(MUS_STATE* MusState);
+void RestoreMusic(MUS_STATE* MusState);
+
 //void SetDACState(UINT8 DacOn);
 
 

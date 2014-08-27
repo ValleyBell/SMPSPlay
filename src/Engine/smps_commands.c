@@ -1025,16 +1025,25 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	case CF_FADE_IN_SONG:
 		if (CFlag->Len == 0x01)
 		{
+			// Sonic 1/2: Stops all music processing and instantly restores the previous BGM.
+			// (I won't do this here, so I just stop the current track.)
 			CMD_FLAGS EndFlag;
 			
 			EndFlag.Type = CF_TRK_END;
 			EndFlag.SubType = CFS_TEND_STD;
 			EndFlag.Len = 0x00;
 			DoCoordinationFlag(Trk, &EndFlag);
+			
+			SmpsRAM.LoadSaveRequest = 0x01;
 		}
 		else
 		{
+			// Sonic 3K: sets the Communication Byte to FF to tell the driver that the previous
+			// song has to be restored.
+			if (Data[0x00] == 0xFF)
+				SmpsRAM.LoadSaveRequest = 0x01;
 		}
+		// TODO: start Fade In
 		break;
 	case CF_SND_OFF:
 		WriteFMI(0x88, 0x0F);

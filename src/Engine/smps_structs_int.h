@@ -198,8 +198,8 @@ typedef struct _fade_in_info
 #define TRKMODE_SPCSFX	0x80
 typedef struct _sound_ram
 {
-	SMPS_CFG* MusCfg;
-	SMPS_CFG* SFXCfg[SFX_TRKCNT + SPCSFX_TRKCNT];
+	SMPS_CFG MusCfg;
+	SMPS_CFG SFXCfg[SFX_TRKCNT + SPCSFX_TRKCNT];
 	SMPS_CFG DrumCfg[0x02];
 	
 	// SMPS Z80 Type 1:
@@ -247,6 +247,7 @@ typedef struct _sound_ram
 	UINT8 TempoInit;		// 1C14 - Initial Tempo Value
 	// 1C15 - unknown (set to 00 when SFX is started, set to 1F when a track ends)
 	UINT8 CommData;			// 1C16 - Communication Data Byte
+	UINT8 LoadSaveRequest;	// 1C16 - [present in Sonic 3, sort of]
 	// 1C17 - unknown (set to a random value (Z80 register R) when executing DoSoundQueue
 	UINT8 CurSFXPrio;		// 1C18 - current SFX Priority
 	UINT8 TrkMode;			// 1C19 - Music/SFX Mode
@@ -272,6 +273,21 @@ typedef struct _sound_ram
 	TRK_RAM SFXTrks[SFX_TRKCNT];		// 1DF0 - SFX Tracks
 	TRK_RAM SpcSFXTrks[SPCSFX_TRKCNT];	// 1F40 - Special SFX Tracks
 } SND_RAM;
+
+typedef struct _music_save_state
+{
+	SMPS_CFG MusCfg;
+	UINT8 InUse;
+	UINT8 DacChVol[2];
+	UINT8 MusicPaused;
+	UINT8 SpcFM3Mode;
+	UINT8 NoiseDrmVol;
+	UINT8 TempoCntr;
+	UINT8 TempoInit;
+	UINT16 FM3Freqs_Mus[4];
+	//DRUM_TRK_RAM MusDrmTrks[2];	// These are not required.
+	TRK_RAM MusicTrks[MUS_TRKCNT];
+} MUS_STATE;
 
 
 #endif // __SMPS_STRUCTS_INT_H__

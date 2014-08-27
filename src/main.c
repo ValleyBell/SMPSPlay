@@ -203,8 +203,8 @@ int main(int argc, char* argv[])
 				
 				vgm_set_loop(0x00);
 				vgm_dump_stop();
-				if (LastSmpsCfg != NULL)
-					FreeSMPSFile(LastSmpsCfg);
+				//if (LastSmpsCfg != NULL)	// The SMPS driver does this by itself now.
+				//	FreeSMPSFile(LastSmpsCfg);
 				LastSmpsCfg = &NewSmpsEDef->SmpsCfg;
 				
 				PlayingTimer = 0;

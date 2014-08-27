@@ -36,6 +36,10 @@ void Extra_LoopStartCheck(TRK_RAM* Trk);
 //void Extra_LoopEndCheck(TRK_RAM* Trk);
 
 
+// from loader_smps.c
+void FreeSMPSFile(SMPS_CFG* SmpsCfg);
+// The SMPS driver has to free the SMPS files by itself in order to allow song save states.
+
 
 // Function Prototypes
 // -------------------
@@ -53,6 +57,7 @@ INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG
 // Variables
 // ---------
 SND_RAM SmpsRAM;
+MUS_STATE MusicSaveState;
 
 //static const UINT8 VolOperators_DEF[] = {0x40, 0x48, 0x44, 0x4C, 0x00};
 //static const UINT8 VolOperators_HW[] = {0x40, 0x44, 0x48, 0x4C, 0x00};
@@ -228,11 +233,14 @@ void UpdateMusic(void)
 	
 	if (PlayingTimer == -1)
 		PlayingTimer = 0;
-	if (SmpsRAM.MusCfg == NULL)
-		return;
+	//if (SmpsRAM.MusCfg == NULL)
+	//	return;
 	DoPause();
 	if (SmpsRAM.PauseMode)
 		return;
+	
+	if (SmpsRAM.LoadSaveRequest)
+		RestoreMusic(&MusicSaveState);
 	
 	SmpsRAM.MusMultUpdate = 1;
 	DoTempo();
@@ -1994,7 +2002,7 @@ static UINT8 CheckTrkID(UINT8 TrkID, UINT8 ChnBits)
 static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UINT8 Mode,
 						   UINT8 ChnListSize, const UINT8* ChnList, UINT8 TickMult, UINT8 TrkBase)
 {
-	SMPS_CFG* SmpsCfg = SmpsRAM.MusCfg;
+	SMPS_CFG* SmpsCfg = &SmpsRAM.MusCfg;
 	const UINT8* Data = SmpsCfg->SeqData;
 	UINT16 HdrChnSize;
 	UINT16 CurPos;
@@ -2090,10 +2098,20 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 	UINT8 TickMult;
 	UINT8 TrkBase;
 	
+	if (! (SmpsRAM.MusCfg.SeqFlags & SEQFLG_NEED_SAVE))
+	{
+		// Note: It makes a save state ONLY if:
+		//	1. the song-to-be-played has the "need save" flag set and
+		//	2. the current song does NOT have that flag set
+		if (SmpsFileConfig->SeqFlags & SEQFLG_NEED_SAVE)
+			BackupMusic(&MusicSaveState);
+	}
+	FreeSMPSFile(&SmpsRAM.MusCfg);
+	
 	//StopAllSound();	// in the driver, but I can do that in a better way
 	InitMusicPlay(SmpsFileConfig);
 	
-	SmpsRAM.MusCfg = SmpsFileConfig;
+	SmpsRAM.MusCfg = *SmpsFileConfig;
 	Data = SmpsFileConfig->SeqData;
 	CurPos = 0x00;
 	
@@ -2106,11 +2124,11 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 	TickMult = Data[CurPos + 0x04];
 	SmpsRAM.TempoInit = Data[CurPos + 0x05];
 	SmpsRAM.TempoCntr = SmpsRAM.TempoInit;
-	if (SmpsRAM.MusCfg->Tempo1Tick == T1TICK_NOTEMPO)
+	if (SmpsRAM.MusCfg.Tempo1Tick == T1TICK_NOTEMPO)
 	{
 		// DoTempo is called before PlayMusic and thus isn't executed during the first tick.
 		// So we undo one DoTempo.
-		switch(SmpsRAM.MusCfg->TempoMode)
+		switch(SmpsRAM.MusCfg.TempoMode)
 		{
 		case TEMPO_TIMEOUT:
 			SmpsRAM.TempoCntr ++;
@@ -2206,13 +2224,19 @@ void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX)
 		}
 		
 		memset(SFXTrk, 0x00, sizeof(TRK_RAM));
-		SFXTrk->SmpsCfg = SmpsFileConfig;
+		if (SpecialSFX)
+			SFXTrk->SmpsCfg = &SmpsRAM.SFXCfg[SFX_TRKCNT + SpcSFXTrkID];
+		else
+			SFXTrk->SmpsCfg = &SmpsRAM.SFXCfg[SFXTrkID];
+		FreeSMPSFile(SFXTrk->SmpsCfg);
+		*SFXTrk->SmpsCfg = *SmpsFileConfig;
+		
 		SFXTrk->PlaybkFlags = Data[CurPos + 0x00];
 		SFXTrk->ChannelMask = Data[CurPos + 0x01];
 		if (SFXTrk->ChannelMask == 0x02)
 			ResetSpcFM3Mode();
 		SFXTrk->TickMult = TickMult;
-		SFXTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SmpsFileConfig);
+		SFXTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SFXTrk->SmpsCfg);
 		SFXTrk->Transpose = Data[CurPos + 0x02];
 		SFXTrk->Volume = Data[CurPos + 0x03];
 		//FinishFMTrkInit:
@@ -2223,7 +2247,7 @@ void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX)
 		SFXTrk->PanAFMS = 0xC0;
 		SFXTrk->RemTicks = 0x01;
 		
-		if (SFXTrk->Pos >= SmpsFileConfig->SeqLength)
+		if (SFXTrk->Pos >= SFXTrk->SmpsCfg->SeqLength)
 			SFXTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 		
 		if (SpcSFXTrkID != 0xFF && SFXTrkID != 0xFF)
@@ -2258,14 +2282,21 @@ void GetSFXChnPtrs(UINT8 ChannelMask, UINT8* MusicTrk, UINT8* SFXTrk, UINT8* Spc
 UINT8 GetChannelTrack(UINT8 ChannelMask, UINT8 TrkCount, const TRK_RAM* Tracks)
 {
 	UINT8 CurTrk;
+	UINT8 TrkID;
 	
+	TrkID = 0xFF;
 	for (CurTrk = 0; CurTrk < TrkCount; CurTrk ++)
 	{
 		if (Tracks[CurTrk].ChannelMask == ChannelMask)
-			return CurTrk;
+		{
+			if (Tracks[CurTrk].PlaybkFlags & PBKFLG_ACTIVE)
+				return CurTrk;	// active track found - take it
+			else if (TrkID == 0xFF)
+				TrkID = CurTrk;	// else search for active tracks with same Channel Mask
+		}
 	}
 	
-	return 0xFF;
+	return TrkID;
 }
 
 
@@ -2323,7 +2354,7 @@ static void DoTempo(void)
 	UINT16 NewTempoVal;
 	UINT8 CurTrk;
 	
-	switch(SmpsRAM.MusCfg->TempoMode)
+	switch(SmpsRAM.MusCfg.TempoMode)
 	{
 	case TEMPO_TIMEOUT:
 		// Note: (pre-)SMPS 68k checks TempoInit, SMPS Z80 checks TempoCntr
@@ -2673,21 +2704,40 @@ void RestoreBGMChannel(TRK_RAM* Trk)
 	TRK_RAM* SpcSFXTrk;
 	TRK_RAM* RstTrk;	// Restored Track
 	
-	GetSFXChnPtrs(Trk->ChannelMask, &MusTrkID, &SpcSFXTrkID, &SFXTrkID);
-	MusTrk = (MusTrkID == 0xFF) ? NULL : &SmpsRAM.MusicTrks[MusTrkID];
-	SFXTrk = (SFXTrkID == 0xFF) ? NULL : &SmpsRAM.SFXTrks[SFXTrkID];
-	SpcSFXTrk = (SpcSFXTrkID == 0xFF) ? NULL : &SmpsRAM.SpcSFXTrks[SpcSFXTrkID];
-	
-	if (SpcSFXTrk->PlaybkFlags & PBKFLG_ACTIVE)
-		RstTrk = SpcSFXTrk;
+	if (Trk >= SmpsRAM.MusicTrks && Trk < SmpsRAM.MusicTrks + MUS_TRKCNT)
+	{
+		RstTrk = Trk;
+	}
 	else
-		RstTrk = MusTrk;
+	{
+		GetSFXChnPtrs(Trk->ChannelMask, &MusTrkID, &SpcSFXTrkID, &SFXTrkID);
+		MusTrk = (MusTrkID == 0xFF) ? NULL : &SmpsRAM.MusicTrks[MusTrkID];
+		SFXTrk = (SFXTrkID == 0xFF) ? NULL : &SmpsRAM.SFXTrks[SFXTrkID];
+		SpcSFXTrk = (SpcSFXTrkID == 0xFF) ? NULL : &SmpsRAM.SpcSFXTrks[SpcSFXTrkID];
+		
+		if (SpcSFXTrk != NULL && SpcSFXTrk->PlaybkFlags & PBKFLG_ACTIVE)
+			RstTrk = SpcSFXTrk;
+		else
+			RstTrk = MusTrk;
+	}
+	if (RstTrk == NULL)
+		return;	// This should really not happen, because then MusTrk was NULL.
 	RstTrk->PlaybkFlags &= ~PBKFLG_OVERRIDDEN;
 	if (! (RstTrk->PlaybkFlags & PBKFLG_ACTIVE))
 		return;
+	if (RstTrk->SmpsCfg == NULL)
+		return;
 	
-	if (! (RstTrk->ChannelMask & 0xF8))
+	// restore a channel (heavily dependent on the channel type)
+	if (RstTrk->ChannelMask & 0x80)
 	{
+		// restore PSG channel
+		if (Trk->NoiseMode & 0x0)
+			WritePSG(Trk->NoiseMode);
+	}
+	else if ((RstTrk->ChannelMask & 0xF8) == 0x00)
+	{
+		// FM channel - 00..07
 		INS_LIB* InsLib;
 		const UINT8* InsPtr;
 		UINT8 InsID;
@@ -2718,11 +2768,67 @@ void RestoreBGMChannel(TRK_RAM* Trk)
 		if (Trk->SSGEG.Type & 0x80)
 			SendSSGEG(Trk, &Trk->SmpsCfg->SeqData[Trk->SSGEG.DataPtr], Trk->SSGEG.Type & 0x01);
 	}
-	else if (RstTrk->ChannelMask & 0x80)
+	else if ((RstTrk->ChannelMask & 0xF8) == 0x10)
 	{
-		// restore PSG channel
-		if (Trk->NoiseMode & 0x0)
-			WritePSG(Trk->NoiseMode);
+		// Drum/DAC channel - 10..17
+		WriteFMMain(Trk, 0xB4, Trk->PanAFMS);
+	}
+	
+	return;
+}
+
+void BackupMusic(MUS_STATE* MusState)
+{
+	MusState->MusCfg = SmpsRAM.MusCfg;
+	memcpy(MusState->DacChVol, SmpsRAM.DacChVol, sizeof(UINT8) * 2);
+	MusState->MusicPaused = SmpsRAM.MusicPaused;
+	MusState->SpcFM3Mode = SmpsRAM.SpcFM3Mode;
+	MusState->NoiseDrmVol = SmpsRAM.NoiseDrmVol;
+	MusState->TempoCntr = SmpsRAM.TempoCntr;
+	MusState->TempoInit = SmpsRAM.TempoInit;
+	memcpy(MusState->FM3Freqs_Mus, SmpsRAM.FM3Freqs_Mus, sizeof(UINT16) * 4);
+	memcpy(MusState->MusicTrks, SmpsRAM.MusicTrks, sizeof(TRK_RAM) * MUS_TRKCNT);
+	MusState->InUse = 0x01;
+	SmpsRAM.MusCfg.UsageCounter ++;
+	
+	return;
+}
+
+void RestoreMusic(MUS_STATE* MusState)
+{
+	UINT8 CurTrk;
+	TRK_RAM* TempTrk;
+	
+	SmpsRAM.LoadSaveRequest = 0x00;
+	
+	if (! MusState->InUse)
+		return;
+	
+	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
+	{
+		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
+		TempTrk->PlaybkFlags &= ~PBKFLG_HOLD;
+		DoNoteOff(TempTrk);
+		DisableSSGEG(TempTrk);
+	}
+	FreeSMPSFile(&SmpsRAM.MusCfg);
+	
+	SmpsRAM.MusCfg = MusState->MusCfg;
+	memcpy(SmpsRAM.DacChVol, MusState->DacChVol, sizeof(UINT8) * 2);
+	SmpsRAM.MusicPaused = MusState->MusicPaused;
+	SmpsRAM.SpcFM3Mode = MusState->SpcFM3Mode;
+	SmpsRAM.NoiseDrmVol = MusState->NoiseDrmVol;
+	SmpsRAM.TempoCntr = MusState->TempoCntr;
+	SmpsRAM.TempoInit = MusState->TempoInit;
+	memcpy(SmpsRAM.FM3Freqs_Mus, MusState->FM3Freqs_Mus, sizeof(UINT16) * 4);
+	memcpy(SmpsRAM.MusicTrks, MusState->MusicTrks, sizeof(TRK_RAM) * MUS_TRKCNT);
+	MusState->InUse = 0x00;
+	
+	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
+	{
+		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
+		TempTrk->PlaybkFlags |= PBKFLG_ATREST;
+		RestoreBGMChannel(TempTrk);
 	}
 	
 	return;

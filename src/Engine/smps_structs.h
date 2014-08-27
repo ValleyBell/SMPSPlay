@@ -186,6 +186,7 @@ typedef struct _smps_settings
 	UINT8 VolMode;
 	UINT8 DrumChnMode;
 	
+	UINT8 UsageCounter;
 	UINT8 SeqFlags;
 	UINT16 SeqBase;		// Z80 only: Sequence Base Offset
 	UINT16 SeqLength;

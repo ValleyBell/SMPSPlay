@@ -284,6 +284,7 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 	{
 		SmpsCfg->InsLib = NULL;
 	}
+	SmpsCfg->UsageCounter = 0x01;
 	SmpsCfg->LoopPtrs = (UINT16*)malloc(TrkCount * sizeof(UINT16));
 	
 	// reset DAC usage
@@ -649,6 +650,13 @@ static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Note)
 
 void FreeSMPSFile(SMPS_CFG* SmpsCfg)
 {
+	if (SmpsCfg->UsageCounter)
+	{
+		SmpsCfg->UsageCounter --;
+		if (SmpsCfg->UsageCounter)
+			return;
+	}
+	
 	if (SmpsCfg->SeqData != NULL)
 	{
 		free(SmpsCfg->SeqData);

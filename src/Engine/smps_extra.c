@@ -47,7 +47,7 @@ void StartSignal(void)
 	StoppedTimer = -1;
 	
 	vgm_dump_start();
-	DumpDACSounds(&SmpsRAM.MusCfg->DACDrv);
+	DumpDACSounds(&SmpsRAM.MusCfg.DACDrv);
 	
 	return;
 }
