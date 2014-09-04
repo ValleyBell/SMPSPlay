@@ -366,6 +366,7 @@ void FreeDACData(DAC_CFG* DACDrv)
 	DAC_SAMPLE* TempSmpl;
 	
 	DAC_Reset();
+	SetDACDriver(NULL);
 	
 	for (CurSmpl = 0x00; CurSmpl < DACDrv->SmplCount; CurSmpl ++)
 	{

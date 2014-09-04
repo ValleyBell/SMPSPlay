@@ -138,6 +138,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		// I need to use DrumTrk here, because NoteOff ignores the Drum channel
 		DrumTrk->ChannelMask = Trk->ChannelMask & 0x0F;
 		DoNoteOff(DrumTrk);
+		FreeSMPSFile(DrumTrk->SmpsSet);
 		
 		DTrkLib = &SmpsCfg->FMDrums;
 		if (DrumData->DrumID >= DTrkLib->DrumCount)
@@ -150,6 +151,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DTrkData = &DTrkLib->File.Data[DrumOfs];
 		DTrkSet->SeqBase = DTrkLib->DrumBase;
 		DTrkSet->Seq = DTrkLib->File;
+		DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
 		
 		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
 		DrumTrk->SmpsSet = DTrkSet;
@@ -180,7 +182,9 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DrumTrk = &SmpsRAM.MusicTrks[TRACK_MUS_PSG3];
 		if (DrumTrk->PlaybkFlags & PBKFLG_OVERRIDDEN)
 			return;
-		DoNoteOff(Trk);
+		if (DrumTrk->ChannelMask)
+			DoNoteOff(DrumTrk);
+		FreeSMPSFile(DrumTrk->SmpsSet);
 		
 		DTrkLib = &SmpsCfg->PSGDrums;
 		if (DrumData->DrumID >= DTrkLib->DrumCount)
@@ -193,6 +197,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DTrkData = &DTrkLib->File.Data[DrumOfs];
 		DTrkSet->SeqBase = DTrkLib->DrumBase;
 		DTrkSet->Seq = DTrkLib->File;
+		DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
 		
 		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
 		DrumTrk->SmpsSet = DTrkSet;

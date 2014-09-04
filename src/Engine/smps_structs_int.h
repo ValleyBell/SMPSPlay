@@ -198,9 +198,10 @@ typedef struct _fade_in_info
 #define TRKMODE_SPCSFX	0x80
 typedef struct _sound_ram
 {
-	SMPS_SET MusSet;
-	SMPS_SET SFXSet[SFX_TRKCNT + SPCSFX_TRKCNT];
-	SMPS_SET DrumSet[0x02];
+	// Note: SMPS_SET is stored as pointers, so that multiple SFX tracks can reference the same data.
+	SMPS_SET* MusSet;
+	SMPS_SET* SFXSet[SFX_TRKCNT + SPCSFX_TRKCNT];
+	SMPS_SET DrumSet[0x02];	// Note: These always reuse data from MusSet and don't require memory management.
 	
 	// SMPS Z80 Type 1:
 	// 1C00/1C01 - Data Bank
@@ -276,8 +277,12 @@ typedef struct _sound_ram
 
 typedef struct _music_save_state
 {
-	SMPS_SET MusSet;
+	SMPS_SET* MusSet;
 	UINT8 InUse;
+	UINT16 TimerAVal;
+	UINT8 TimerBVal;
+	UINT8 TimingMode;
+	UINT8 LockTimingMode;
 	UINT8 DacChVol[2];
 	UINT8 MusicPaused;
 	UINT8 SpcFM3Mode;

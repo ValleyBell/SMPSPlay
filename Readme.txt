@@ -2,7 +2,7 @@ SMPS Player
 ===========
 by Valley Bell
 
-Version 2.01 (2014-08-17)
+Version 2.10 (2014-##-##)
 
 
 This program plays SMPS music files, a format commonly used in games for the Sega MegaDrive/Genesis.
@@ -14,7 +14,7 @@ Features
 - fully customizable SMPS commands and drums
 - many SMPS driver settings, incl. FM/PSG frequencies and modulation/volume envelope commands
 - separate SMPS settings for every file extention
-- support for a wide range of SMPS effects
+- support for a wide range of SMPS effects and commands
 - support for FM, PSG and DAC on the drum channel and mixed drums (FM/PSG is common)
 - global FM instrument tables
 - clean DAC playback, with frequencies based on Z80 cycle calculations
@@ -34,6 +34,7 @@ Keys
 - S - stop and mute music (calls the StopAllSound SMPS routine)
 - F - fade music out (calls FadeOutMusic SMPS routine)
 - V - enable/disable VGM logging
+- J - toggle Conditional Jump variable
 - ESC - quit
 
 
@@ -63,15 +64,16 @@ A huge thanks to the developers of IDA, The Interactive Disassembler. Disassembl
 
 History
 -------
-2014-##-##
+2014-##-## - 2.10
 	added "Tempo1Tick" setting, allowing for more accurate jitter emulation
 	added full support for the SMPS variant used in Sonic 2 Recreation
-2014-08-17
+	added support for music save states used by the Sonic series 1-up tunes
+2014-08-17 - 2.01
 	added proper support for Master System SMPS (incl. PSG drums, additional commands)
 	added preSMPS instrument format (register-data pairs)
 	added support for 2x 2op drums (used in early preSMPS Z80)
-2014-07-01
-	First real public release. v2.00
+2014-07-01 - 2.00
+	First real public release.
 2014-05-04
 	MainMemory releases SMPSOUT.DLL, a music DLL for Sonic & Knuckles PC Collection.
 	I lent him much of the code I had written for SMPSPlay at that time.

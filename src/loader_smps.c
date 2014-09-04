@@ -673,6 +673,9 @@ static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Note)
 
 void FreeSMPSFile(SMPS_SET* SmpsSet)
 {
+	if (SmpsSet == NULL)
+		return;
+	
 	if (SmpsSet->UsageCounter)
 	{
 		SmpsSet->UsageCounter --;

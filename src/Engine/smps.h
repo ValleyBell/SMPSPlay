@@ -6,6 +6,7 @@
 #include "smps_structs.h"
 
 void InitDriver(void);
+void DeinitDriver(void);
 
 #define UPDATEEVT_VINT	0x00
 #define UPDATEEVT_TIMER	0x01

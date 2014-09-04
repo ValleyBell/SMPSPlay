@@ -12,6 +12,12 @@
 void WriteFMMain(const TRK_RAM* Trk, UINT8 Reg, UINT8 Data);
 
 //void InitDriver(void);
+//void DeinitDriver(void);
+void FreeSMPSFile(SMPS_SET* SmpsSet);	// from loader_smps.c, but required by SMPS routines to do memory management
+static void FreeSMPSFileRef_Zero(SMPS_SET** SmpsSetRef);
+static UINT8 CleanSmpsTrack(TRK_RAM* Trk);
+static void CleanSmpsFiles(void);
+
 static void ResetYMTimerA(void);
 static void ResetYMTimerB(void);
 

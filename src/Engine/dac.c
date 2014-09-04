@@ -53,7 +53,7 @@ static UINT32 CalcDACDelta_Rate(UINT32 Rate);
 //void DAC_SetFrequency(UINT8 Chn, UINT32 Freq, UINT8 MidNote);
 
 
-DAC_CFG* DACDrv = NULL;
+static DAC_CFG* DACDrv = NULL;
 
 extern UINT32 SampleRate;
 
@@ -63,6 +63,8 @@ static DAC_STATE DACChnState[MAX_DAC_CHNS];
 void SetDACDriver(DAC_CFG* DACSet)
 {
 	DACDrv = DACSet;
+	if (DACDrv == NULL)
+		return;
 	
 	if (! DACDrv->Cfg.Channels || DACDrv->Cfg.Channels > MAX_DAC_CHNS)
 		DACDrv->Cfg.Channels = MAX_DAC_CHNS;

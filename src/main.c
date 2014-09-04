@@ -2,7 +2,7 @@
 // -----------
 // Written by Valley Bell, 2014
 
-#define SMPSPLAY_VER	"2.02"
+#define SMPSPLAY_VER	"2.10"
 //#define BETA
 
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
@@ -343,7 +343,8 @@ int main(int argc, char* argv[])
 		Sleep(1);
 	vgm_set_loop(0x00);
 	vgm_dump_stop();
-	FreeSMPSFile(&LastSmpsCfg);
+	
+	DeinitDriver();
 	StopAudioOutput();
 	
 FinishProgram:
