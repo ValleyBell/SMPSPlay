@@ -37,7 +37,7 @@ void Extra_LoopStartCheck(TRK_RAM* Trk);
 
 
 // from loader_smps.c
-void FreeSMPSFile(SMPS_CFG* SmpsCfg);
+void FreeSMPSFile(SMPS_SET* SmpsSet);
 // The SMPS driver has to free the SMPS files by itself in order to allow song save states.
 
 
@@ -46,8 +46,8 @@ void FreeSMPSFile(SMPS_CFG* SmpsCfg);
 INLINE UINT16 ReadBE16(const UINT8* Data);
 INLINE UINT16 ReadLE16(const UINT8* Data);
 INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
-INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
-INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG* SmpsCfg);
+INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet);
+INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet);
 
 // TODO: copy smps_int.h here
 
@@ -94,22 +94,22 @@ INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg)
 		return ReadLE16(Data);
 }
 
-INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg)
+INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet)
 {
-	return ReadRawPtr(Data, SmpsCfg) - SmpsCfg->SeqBase;
+	return ReadRawPtr(Data, SmpsSet->Cfg) - SmpsSet->SeqBase;
 }
 
-INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG* SmpsCfg)
+INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet)
 {
 	UINT16 PtrVal;
 	UINT8 Offset;
 	
-	PtrVal = ReadRawPtr(Data, SmpsCfg);
-	Offset = SmpsCfg->PtrFmt & PTRFMT_OFSMASK;
+	PtrVal = ReadRawPtr(Data, SmpsSet->Cfg);
+	Offset = SmpsSet->Cfg->PtrFmt & PTRFMT_OFSMASK;
 	if (! Offset)
 	{
 		// absolute
-		return PtrVal - SmpsCfg->SeqBase;
+		return PtrVal - SmpsSet->SeqBase;
 	}
 	else
 	{
@@ -233,8 +233,8 @@ void UpdateMusic(void)
 	
 	if (PlayingTimer == -1)
 		PlayingTimer = 0;
-	//if (SmpsRAM.MusCfg == NULL)
-	//	return;
+	if (SmpsRAM.MusSet.Cfg == NULL)
+		return;
 	DoPause();
 	if (SmpsRAM.PauseMode)
 		return;
@@ -303,6 +303,7 @@ INLINE void UpdateTrack(TRK_RAM* Trk)
 
 static void UpdateFMTrack(TRK_RAM* Trk)
 {
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
 	UINT16 Freq;
 	UINT8 FreqUpdate;
 	
@@ -316,18 +317,18 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 			return;
 		
 		PrepareModulat(Trk);
-		if (Trk->SmpsCfg->DelayFreq == DLYFREQ_RESET && ! Trk->Frequency)
+		if (SmpsCfg->DelayFreq == DLYFREQ_RESET && ! Trk->Frequency)
 		{
 			Trk->PlaybkFlags |= PBKFLG_ATREST;
 			return;
 		}
-		if (! Trk->SmpsCfg->FMOctWrap)
+		if (! SmpsCfg->FMOctWrap)
 			Freq = Trk->Frequency + Trk->Detune;
 		else
 			Freq = DoPitchSlide(Trk);
 		
-		//if (Trk->SmpsCfg->ModAlgo == MODULAT_Z80)
-		if (Trk->SmpsCfg->ModAlgo & 0x01)
+		//if (SmpsCfg->ModAlgo == MODULAT_Z80)
+		if (SmpsCfg->ModAlgo & 0x01)
 		{
 			DoModulation(Trk, &Freq);
 		}
@@ -373,6 +374,7 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 
 static void UpdatePSGTrack(TRK_RAM* Trk)
 {
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
 	UINT16 Freq;
 	UINT8 FreqUpdate;
 	UINT8 WasNewNote;
@@ -388,18 +390,18 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 		
 		PrepareModulat(Trk);
 		PrepareADSR(Trk);
-		if (Trk->SmpsCfg->DelayFreq == DLYFREQ_RESET && (Trk->Frequency & 0x8000))
+		if (SmpsCfg->DelayFreq == DLYFREQ_RESET && (Trk->Frequency & 0x8000))
 		{
 			Trk->PlaybkFlags |= PBKFLG_ATREST;
 			return;
 		}
-		if (! Trk->SmpsCfg->FMOctWrap)
+		if (! SmpsCfg->FMOctWrap)
 			Freq = Trk->Frequency + Trk->Detune;
 		else
 			Freq = DoPitchSlide(Trk);
 		
-		//if (Trk->SmpsCfg->ModAlgo == MODULAT_Z80)
-		if (Trk->SmpsCfg->ModAlgo & 0x01)
+		//if (SmpsCfg->ModAlgo == MODULAT_Z80)
+		if (SmpsCfg->ModAlgo & 0x01)
 		{
 			FreqUpdate = DoModulation(Trk, &Freq);
 		}
@@ -488,12 +490,14 @@ static void UpdatePSGVolume(TRK_RAM* Trk, UINT8 WasNewNote)
 
 static void UpdateDrumTrack(TRK_RAM* Trk)
 {
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	
 	Trk->RemTicks --;
 	if (! Trk->RemTicks)
 	{
-		const UINT8* Data = Trk->SmpsCfg->SeqData;
+		const UINT8* Data = Trk->SmpsSet->Seq.Data;
 		
-		if (Trk->Pos >= Trk->SmpsCfg->SeqLength)
+		if (Trk->Pos >= Trk->SmpsSet->Seq.Len)
 		{
 			Trk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 			return;
@@ -501,7 +505,7 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 		
 		Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
 		
-		while(Data[Trk->Pos] >= Trk->SmpsCfg->CmdList.FlagBase)
+		while(Data[Trk->Pos] >= SmpsCfg->CmdList.FlagBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			cfHandler(Trk, Data[Trk->Pos]);
@@ -581,7 +585,7 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 				DAC_SetFeature(0x00, DACFLAG_FF_STATE, Trk->DAC.Unused & 0x40);
 				if (! (Trk->PlaybkFlags & PBKFLG_HOLD))
 				{
-					if (Trk->DAC.Snd < Trk->SmpsCfg->DrumLib.DrumCount)
+					if (Trk->DAC.Snd < SmpsCfg->DrumLib.DrumCount)
 						PlayDrumNote(Trk, 0x80 | Trk->DAC.Snd);
 					else
 						DAC_Play(0x00, Trk->DAC.Snd - 0x01);
@@ -657,13 +661,14 @@ static void Update2OpDrumTrack(DRUM_TRK_RAM* Trk)
 
 static void UpdatePWMTrack(TRK_RAM* Trk)
 {
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	
 	Trk->RemTicks --;
 	if (! Trk->RemTicks)
 	{
-		const UINT8* Data = Trk->SmpsCfg->SeqData;
-		UINT8 Note;
+		const UINT8* Data = Trk->SmpsSet->Seq.Data;
 		
-		if (Trk->Pos >= Trk->SmpsCfg->SeqLength)
+		if (Trk->Pos >= Trk->SmpsSet->Seq.Len)
 		{
 			Trk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 			return;
@@ -671,7 +676,7 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 		
 		Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
 		
-		while(Data[Trk->Pos] >= Trk->SmpsCfg->CmdList.FlagBase)
+		while(Data[Trk->Pos] >= SmpsCfg->CmdList.FlagBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			cfHandler(Trk, Data[Trk->Pos]);
@@ -685,8 +690,7 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 			Trk->DAC.Snd = Data[Trk->Pos];
 			Trk->Pos ++;
 		}
-		Note = Trk->DAC.Snd;
-		if (! (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN) && Note >= 0x81)
+		if (! (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN) && Trk->DAC.Snd >= 0x81)
 		{
 			UINT8 VolValue;
 			
@@ -694,7 +698,7 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 			VolValue += 1 + ((Trk->Volume & 0xF0) >> 4);
 			DAC_SetVolume((Trk->ChannelMask & 0x06) >> 1, VolValue * 0x10);
 			if (! (Trk->PlaybkFlags & PBKFLG_HOLD))
-				DAC_Play((Trk->ChannelMask & 0x06) >> 1, Note - 0x81);
+				DAC_Play((Trk->ChannelMask & 0x06) >> 1, Trk->DAC.Snd - 0x81);
 		}
 		
 		// read Duration for 00..7F
@@ -716,16 +720,17 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 
 static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 {
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
 	UINT16 Freq;
 	UINT8 WasNewNote;
 	
 	Trk->RemTicks --;
 	if (! Trk->RemTicks)
 	{
-		const UINT8* Data = Trk->SmpsCfg->SeqData;
+		const UINT8* Data = Trk->SmpsSet->Seq.Data;
 		UINT8 Note;
 		
-		if (Trk->Pos >= Trk->SmpsCfg->SeqLength)
+		if (Trk->Pos >= Trk->SmpsSet->Seq.Len)
 		{
 			Trk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 			return;
@@ -733,7 +738,7 @@ static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 		
 		Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
 		
-		while(Data[Trk->Pos] >= Trk->SmpsCfg->CmdList.FlagBase)
+		while(Data[Trk->Pos] >= SmpsCfg->CmdList.FlagBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			cfHandler(Trk, Data[Trk->Pos]);
@@ -853,11 +858,12 @@ static void SendPSGFrequency(TRK_RAM* Trk, UINT16 Freq)
 
 static void TrkUpdate_Proc(TRK_RAM* Trk)
 {
-	const UINT8* Data = Trk->SmpsCfg->SeqData;
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	const UINT8* Data = Trk->SmpsSet->Seq.Data;
 	UINT8 Note;
 	UINT8 ReuseDelay;
 	
-	if (Trk->Pos >= Trk->SmpsCfg->SeqLength)
+	if (Trk->Pos >= Trk->SmpsSet->Seq.Len)
 	{
 		Trk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 		return;
@@ -867,7 +873,7 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 	if (Trk->PlaybkFlags & PBKFLG_HOLD_ALL)
 		Trk->PlaybkFlags |= PBKFLG_HOLD;
 	
-	while(Data[Trk->Pos] >= /*0xE0*/Trk->SmpsCfg->CmdList.FlagBase)
+	while(Data[Trk->Pos] >= /*0xE0*/SmpsCfg->CmdList.FlagBase)
 	{
 		Extra_LoopStartCheck(Trk);
 		cfHandler(Trk, Data[Trk->Pos]);
@@ -893,7 +899,7 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			if (Note == 0x80)
 			{
 				DoPSGNoteOff(Trk);
-				if (Trk->SmpsCfg->DelayFreq == DLYFREQ_RESET)
+				if (SmpsCfg->DelayFreq == DLYFREQ_RESET)
 					Trk->Frequency = (Trk->ChannelMask & 0x80) ? 0xFFFF : 0x0000;
 			}
 			else
@@ -930,7 +936,7 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 
 static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 {
-	const UINT8* Data = Trk->SmpsCfg->SeqData;
+	const UINT8* Data = Trk->SmpsSet->Seq.Data;
 	
 	if (ReadDuration)
 	{
@@ -1010,6 +1016,7 @@ static UINT8 DoNoteStop(TRK_RAM* Trk)
 
 static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 {
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
 	INT16 Note;
 	UINT8 Octave;
 	
@@ -1018,39 +1025,39 @@ static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 	if (Trk->ChannelMask & 0x80)
 	{
 		// Sonic 2 SMS does (NoteCmd - 0x80), too
-		//if (Trk->SmpsCfg->PSGBaseNote == PSGBASEN_B)
+		//if (SmpsCfg->PSGBaseNote == PSGBASEN_B)
 		//	Note ++;
-		Note += Trk->SmpsCfg->PSGBaseNote;
+		Note += SmpsCfg->PSGBaseNote;
 		
 		if (Trk->Transpose == -36 && Note < -24)
 			return 0x6000;	// workaround for crappy xm#smps conversions that use an invalid PSG frequency for noise
 		if (Note < 0)
 			Note = 0;
-		else if (Note >= Trk->SmpsCfg->PSGFreqCnt)
-			Note = Trk->SmpsCfg->PSGFreqCnt - 1;
-		return Trk->SmpsCfg->PSGFreqs[Note];
+		else if (Note >= SmpsCfg->PSGFreqCnt)
+			Note = SmpsCfg->PSGFreqCnt - 1;
+		return SmpsCfg->PSGFreqs[Note];
 	}
 	else //if (! (Trk->ChannelMask & 0x70))
 	{
 		// SMPS 68k drivers do (NoteCmd - 0x80) instead, so add 1 again.
-		//if (Trk->SmpsCfg->FMBaseNote == FMBASEN_B)
+		//if (SmpsCfg->FMBaseNote == FMBASEN_B)
 		//	Note ++;
-		Note += Trk->SmpsCfg->FMBaseNote;
+		Note += SmpsCfg->FMBaseNote;
 		
-		if (Trk->SmpsCfg->FMFreqCnt == 12)
+		if (SmpsCfg->FMFreqCnt == 12)
 		{
 			Note &= 0xFF;	// simulate SMPS Z80 behaviour
-			Octave = Trk->SmpsCfg->FMBaseOct + Note / 12;
+			Octave = SmpsCfg->FMBaseOct + Note / 12;
 			Note %= 12;
-			return Trk->SmpsCfg->FMFreqs[Note] | (Octave << 11);
+			return SmpsCfg->FMFreqs[Note] | (Octave << 11);
 		}
 		else
 		{
 			if (Note < 0)
 				Note = 0;
-			else if (Note >= Trk->SmpsCfg->FMFreqCnt)
-				Note = Trk->SmpsCfg->FMFreqCnt - 1;
-			return Trk->SmpsCfg->FMFreqs[Note];
+			else if (Note >= SmpsCfg->FMFreqCnt)
+				Note = SmpsCfg->FMFreqCnt - 1;
+			return SmpsCfg->FMFreqs[Note];
 		}
 	}
 }
@@ -1058,7 +1065,7 @@ static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 
 static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue)
 {
-	const PAN_ANI_LIB* PAniLib = &Trk->SmpsCfg->PanAnims;
+	const PAN_ANI_LIB* PAniLib = &Trk->SmpsSet->Cfg->PanAnims;
 	UINT16 DataPtr;
 	UINT8 PanData;
 	
@@ -1088,7 +1095,7 @@ static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue)
 		else //if (Trk->PanAni.Type >= 0x02)
 		{
 			Trk->PanAni.AniIdx = 0x00;
-			if ((Trk->SmpsCfg->ModAlgo & 0xF0) == MODALGO_68K)
+			if ((Trk->SmpsSet->Cfg->ModAlgo & 0xF0) == MODALGO_68K)
 				Trk->PanAni.Timeout = 1;
 		}
 	}
@@ -1181,8 +1188,8 @@ static void ExecLFOModulation(TRK_RAM* Trk)
 static void DoFMVolEnv(TRK_RAM* Trk)
 {
 	UINT8 EnvVol;
-	//const UINT8* OpPtr = (Trk->SmpsCfg->InsMode & 0x01) ? VolOperators_HW : VolOperators_DEF;
-	const UINT8* OpPtr = Trk->SmpsCfg->InsReg_TL;
+	//const UINT8* OpPtr = (Trk->SmpsSet->Cfg->InsMode & 0x01) ? VolOperators_HW : VolOperators_DEF;
+	const UINT8* OpPtr = Trk->SmpsSet->Cfg->InsReg_TL;
 	const UINT8* VolPtr = Trk->VolOpPtr;
 	UINT8 AlgoMask;
 	UINT8 CurOp;
@@ -1214,7 +1221,7 @@ static void DoFMVolEnv(TRK_RAM* Trk)
 
 static void PrepareModulat(TRK_RAM* Trk)
 {
-	const UINT8* Data = Trk->SmpsCfg->SeqData;
+	const UINT8* Data = Trk->SmpsSet->Seq.Data;
 	const UINT8* ModData;
 	
 	if (Trk->PlaybkFlags & PBKFLG_HOLD)
@@ -1244,7 +1251,7 @@ static UINT8 DoModulation(TRK_RAM* Trk, UINT16* Freq)
 	
 	if (! Trk->ModEnv)
 		return 0x00;
-	if (Trk->ModEnv > 0x80 && (Trk->SmpsCfg->ModAlgo & 0xF0) == MODALGO_Z80)
+	if (Trk->ModEnv > 0x80 && (Trk->SmpsSet->Cfg->ModAlgo & 0xF0) == MODALGO_Z80)
 	{
 		if (DebugMsgs & 0x02)
 			printf("Warning: Modulation Type %02X on Channel %02X, Pos 0x%04X!\n", Trk->ModEnv, Trk->ChannelMask, Trk->Pos);
@@ -1294,13 +1301,13 @@ static UINT8 DoModulation(TRK_RAM* Trk, UINT16* Freq)
 
 static INT16 DoCustomModulation(TRK_RAM* Trk)
 {
-	const UINT8* Data = Trk->SmpsCfg->SeqData;
+	const UINT8* Data = Trk->SmpsSet->Seq.Data;
 	const UINT8* ModData = &Data[Trk->CstMod.DataPtr];
 	
 	if (! (Trk->ModEnv & 0x80))
 		return 0x8000;
 	
-	if ((Trk->SmpsCfg->ModAlgo & 0xF0) == MODALGO_68K)
+	if ((Trk->SmpsSet->Cfg->ModAlgo & 0xF0) == MODALGO_68K)
 	{
 		if (Trk->CstMod.Delay)
 		{
@@ -1324,7 +1331,7 @@ static INT16 DoCustomModulation(TRK_RAM* Trk)
 		Trk->CstMod.Freq += Trk->CstMod.Delta;
 		return Trk->CstMod.Freq;
 	}
-	else if ((Trk->SmpsCfg->ModAlgo & 0xF0) == MODALGO_Z80)
+	else if ((Trk->SmpsSet->Cfg->ModAlgo & 0xF0) == MODALGO_Z80)
 	{
 		INT16 NewFreq;
 		
@@ -1358,7 +1365,8 @@ static INT16 DoCustomModulation(TRK_RAM* Trk)
 
 static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 {
-	const ENV_LIB* ModEnvLib = &Trk->SmpsCfg->ModEnvs;
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	const ENV_LIB* ModEnvLib = &SmpsCfg->ModEnvs;
 	INT8 EnvVal;
 	INT16 Multiplier;
 	
@@ -1368,11 +1376,11 @@ static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 	if (EnvID >= ModEnvLib->EnvCount)
 		return 0x8000;
 	
-	EnvVal = (INT8)DoEnvelope(&ModEnvLib->EnvData[EnvID], Trk->SmpsCfg->EnvCmds,
+	EnvVal = (INT8)DoEnvelope(&ModEnvLib->EnvData[EnvID], SmpsCfg->EnvCmds,
 								&Trk->ModEnvIdx, &Trk->ModEnvMult);
 	if (EnvVal & 0x80)
 	{
-		switch(Trk->SmpsCfg->EnvCmds[EnvVal & 0x7F])
+		switch(SmpsCfg->EnvCmds[EnvVal & 0x7F])
 		{
 		case ENVCMD_HOLD:	// 81 - hold at current level
 			return 0x8001;
@@ -1399,7 +1407,7 @@ static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 	// SMPS Z80 formula: (also preSMPS Z80, Space Harrier II)
 	//	FreqDelta = (INT8)EnvVal * (UNT8)(EnvMult + 1)
 	
-	switch(Trk->SmpsCfg->EnvMult)
+	switch(SmpsCfg->EnvMult)
 	{
 	case ENVMULT_PRE:
 		Multiplier = Trk->ModEnvMult ? Trk->ModEnvMult : 1;
@@ -1418,7 +1426,8 @@ static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 
 static UINT8 DoVolumeEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 {
-	const ENV_LIB* VolEnvLib = &Trk->SmpsCfg->VolEnvs;
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	const ENV_LIB* VolEnvLib = &SmpsCfg->VolEnvs;
 	UINT8 EnvVal;
 	
 	if (! EnvID)
@@ -1427,10 +1436,10 @@ static UINT8 DoVolumeEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 	if (EnvID >= VolEnvLib->EnvCount)
 		return 0x80;
 	
-	EnvVal = DoEnvelope(&VolEnvLib->EnvData[EnvID], Trk->SmpsCfg->EnvCmds, &Trk->VolEnvIdx, NULL);
+	EnvVal = DoEnvelope(&VolEnvLib->EnvData[EnvID], SmpsCfg->EnvCmds, &Trk->VolEnvIdx, NULL);
 	if (EnvVal & 0x80)
 	{
-		switch(Trk->SmpsCfg->EnvCmds[EnvVal & 0x7F])
+		switch(SmpsCfg->EnvCmds[EnvVal & 0x7F])
 		{
 		case ENVCMD_HOLD:	// 81 - hold at current level
 			return 0x80;
@@ -1573,6 +1582,7 @@ static UINT8 DoADSR(TRK_RAM* Trk)
 
 void DoNoteOn(TRK_RAM* Trk)
 {
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
 	UINT8 Flags;
 	
 	if (! Trk->Frequency)
@@ -1581,9 +1591,9 @@ void DoNoteOn(TRK_RAM* Trk)
 	// SMPS 68k and Z80 both return when bit 1 or 2 is set. (AND 06h)
 	// But for SMPS Z80, bit 1 is PBKFLG_HOLD, for SMPS 68k it is PBKFLG_ATREST.
 	Flags = PBKFLG_OVERRIDDEN;
-	if (Trk->SmpsCfg->NoteOnPrevent == NONPREV_HOLD)
+	if (SmpsCfg->NoteOnPrevent == NONPREV_HOLD)
 		Flags |= PBKFLG_HOLD;	// SMPS Z80
-	else //if (Trk->SmpsCfg->NoteOnPrevent == NONPREV_REST)
+	else //if (SmpsCfg->NoteOnPrevent == NONPREV_REST)
 		Flags |= PBKFLG_ATREST;	// SMPS 68k
 	if (Trk->PlaybkFlags & Flags)
 		return;
@@ -1592,7 +1602,7 @@ void DoNoteOn(TRK_RAM* Trk)
 		return;
 	
 	// [not in driver] turn DAC off when playing a note on FM6
-	if (Trk->SmpsCfg->FM6DACOff && Trk->ChannelMask == 0x06 && (SmpsRAM.DacState & 0x80))
+	if (SmpsCfg->FM6DACOff && Trk->ChannelMask == 0x06 && (SmpsRAM.DacState & 0x80))
 		SetDACState(0x00);
 	
 	WriteFMI(0x28, Trk->ChannelMask | 0xF0);
@@ -1669,7 +1679,7 @@ static UINT16 DoPitchSlide(TRK_RAM* Trk)
 		UINT16 BaseFreq;
 		UINT16 OctFreq;	// frequency within octave
 		
-		BaseFreq = Trk->SmpsCfg->FMFreqs[0] & 0x7FF;
+		BaseFreq = Trk->SmpsSet->Cfg->FMFreqs[0] & 0x7FF;
 		OctFreq = NewFreq & 0x7FF;
 		if (OctFreq < BaseFreq)
 			NewFreq -= (0x7FF - BaseFreq);
@@ -1702,20 +1712,20 @@ static UINT16 DoPitchSlide(TRK_RAM* Trk)
 	return NewFreq;
 }
 
-INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID)
+const INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID)
 {
 	// placeholder function
 	// If it should be possible to define song IDs sometime, this will return the instrument table of another song.
-	return &Trk->SmpsCfg->GlbInsLib;
+	return &Trk->SmpsSet->Cfg->GblInsLib;
 }
 
 void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
 {
-	const UINT8* OpPtr = Trk->SmpsCfg->InsRegs;
+	const UINT8* OpPtr = Trk->SmpsSet->Cfg->InsRegs;
 	const UINT8* InsPtr = InsData;
 	UINT8 HadB4;
 	
-	if (! (Trk->SmpsCfg->InsMode & INSMODE_INT))
+	if (! (Trk->SmpsSet->Cfg->InsMode & INSMODE_INT))
 	{
 		if (OpPtr == NULL || InsData == NULL)
 			return;
@@ -1812,7 +1822,7 @@ static UINT8 ApplyOutOperatorVol(TRK_RAM* Trk, UINT8 AlgoMask, UINT8 Reg, UINT8 
 {
 	UINT8 IsOutputOp;
 	
-	if (Trk->SmpsCfg->VolMode & VOLMODE_BIT7)
+	if (Trk->SmpsSet->Cfg->VolMode & VOLMODE_BIT7)
 	{
 		IsOutputOp = (CurTL & 0x80);
 	}
@@ -1824,7 +1834,7 @@ static UINT8 ApplyOutOperatorVol(TRK_RAM* Trk, UINT8 AlgoMask, UINT8 Reg, UINT8 
 	if (! IsOutputOp)
 		return CurTL;
 	
-	if (Trk->SmpsCfg->VolMode & VOLMODE_SETVOL)
+	if (Trk->SmpsSet->Cfg->VolMode & VOLMODE_SETVOL)
 		CurTL = Trk->Volume;
 	else
 		CurTL += Trk->Volume;
@@ -1845,9 +1855,9 @@ void RefreshFMVolume(TRK_RAM* Trk)
 //		return;	// don't refresh on DAC/Drum tracks
 	
 	AlgoMask = AlgoOutMask[Trk->FMAlgo & 0x07];
-	if (! (Trk->SmpsCfg->InsMode & INSMODE_INT))
+	if (! (Trk->SmpsSet->Cfg->InsMode & INSMODE_INT))
 	{
-		OpPtr = Trk->SmpsCfg->InsReg_TL;
+		OpPtr = Trk->SmpsSet->Cfg->InsReg_TL;
 		VolPtr = Trk->VolOpPtr;
 		if (OpPtr == NULL || VolPtr == NULL)
 			return;
@@ -1886,9 +1896,9 @@ void SendSSGEG(TRK_RAM* Trk, const UINT8* Data, UINT8 ForceMaxAtk)
 	const UINT8* OpPtr;
 	UINT8 CurOp;
 	
-	if ((Trk->SmpsCfg->InsMode & 0x01) == INSMODE_DEF)
+	if ((Trk->SmpsSet->Cfg->InsMode & 0x01) == INSMODE_DEF)
 		OpPtr = OpList_DEF;
-	else //if ((Trk->SmpsCfg->InsMode & 0x01) == INSMODE_HW)
+	else //if ((Trk->SmpsSet->Cfg->InsMode & 0x01) == INSMODE_HW)
 		OpPtr = OpList_HW;
 	
 	for (CurOp = 0x00; CurOp < 0x04; CurOp ++)
@@ -1903,7 +1913,7 @@ void SendSSGEG(TRK_RAM* Trk, const UINT8* Data, UINT8 ForceMaxAtk)
 
 
 
-static void InitMusicPlay(SMPS_CFG* SmpsFileConfig)
+static void InitMusicPlay(const SMPS_CFG* SmpsFileSet)
 {
 	UINT8 CurTrk;
 	TRK_RAM* TempTrk;
@@ -1917,7 +1927,7 @@ static void InitMusicPlay(SMPS_CFG* SmpsFileConfig)
 		DoNoteOff(TempTrk);
 		DisableSSGEG(TempTrk);
 		TempTrk->PlaybkFlags = 0x00;
-		TempTrk->SmpsCfg = NULL;
+		TempTrk->SmpsSet = NULL;
 	}
 	for (CurTrk = 0; CurTrk < 2; CurTrk ++)
 		SmpsRAM.MusDrmTrks[CurTrk].PlaybkFlags &= ~PBKFLG_ACTIVE;
@@ -1925,7 +1935,7 @@ static void InitMusicPlay(SMPS_CFG* SmpsFileConfig)
 	ResetSpcFM3Mode();
 	SmpsRAM.FadeOut.Steps = 0x00;
 	
-	InitCfg = &SmpsFileConfig->InitCfg;
+	InitCfg = &SmpsFileSet->InitCfg;
 	if (SmpsRAM.LockTimingMode == 0xFF)
 	{
 		SmpsRAM.LockTimingMode = InitCfg->Timing_Lock;
@@ -1951,7 +1961,7 @@ static void InitMusicPlay(SMPS_CFG* SmpsFileConfig)
 		ym2612_timer_mask(0x02);	// YM2612 Timer B
 	else //if (SmpsRAM.TimingMode == 0x80)
 		ym2612_timer_mask(0x03);	// YM2612 Timer A and B
-	SetDACDriver(&SmpsFileConfig->DACDrv);
+	SetDACDriver((DAC_CFG*)&SmpsFileSet->DACDrv);
 	DAC_ResetOverride();
 	
 	return;
@@ -2002,8 +2012,8 @@ static UINT8 CheckTrkID(UINT8 TrkID, UINT8 ChnBits)
 static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UINT8 Mode,
 						   UINT8 ChnListSize, const UINT8* ChnList, UINT8 TickMult, UINT8 TrkBase)
 {
-	SMPS_CFG* SmpsCfg = &SmpsRAM.MusCfg;
-	const UINT8* Data = SmpsCfg->SeqData;
+	SMPS_SET* SmpsSet = &SmpsRAM.MusSet;
+	const UINT8* Data = SmpsSet->Seq.Data;
 	UINT16 HdrChnSize;
 	UINT16 CurPos;
 	UINT8 CurTrk;
@@ -2036,11 +2046,11 @@ static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UI
 		
 		TempTrk = &SmpsRAM.MusicTrks[TrkID];
 		memset(TempTrk, 0x00, sizeof(TRK_RAM));
-		TempTrk->SmpsCfg = SmpsCfg;
+		TempTrk->SmpsSet = SmpsSet;
 		TempTrk->PlaybkFlags = PBKFLG_ACTIVE;
 		TempTrk->ChannelMask = ChnList[CurTrk];
 		TempTrk->TickMult = TickMult;
-		TempTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SmpsCfg);
+		TempTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SmpsSet);
 		TempTrk->Transpose = Data[CurPos + 0x02];
 		TempTrk->Volume = Data[CurPos + 0x03];
 		if (Mode & CHNMODE_PSG)
@@ -2058,20 +2068,20 @@ static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UI
 		TempTrk->StackPtr = TRK_STACK_SIZE;
 		TempTrk->PanAFMS = 0xC0;
 		TempTrk->RemTicks = 0x01;
-		if (SmpsCfg->LoopPtrs != NULL)
-			TempTrk->LoopOfs = SmpsCfg->LoopPtrs[TrkBase + CurTrk];
+		if (SmpsSet->LoopPtrs != NULL)
+			TempTrk->LoopOfs = SmpsSet->LoopPtrs[TrkBase + CurTrk];
 		else
 			TempTrk->LoopOfs = 0x0000;
 		
 		if ((TempTrk->ChannelMask & 0xF8) == 0x10)	// DAC drum channels
-			TempTrk->SpcDacMode = SmpsCfg->DrumChnMode;
+			TempTrk->SpcDacMode = SmpsSet->Cfg->DrumChnMode;
 		if ((TempTrk->ChannelMask & 0xF8) == 0x18)	// PWM channels
 			SmpsRAM.MusicTrks[TRACK_MUS_FM6].PlaybkFlags = 0x00;	// disable FM 6 for PWM simulation
 		
 		if (TrkID == TRACK_MUS_DRUM)
 			WriteFMMain(TempTrk, 0xB4, TempTrk->PanAFMS);	// force Pan bits to LR
 		
-		if (TempTrk->Pos >= SmpsCfg->SeqLength)
+		if (TempTrk->Pos >= SmpsSet->Seq.Len)
 		{
 			TempTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 			//printf("Track XX points after EOF!\n");
@@ -2089,8 +2099,9 @@ static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UI
 //static const UINT8 FMChnOrder[7] = {0x12, 0x00, 0x01, 0x04, 0x05, 0x06, 0x02};
 //static const UINT8 PSGChnOrder[3] = {0x80, 0xA0, 0xC0};
 
-void PlayMusic(SMPS_CFG* SmpsFileConfig)
+void PlayMusic(SMPS_SET* SmpsFileSet)
 {
+	const SMPS_CFG* SmpsCfg = SmpsFileSet->Cfg;
 	const UINT8* Data;
 	UINT16 CurPos;
 	UINT8 FMChnCnt;
@@ -2098,37 +2109,37 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 	UINT8 TickMult;
 	UINT8 TrkBase;
 	
-	if (! (SmpsRAM.MusCfg.SeqFlags & SEQFLG_NEED_SAVE))
+	if (! (SmpsRAM.MusSet.SeqFlags & SEQFLG_NEED_SAVE))
 	{
 		// Note: It makes a save state ONLY if:
 		//	1. the song-to-be-played has the "need save" flag set and
 		//	2. the current song does NOT have that flag set
-		if (SmpsFileConfig->SeqFlags & SEQFLG_NEED_SAVE)
+		if (SmpsFileSet->SeqFlags & SEQFLG_NEED_SAVE)
 			BackupMusic(&MusicSaveState);
 	}
-	FreeSMPSFile(&SmpsRAM.MusCfg);
+	FreeSMPSFile(&SmpsRAM.MusSet);
 	
 	//StopAllSound();	// in the driver, but I can do that in a better way
-	InitMusicPlay(SmpsFileConfig);
+	InitMusicPlay(SmpsCfg);
 	
-	SmpsRAM.MusCfg = *SmpsFileConfig;
-	Data = SmpsFileConfig->SeqData;
+	SmpsRAM.MusSet = *SmpsFileSet;
+	Data = SmpsFileSet->Seq.Data;
 	CurPos = 0x00;
 	
-	//InsLibPtr = ReadPtr(&Data[CurPos + 0x00], SmpsFileConfig);	// done by the SMPS preparser
+	//InsLibPtr = ReadPtr(&Data[CurPos + 0x00], SmpsFileSet);	// done by the SMPS preparser
 	FMChnCnt = Data[CurPos + 0x02];
 	PSGChnCnt = Data[CurPos + 0x03];
-	if (FMChnCnt + PSGChnCnt > SmpsFileConfig->FMChnCnt + SmpsFileConfig->PSGChnCnt)
+	if (FMChnCnt + PSGChnCnt > SmpsCfg->FMChnCnt + SmpsCfg->PSGChnCnt)
 		return;	// invalid file
 	
 	TickMult = Data[CurPos + 0x04];
 	SmpsRAM.TempoInit = Data[CurPos + 0x05];
 	SmpsRAM.TempoCntr = SmpsRAM.TempoInit;
-	if (SmpsRAM.MusCfg.Tempo1Tick == T1TICK_NOTEMPO)
+	if (SmpsCfg->Tempo1Tick == T1TICK_NOTEMPO)
 	{
 		// DoTempo is called before PlayMusic and thus isn't executed during the first tick.
 		// So we undo one DoTempo.
-		switch(SmpsRAM.MusCfg.TempoMode)
+		switch(SmpsCfg->TempoMode)
 		{
 		case TEMPO_TIMEOUT:
 			SmpsRAM.TempoCntr ++;
@@ -2160,18 +2171,18 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 	TrkBase = 0x00;
 	// FM channels
 	LoadChannelSet(TRACK_MUS_DRUM, FMChnCnt, &CurPos, CHNMODE_DEF | CHNMODE_DRM,
-					SmpsFileConfig->FMChnCnt, SmpsFileConfig->FMChnList, TickMult, TrkBase);
+					SmpsCfg->FMChnCnt, SmpsCfg->FMChnList, TickMult, TrkBase);
 	TrkBase += FMChnCnt;
 	
 	// PSG channels
 	LoadChannelSet(TRACK_MUS_PSG1, PSGChnCnt, &CurPos, CHNMODE_PSG,
-					SmpsFileConfig->PSGChnCnt, SmpsFileConfig->PSGChnList, TickMult, TrkBase);
+					SmpsCfg->PSGChnCnt, SmpsCfg->PSGChnList, TickMult, TrkBase);
 	TrkBase += PSGChnCnt;
 	
 	// additional channels that don't have "channel count" values in the header (i.e. PWM channels)
-	LoadChannelSet(TRACK_MUS_PWM1, SmpsFileConfig->AddChnCnt, &CurPos, CHNMODE_DEF,
-					SmpsFileConfig->AddChnCnt, SmpsFileConfig->AddChnList, TickMult, TrkBase);
-	TrkBase += SmpsFileConfig->AddChnCnt;
+	LoadChannelSet(TRACK_MUS_PWM1, SmpsCfg->AddChnCnt, &CurPos, CHNMODE_DEF,
+					SmpsCfg->AddChnCnt, SmpsCfg->AddChnList, TickMult, TrkBase);
+	TrkBase += SmpsCfg->AddChnCnt;
 	
 	Extra_LoopInit();
 	
@@ -2180,8 +2191,9 @@ void PlayMusic(SMPS_CFG* SmpsFileConfig)
 	return;
 }
 
-void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX)
+void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX)
 {
+	const SMPS_CFG* SmpsCfg = SmpsFileSet->Cfg;
 	const UINT8* Data;
 	UINT16 CurPos;
 	UINT8 ChnCnt;
@@ -2193,10 +2205,10 @@ void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX)
 	TRK_RAM* SFXTrk;
 	TRK_RAM* MusTrk;
 	
-	Data = SmpsFileConfig->SeqData;
+	Data = SmpsFileSet->Seq.Data;
 	CurPos = 0x00;
 	
-	//InsLibPtr = ReadPtr(&Data[CurPos + 0x00], SmpsFileConfig);
+	//InsLibPtr = ReadPtr(&Data[CurPos + 0x00], SmpsFileSet);
 	TickMult = Data[CurPos + 0x02];
 	ChnCnt = Data[CurPos + 0x03];
 	CurPos += 0x04;
@@ -2225,18 +2237,18 @@ void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX)
 		
 		memset(SFXTrk, 0x00, sizeof(TRK_RAM));
 		if (SpecialSFX)
-			SFXTrk->SmpsCfg = &SmpsRAM.SFXCfg[SFX_TRKCNT + SpcSFXTrkID];
+			SFXTrk->SmpsSet = &SmpsRAM.SFXSet[SFX_TRKCNT + SpcSFXTrkID];
 		else
-			SFXTrk->SmpsCfg = &SmpsRAM.SFXCfg[SFXTrkID];
-		FreeSMPSFile(SFXTrk->SmpsCfg);
-		*SFXTrk->SmpsCfg = *SmpsFileConfig;
+			SFXTrk->SmpsSet = &SmpsRAM.SFXSet[SFXTrkID];
+		FreeSMPSFile(SFXTrk->SmpsSet);
+		*SFXTrk->SmpsSet = *SmpsFileSet;
 		
 		SFXTrk->PlaybkFlags = Data[CurPos + 0x00];
 		SFXTrk->ChannelMask = Data[CurPos + 0x01];
 		if (SFXTrk->ChannelMask == 0x02)
 			ResetSpcFM3Mode();
 		SFXTrk->TickMult = TickMult;
-		SFXTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SFXTrk->SmpsCfg);
+		SFXTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SFXTrk->SmpsSet);
 		SFXTrk->Transpose = Data[CurPos + 0x02];
 		SFXTrk->Volume = Data[CurPos + 0x03];
 		//FinishFMTrkInit:
@@ -2247,7 +2259,7 @@ void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX)
 		SFXTrk->PanAFMS = 0xC0;
 		SFXTrk->RemTicks = 0x01;
 		
-		if (SFXTrk->Pos >= SFXTrk->SmpsCfg->SeqLength)
+		if (SFXTrk->Pos >= SFXTrk->SmpsSet->Seq.Len)
 			SFXTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 		
 		if (SpcSFXTrkID != 0xFF && SFXTrkID != 0xFF)
@@ -2354,7 +2366,7 @@ static void DoTempo(void)
 	UINT16 NewTempoVal;
 	UINT8 CurTrk;
 	
-	switch(SmpsRAM.MusCfg.TempoMode)
+	switch(SmpsRAM.MusSet.Cfg->TempoMode)
 	{
 	case TEMPO_TIMEOUT:
 		// Note: (pre-)SMPS 68k checks TempoInit, SMPS Z80 checks TempoCntr
@@ -2725,7 +2737,7 @@ void RestoreBGMChannel(TRK_RAM* Trk)
 	RstTrk->PlaybkFlags &= ~PBKFLG_OVERRIDDEN;
 	if (! (RstTrk->PlaybkFlags & PBKFLG_ACTIVE))
 		return;
-	if (RstTrk->SmpsCfg == NULL)
+	if (RstTrk->SmpsSet == NULL)
 		return;
 	
 	// restore a channel (heavily dependent on the channel type)
@@ -2738,7 +2750,7 @@ void RestoreBGMChannel(TRK_RAM* Trk)
 	else if ((RstTrk->ChannelMask & 0xF8) == 0x00)
 	{
 		// FM channel - 00..07
-		INS_LIB* InsLib;
+		const INS_LIB* InsLib;
 		const UINT8* InsPtr;
 		UINT8 InsID;
 		
@@ -2757,7 +2769,7 @@ void RestoreBGMChannel(TRK_RAM* Trk)
 		if (Trk->FMInsSong)	// But this is safer in our case, since we're supporting large instrument tables.
 			InsLib = GetSongInsLib(Trk, Trk->FMInsSong);
 		else
-			InsLib = Trk->SmpsCfg->InsLib;
+			InsLib = &Trk->SmpsSet->InsLib;
 		InsID = Trk->Instrument & 0x7F;
 		if (InsLib != NULL && InsID < InsLib->InsCount)
 		{
@@ -2766,7 +2778,7 @@ void RestoreBGMChannel(TRK_RAM* Trk)
 		}
 		
 		if (Trk->SSGEG.Type & 0x80)
-			SendSSGEG(Trk, &Trk->SmpsCfg->SeqData[Trk->SSGEG.DataPtr], Trk->SSGEG.Type & 0x01);
+			SendSSGEG(Trk, &Trk->SmpsSet->Seq.Data[Trk->SSGEG.DataPtr], Trk->SSGEG.Type & 0x01);
 	}
 	else if ((RstTrk->ChannelMask & 0xF8) == 0x10)
 	{
@@ -2779,7 +2791,7 @@ void RestoreBGMChannel(TRK_RAM* Trk)
 
 void BackupMusic(MUS_STATE* MusState)
 {
-	MusState->MusCfg = SmpsRAM.MusCfg;
+	MusState->MusSet = SmpsRAM.MusSet;
 	memcpy(MusState->DacChVol, SmpsRAM.DacChVol, sizeof(UINT8) * 2);
 	MusState->MusicPaused = SmpsRAM.MusicPaused;
 	MusState->SpcFM3Mode = SmpsRAM.SpcFM3Mode;
@@ -2789,7 +2801,7 @@ void BackupMusic(MUS_STATE* MusState)
 	memcpy(MusState->FM3Freqs_Mus, SmpsRAM.FM3Freqs_Mus, sizeof(UINT16) * 4);
 	memcpy(MusState->MusicTrks, SmpsRAM.MusicTrks, sizeof(TRK_RAM) * MUS_TRKCNT);
 	MusState->InUse = 0x01;
-	SmpsRAM.MusCfg.UsageCounter ++;
+	SmpsRAM.MusSet.UsageCounter ++;
 	
 	return;
 }
@@ -2811,9 +2823,9 @@ void RestoreMusic(MUS_STATE* MusState)
 		DoNoteOff(TempTrk);
 		DisableSSGEG(TempTrk);
 	}
-	FreeSMPSFile(&SmpsRAM.MusCfg);
+	FreeSMPSFile(&SmpsRAM.MusSet);
 	
-	SmpsRAM.MusCfg = MusState->MusCfg;
+	SmpsRAM.MusSet = MusState->MusSet;
 	memcpy(SmpsRAM.DacChVol, MusState->DacChVol, sizeof(UINT8) * 2);
 	SmpsRAM.MusicPaused = MusState->MusicPaused;
 	SmpsRAM.SpcFM3Mode = MusState->SpcFM3Mode;

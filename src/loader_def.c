@@ -775,11 +775,6 @@ static void LoadRegisterList(SMPS_CFG* SmpsCfg, UINT8 CstRegCnt, const UINT8* Cs
 
 void FreeDriverDefinition(SMPS_CFG* SmpsCfg)
 {
-	/*if (SmpsCfg->FMChnList != NULL)
-	{
-		SmpsCfg->FMChnCnt = 0x00;
-		free(SmpsCfg->FMChnList);	SmpsCfg->FMChnList = NULL;
-	}*/
 	if (SmpsCfg->InsRegs != NULL)
 	{
 		SmpsCfg->InsRegCnt = 0x00;

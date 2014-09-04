@@ -33,6 +33,7 @@
 
 
 int main(int argc, char* argv[]);
+static void InitSmpsFile(SMPS_SET* SmpsFile, UINT32 FileLen, UINT8* FileData, const SMPS_EXT_DEF* ExtDef);
 static void GetFileList(const char* DirPath);
 static void PrintFileList(void);
 static UINT32 GetFileData(const char* FileName, UINT8** RetBuffer);
@@ -89,7 +90,7 @@ int main(int argc, char* argv[])
 	int inkey;
 	UINT32 NewSeqLen;
 	UINT8* NewSeqData;
-	SMPS_CFG* LastSmpsCfg;
+	SMPS_SET LastSmpsCfg;
 	SMPS_EXT_DEF* NewSmpsEDef;
 	
 	printf("SMPS Music Player v" SMPSPLAY_VER "\n");
@@ -154,7 +155,7 @@ int main(int argc, char* argv[])
 	StoppedTimer = -1;
 	
 	smps_playing = -1;
-	LastSmpsCfg = NULL;
+	memset(&LastSmpsCfg, 0x00, sizeof(SMPS_SET));
 	LastLineState = 0xFF;
 	DisplayFileID(cursor);
 	inkey = 0x00;
@@ -203,31 +204,25 @@ int main(int argc, char* argv[])
 				
 				vgm_set_loop(0x00);
 				vgm_dump_stop();
-				//if (LastSmpsCfg != NULL)	// The SMPS driver does this by itself now.
-				//	FreeSMPSFile(LastSmpsCfg);
-				LastSmpsCfg = &NewSmpsEDef->SmpsCfg;
 				
 				PlayingTimer = 0;
 				smps_playing = -1;
 				
-				LastSmpsCfg->SeqLength = NewSeqLen;
-				LastSmpsCfg->SeqData = NewSeqData;
-				LastSmpsCfg->SeqBase = 0x0000;
-				LastSmpsCfg->InsLib = NULL;
+				InitSmpsFile(&LastSmpsCfg, NewSeqLen, NewSeqData, NewSmpsEDef);
 				
-				RetVal = GuessSMPSOffset(LastSmpsCfg);
+				RetVal = GuessSMPSOffset(&LastSmpsCfg);
 				if (! RetVal)
-					FileList[cursor].SeqBase = LastSmpsCfg->SeqBase;
-				if ((LastSmpsCfg->PtrFmt & PTRFMT_OFSMASK) == 0x00)
-					SmpsOffsetFromFilename(FileList[cursor].Title, &LastSmpsCfg->SeqBase);
+					FileList[cursor].SeqBase = LastSmpsCfg.SeqBase;
+				if ((LastSmpsCfg.Cfg->PtrFmt & PTRFMT_OFSMASK) == 0x00)
+					SmpsOffsetFromFilename(FileList[cursor].Title, &LastSmpsCfg.SeqBase);
 				
 				if (! RetVal)
-					RetVal = PreparseSMPSFile(LastSmpsCfg);
+					RetVal = PreparseSMPSFile(&LastSmpsCfg);
 				if (! RetVal)
 				{
-					//FileList[cursor].SeqBase = LastSmpsCfg->SeqBase;
+					//FileList[cursor].SeqBase = LastSmpsCfg.SeqBase;
 					MakeVgmFileName(FileList[cursor].Title);
-					PlayMusic(LastSmpsCfg);
+					PlayMusic(&LastSmpsCfg);
 					smps_playing = cursor;
 				}
 				else
@@ -240,7 +235,7 @@ int main(int argc, char* argv[])
 			PauseThread = false;
 			PauseStream(PauseMode);
 			DisplayFileID(cursor);	// erase line and redraw text
-			if (LastSmpsCfg->SeqData == NULL)
+			if (LastSmpsCfg.Seq.Data == NULL)
 			{
 				ClearLine();
 				printf("Error opening %s.\r", FileList[cursor].Title);
@@ -348,8 +343,7 @@ int main(int argc, char* argv[])
 		Sleep(1);
 	vgm_set_loop(0x00);
 	vgm_dump_stop();
-	if (LastSmpsCfg != NULL)
-		FreeSMPSFile(LastSmpsCfg);
+	FreeSMPSFile(&LastSmpsCfg);
 	StopAudioOutput();
 	
 FinishProgram:
@@ -370,6 +364,29 @@ FinishProgram:
 #endif
 	
 	return 0;
+}
+
+static void InitSmpsFile(SMPS_SET* SmpsFile, UINT32 FileLen, UINT8* FileData, const SMPS_EXT_DEF* ExtDef)
+{
+	UINT8 CurChr;
+	
+	SmpsFile->Cfg = &ExtDef->SmpsCfg;
+	for (CurChr = 0; CurChr < 4; CurChr ++)
+	{
+		if (ExtDef->Extention[CurChr] == '\0')
+			break;
+		SmpsFile->CfgExtFCC[CurChr] = ExtDef->Extention[CurChr];
+	}
+	for (; CurChr < 4; CurChr ++)
+		SmpsFile->CfgExtFCC[CurChr] = '\0';
+	
+	SmpsFile->Seq.Len = (FileLen < 0x10000) ? FileLen : 0xFFFF;
+	SmpsFile->Seq.Data = FileData;
+	SmpsFile->SeqBase = 0x0000;
+	SmpsFile->InsLib.InsCount = 0x00;
+	SmpsFile->InsLib.InsPtrs = NULL;
+	
+	return;
 }
 
 

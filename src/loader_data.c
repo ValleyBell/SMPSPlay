@@ -551,9 +551,9 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		BaseOfs = InsOfs;
 	fseek(hFile, BaseOfs, SEEK_SET);
 	
-	DrumLib->DataLen = FileLen - BaseOfs;
-	DrumLib->Data = (UINT8*)malloc(DrumLib->DataLen);
-	fread(DrumLib->Data, 0x01, DrumLib->DataLen, hFile);
+	DrumLib->File.Len = FileLen - BaseOfs;
+	DrumLib->File.Data = (UINT8*)malloc(DrumLib->File.Len);
+	fread(DrumLib->File.Data, 0x01, DrumLib->File.Len, hFile);
 	
 	fclose(hFile);
 	
@@ -561,7 +561,7 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 	CurPos = DrumOfs - BaseOfs;
 	DrumLib->DrumBase -= CurPos;
 	for (CurItm = 0x00; CurItm < DrumLib->DrumCount; CurItm ++, CurPos += 0x02)
-		DrumLib->DrumList[CurItm] = ReadLE16(&DrumLib->Data[CurPos]);
+		DrumLib->DrumList[CurItm] = ReadLE16(&DrumLib->File.Data[CurPos]);
 	
 	DrumLib->InsLib.InsCount = InsCount;
 	DrumLib->InsLib.InsPtrs = NULL;
@@ -572,9 +572,9 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		InsBaseOfs -= CurPos;
 		for (CurItm = 0x00; CurItm < InsCount; CurItm ++, CurPos += 0x02)
 		{
-			TempOfs = ReadLE16(&DrumLib->Data[CurPos]) - InsBaseOfs;
-			if (TempOfs >= BaseOfs && TempOfs < DrumLib->DataLen - 0x10)
-				DrumLib->InsLib.InsPtrs[CurItm] = &DrumLib->Data[TempOfs];
+			TempOfs = ReadLE16(&DrumLib->File.Data[CurPos]) - InsBaseOfs;
+			if (TempOfs >= BaseOfs && TempOfs < DrumLib->File.Len - 0x10)
+				DrumLib->InsLib.InsPtrs[CurItm] = &DrumLib->File.Data[TempOfs];
 			else
 				DrumLib->InsLib.InsPtrs[CurItm] = NULL;
 		}
@@ -599,9 +599,7 @@ void FreeDrumTracks(DRUM_TRK_LIB* DrumLib)
 		DrumLib->InsLib.InsPtrs = NULL;
 	}
 	
-	DrumLib->DataLen = 0x00;
-	free(DrumLib->Data);
-	DrumLib->DrumList = NULL;
+	FreeFileData(&DrumLib->File);
 	
 	return;
 }
@@ -731,7 +729,7 @@ UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg)
 	else
 	{
 		RetVal = LoadSimpleInstrumentLib(FileLen, FileData, SmpsCfg);
-		RetVal = SmpsOffsetFromFilename(FileName, &SmpsCfg->GlbInsBase);
+		RetVal = SmpsOffsetFromFilename(FileName, &SmpsCfg->GblInsBase);
 	}
 	
 	return 0x00;
@@ -743,20 +741,20 @@ static UINT8 LoadSimpleInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* 
 	UINT16 CurIns;
 	UINT16 CurPos;
 	
-	SmpsCfg->GlbInsLen = FileLen;
-	SmpsCfg->GlbInsData = FileData;
+	SmpsCfg->GblIns.Len = FileLen;
+	SmpsCfg->GblIns.Data = FileData;
 	InsCount = FileLen / SmpsCfg->InsRegCnt;
-	SmpsCfg->GlbInsLib.InsCount = InsCount;
-	SmpsCfg->GlbInsLib.InsPtrs = NULL;
+	SmpsCfg->GblInsLib.InsCount = InsCount;
+	SmpsCfg->GblInsLib.InsPtrs = NULL;
 	if (InsCount)
 	{
-		SmpsCfg->GlbInsLib.InsPtrs = (UINT8**)malloc(InsCount * sizeof(UINT8*));
+		SmpsCfg->GblInsLib.InsPtrs = (UINT8**)malloc(InsCount * sizeof(UINT8*));
 		CurPos = 0x0000;
 		for (CurIns = 0x00; CurIns < InsCount; CurIns ++, CurPos += SmpsCfg->InsRegCnt)
-			SmpsCfg->GlbInsLib.InsPtrs[CurIns] = &FileData[CurPos];
+			SmpsCfg->GblInsLib.InsPtrs[CurIns] = &FileData[CurPos];
 	}
 	
-	SmpsCfg->GlbInsBase = 0x0000;
+	SmpsCfg->GblInsBase = 0x0000;
 	return 0x00;
 }
 
@@ -784,13 +782,13 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 	if (! InsOfs)
 		return 0xC1;	// invalid drum offset
 	
-	SmpsCfg->GlbInsLen = FileLen;
-	SmpsCfg->GlbInsData = FileData;
-	SmpsCfg->GlbInsLib.InsCount = InsCount;
-	SmpsCfg->GlbInsLib.InsPtrs = NULL;
+	SmpsCfg->GblIns.Len = FileLen;
+	SmpsCfg->GblIns.Data = FileData;
+	SmpsCfg->GblInsLib.InsCount = InsCount;
+	SmpsCfg->GblInsLib.InsPtrs = NULL;
 	if (InsCount)
 	{
-		SmpsCfg->GlbInsLib.InsPtrs = (UINT8**)malloc(InsCount * sizeof(UINT8*));
+		SmpsCfg->GblInsLib.InsPtrs = (UINT8**)malloc(InsCount * sizeof(UINT8*));
 		CurPos = InsOfs;
 		for (CurIns = 0x00; CurIns < InsCount; CurIns ++, CurPos += 0x02)
 		{
@@ -800,9 +798,9 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 				InsPos = ReadBE16(&FileData[CurPos]);
 			InsPos = InsPos - InsBase + InsOfs;
 			if (InsPos >= InsOfs && InsPos < FileLen)
-				SmpsCfg->GlbInsLib.InsPtrs[CurIns] = &FileData[InsPos];
+				SmpsCfg->GblInsLib.InsPtrs[CurIns] = &FileData[InsPos];
 			else
-				SmpsCfg->GlbInsLib.InsPtrs[CurIns] = NULL;
+				SmpsCfg->GblInsLib.InsPtrs[CurIns] = NULL;
 		}
 	}
 	
@@ -811,22 +809,33 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 
 void FreeGlobalInstrumentLib(SMPS_CFG* SmpsCfg)
 {
-	if (SmpsCfg->GlbInsData == NULL)
+	if (SmpsCfg->GblIns.Data == NULL)
 		return;
 	
-	if (SmpsCfg->GlbInsLib.InsPtrs != NULL)
+	if (SmpsCfg->GblInsLib.InsPtrs != NULL)
 	{
-		SmpsCfg->GlbInsLib.InsCount = 0x00;
-		free(SmpsCfg->GlbInsLib.InsPtrs);
-		SmpsCfg->GlbInsLib.InsPtrs = NULL;
+		SmpsCfg->GblInsLib.InsCount = 0x00;
+		free(SmpsCfg->GblInsLib.InsPtrs);
+		SmpsCfg->GblInsLib.InsPtrs = NULL;
 	}
 	
-	SmpsCfg->GlbInsLen = 0x00;
-	free(SmpsCfg->GlbInsData);
-	SmpsCfg->GlbInsData = NULL;
+	FreeFileData(&SmpsCfg->GblIns);
 	
 	return;
 }
+
+void FreeFileData(FILE_DATA* File)
+{
+	File->Len = 0x00;
+	if (File->Data != NULL)
+	{
+		free(File->Data);
+		File->Data = NULL;
+	}
+	
+	return;
+}
+
 
 
 INLINE UINT16 ReadLE16(const UINT8* Data)

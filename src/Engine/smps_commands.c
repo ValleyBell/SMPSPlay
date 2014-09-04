@@ -44,8 +44,8 @@ INLINE UINT16 ReadBE16(const UINT8* Data);
 INLINE UINT16 ReadLE16(const UINT8* Data);
 INLINE void WriteLE16(UINT8* Data, UINT16 Value);
 INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
-INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
-INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG* SmpsCfg);
+INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet);
+INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet);
 
 //void cfHandler(TRK_RAM* Trk, UINT8 Command)
 static void cfMetaHandler(TRK_RAM* Trk, UINT8 Command);
@@ -82,22 +82,22 @@ INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg)
 		return ReadLE16(Data);
 }
 
-INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg)
+INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet)
 {
-	return ReadRawPtr(Data, SmpsCfg) - SmpsCfg->SeqBase;
+	return ReadRawPtr(Data, SmpsSet->Cfg) - SmpsSet->SeqBase;
 }
 
-INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG* SmpsCfg)
+INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet)
 {
 	UINT16 PtrVal;
 	UINT8 Offset;
 	
-	PtrVal = ReadRawPtr(Data, SmpsCfg);
-	Offset = SmpsCfg->PtrFmt & PTRFMT_OFSMASK;
+	PtrVal = ReadRawPtr(Data, SmpsSet->Cfg);
+	Offset = SmpsSet->Cfg->PtrFmt & PTRFMT_OFSMASK;
 	if (! Offset)
 	{
 		// absolute
-		return PtrVal - SmpsCfg->SeqBase;
+		return PtrVal - SmpsSet->SeqBase;
 	}
 	else
 	{
@@ -111,7 +111,7 @@ INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG
 
 void cfHandler(TRK_RAM* Trk, UINT8 Command)
 {
-	const CMD_LIB* CmdLib = &Trk->SmpsCfg->CmdList;
+	const CMD_LIB* CmdLib = &Trk->SmpsSet->Cfg->CmdList;
 	
 	if (Command < CmdLib->FlagBase || Command - CmdLib->FlagBase >= CmdLib->FlagCount)
 	{
@@ -121,7 +121,7 @@ void cfHandler(TRK_RAM* Trk, UINT8 Command)
 	
 	DoCoordinationFlag(Trk, &CmdLib->CmdData[Command - CmdLib->FlagBase]);
 	
-	if (Trk->Pos >= Trk->SmpsCfg->SeqLength)
+	if (Trk->Pos >= Trk->SmpsSet->Seq.Len)
 		Trk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 	
 	return;
@@ -129,7 +129,7 @@ void cfHandler(TRK_RAM* Trk, UINT8 Command)
 
 static void cfMetaHandler(TRK_RAM* Trk, UINT8 Command)
 {
-	const CMD_LIB* CmdLib = &Trk->SmpsCfg->CmdMetaList;
+	const CMD_LIB* CmdLib = &Trk->SmpsSet->Cfg->CmdMetaList;
 	
 	if (Command < CmdLib->FlagBase || Command - CmdLib->FlagBase >= CmdLib->FlagCount)
 	{
@@ -144,7 +144,8 @@ static void cfMetaHandler(TRK_RAM* Trk, UINT8 Command)
 
 static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 {
-	const UINT8* Data = &Trk->SmpsCfg->SeqData[Trk->Pos + 0x01];
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	const UINT8* Data = &Trk->SmpsSet->Seq.Data[Trk->Pos + 0x01];
 	UINT8 CmdLen;
 	UINT8 TempByt;
 	
@@ -261,14 +262,14 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		if ((CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FM ||	// EF Set FM Instrument
 			(CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FMP)
 		{
-			INS_LIB* InsLib = Trk->SmpsCfg->InsLib;
+			const INS_LIB* InsLib = &Trk->SmpsSet->InsLib;
 			const UINT8* InsPtr;
 			
 			if ((CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FMP && (Trk->ChannelMask & 0x80))
 			{
 				// [Sonic 3K] The PSG instrument is set for the EF flag, too.
 				Trk->Instrument = Data[0x00];
-				if (Trk->Instrument > Trk->SmpsCfg->VolEnvs.EnvCount)
+				if (Trk->Instrument > SmpsCfg->VolEnvs.EnvCount)
 				{
 					if (DebugMsgs & 0x01)
 						printf("Error: Invalid PSG instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
@@ -337,7 +338,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			}
 			
 			Trk->Instrument = Data[0x00];
-			if (Trk->Instrument > Trk->SmpsCfg->VolEnvs.EnvCount)	// 1-based, so not >=
+			if (Trk->Instrument > SmpsCfg->VolEnvs.EnvCount)	// 1-based, so not >=
 			{
 				if (DebugMsgs & 0x01)
 					printf("Error: Invalid PSG instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
@@ -507,7 +508,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			SrcAddr = ReadLE16(&Data[0x00]);
 			ByteCnt = Data[0x02];
 			Trk->Pos += CFlag->Len;
-			SeqData = Trk->SmpsCfg->SeqData;
+			SeqData = Trk->SmpsSet->Seq.Data;
 			
 			// Of course I can't emulate this, since I'm not simulating a full Z80 incl. RAM and ROM.
 			// But even if you ignore this, copying data into the sequence makes absolutely no sense.
@@ -549,7 +550,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		break;
 	case CF_PLAY_DAC:
 		{
-			const DAC_CFG* DacDrv = &Trk->SmpsCfg->DACDrv;
+			const DAC_CFG* DacDrv = &SmpsCfg->DACDrv;
 			UINT8 DacChn;
 			UINT8 DacSnd;
 			
@@ -568,7 +569,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			
 			//SmpsRAM._1C3C = DacSnd;
 			DAC_Play(DacChn, DacSnd - 0x01);
-			if (Trk->SmpsCfg->DrumChnMode == DCHNMODE_CYMN && DacChn == 0x00)
+			if (SmpsCfg->DrumChnMode == DCHNMODE_CYMN && DacChn == 0x00)
 			{
 				if (DacSnd)
 					SmpsRAM.MusicTrks[TRACK_MUS_DRUM].PlaybkFlags |= PBKFLG_OVERRIDDEN;
@@ -593,7 +594,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	// ----------------
 	case CF_MOD_SETUP:	// F0 Modulation Setup
 		Trk->CstMod.DataPtr = Trk->Pos + 0x01;
-		if ((Trk->SmpsCfg->ModAlgo & 0xF0) == MODALGO_68K)
+		if ((SmpsCfg->ModAlgo & 0xF0) == MODALGO_68K)
 		{
 			// unconditional inlined PrepareModulat()
 			Trk->ModEnv |= 0x80;
@@ -710,7 +711,6 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	case CF_SET_LFO:	// E9 Set LFO Data
 		if (CFlag->SubType == CFS_LFO_AMSEN)
 		{
-			SMPS_CFG* SmpsCfg = Trk->SmpsCfg;
 			const UINT8* OpPtr;
 			const UINT8* InsPtr;
 			UINT8 CurOp;
@@ -759,7 +759,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			Trk->PlaybkFlags &= ~PBKFLG_RAWFREQ;
 		break;
 	case CF_SPC_FM3:		// FE FM3 Special Mode
-		if (Trk->SmpsCfg->SeqData != Trk->SmpsCfg->FMDrums.Data && (DebugMsgs & 0x02))
+		if (Trk->SmpsSet->Seq.Data != SmpsCfg->FMDrums.File.Data && (DebugMsgs & 0x02))
 			print_msg(Trk, CmdLen, "Special FM3 mode");
 		if (Trk->ChannelMask != 0x02)
 			break;
@@ -775,8 +775,8 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			
 			for (CurOp = 0x00; CurOp < 0x04; CurOp ++)
 			{
-				if (Data[CurOp] < Trk->SmpsCfg->FM3FreqCnt)
-					FM3FrqRAM[CurOp] = Trk->SmpsCfg->FM3Freqs[Data[CurOp]];
+				if (Data[CurOp] < SmpsCfg->FM3FreqCnt)
+					FM3FrqRAM[CurOp] = SmpsCfg->FM3Freqs[Data[CurOp]];
 				else
 					FM3FrqRAM[CurOp] = 0x0000;
 			}
@@ -785,7 +785,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		}
 		break;
 	case CF_SSG_EG:			// FF 06 SSG-EG
-		if (Trk->SmpsCfg->SeqData != Trk->SmpsCfg->FMDrums.Data && (DebugMsgs & 0x02))
+		if (Trk->SmpsSet->Seq.Data != SmpsCfg->FMDrums.File.Data && (DebugMsgs & 0x02))
 			print_msg(Trk, CmdLen, "SSG-EG Enable");
 		
 		if (CFlag->SubType == CFS_SEG_FULLATK)
@@ -953,7 +953,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		// fall through
 	case CF_GOTO:			// F6 GoTo
 		Trk->Pos += CFlag->JumpOfs;
-		Trk->Pos = ReadJumpPtr(&Trk->SmpsCfg->SeqData[Trk->Pos], Trk->Pos, Trk->SmpsCfg);
+		Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
 		Extra_LoopEndCheck(Trk);
 		CmdLen = 0x00;
 		break;
@@ -967,7 +967,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		{
 			// jump back
 			Trk->Pos += CFlag->JumpOfs;
-			Trk->Pos = ReadJumpPtr(&Trk->SmpsCfg->SeqData[Trk->Pos], Trk->Pos, Trk->SmpsCfg);
+			Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
 			CmdLen = 0x00;
 		}
 		break;
@@ -979,7 +979,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		
 		// jump back
 		Trk->Pos += CFlag->JumpOfs;
-		Trk->Pos = ReadJumpPtr(&Trk->SmpsCfg->SeqData[Trk->Pos], Trk->Pos, Trk->SmpsCfg);
+		Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
 		CmdLen = 0x00;
 		break;
 	case CF_RETURN:			// F9 Return from GoSub
@@ -995,7 +995,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			// jump
 			Trk->LoopStack[TempByt] --;
 			Trk->Pos += CFlag->JumpOfs;
-			Trk->Pos = ReadJumpPtr(&Trk->SmpsCfg->SeqData[Trk->Pos], Trk->Pos, Trk->SmpsCfg);
+			Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
 			Extra_LoopEndCheck(Trk);
 			CmdLen = 0x00;
 		}
@@ -1101,21 +1101,21 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 
 static UINT8 GetInsRegPtrs(TRK_RAM* Trk, const UINT8** RetRegPtr, const UINT8** RetInsPtr, UINT8 Register)
 {
-	SMPS_CFG* SmpsCfg = Trk->SmpsCfg;
+	const SMPS_SET* SmpsSet = Trk->SmpsSet;
 	const UINT8* RegList;
 	const UINT8* InsData;
 	UINT8 CurReg;
 	
-	RegList = SmpsCfg->InsRegs;
+	RegList = SmpsSet->Cfg->InsRegs;
 	if (RegList == NULL)
 		return 0x01;
-	if (Trk->Instrument >= SmpsCfg->InsLib->InsCount)
+	if (Trk->Instrument >= SmpsSet->InsLib.InsCount)
 		return 0x02;
-	InsData = SmpsCfg->InsLib->InsPtrs[Trk->Instrument];
+	InsData = SmpsSet->InsLib.InsPtrs[Trk->Instrument];
 	
 	// Since we're using a user-defined Register order for the instruments,
 	// we need to search for the respective register in the instrument register list.
-	for (CurReg = 0x00; CurReg < SmpsCfg->InsRegCnt; CurReg ++)
+	for (CurReg = 0x00; CurReg < SmpsSet->Cfg->InsRegCnt; CurReg ++)
 	{
 		if (RegList[CurReg] == Register)
 		{
@@ -1318,7 +1318,7 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 
 static UINT8 cfSpecialDAC(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 {
-	const UINT8* Data = &Trk->SmpsCfg->SeqData[Trk->Pos + 0x01];
+	const UINT8* Data = &Trk->SmpsSet->Seq.Data[Trk->Pos + 0x01];
 	UINT8 CmdLen;
 	UINT8 TempByt;
 	
@@ -1446,7 +1446,7 @@ INLINE UINT16* GetFM3FreqPtr(void)
 
 static void print_msg(TRK_RAM* Trk, UINT8 CmdLen, const char* DescStr)
 {
-	const UINT8* Data = Trk->SmpsCfg->SeqData;
+	const UINT8* Data = Trk->SmpsSet->Seq.Data;
 	char TempStr[0x20];
 	char* StrPtr;
 	UINT8 CurByt;

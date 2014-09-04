@@ -4,6 +4,12 @@
 #include "stdtype.h"
 #include "dac.h"	// for DAC_CFG
 
+typedef struct _file_data
+{
+	UINT16 Len;
+	UINT8* Data;
+} FILE_DATA;
+
 // SMPS Settings
 // -------------
 #define PTRFMT_BE		0x00	// Big Endian
@@ -83,6 +89,10 @@
 
 #define SEQFLG_NEED_SAVE	0x01
 
+#define INSTYPE_NONE	0xFF
+#define INSTYPE_SEQ		0x00	// data is part of the sequence
+#define INSTYPE_GBL		0x01	// data is copy from global instrument data
+
 typedef struct _command_flags
 {
 	UINT8 Type;
@@ -98,14 +108,16 @@ typedef struct _command_flag_library
 } CMD_LIB;
 typedef struct _instrument_library
 {
+	UINT8 Type;
 	UINT16 InsCount;
 	UINT8** InsPtrs;
 } INS_LIB;
-typedef struct _envelope_data
+/*typedef struct _envelope_data
 {
 	UINT8 Len;
 	UINT8* Data;
-} ENV_DATA;
+} ENV_DATA;*/
+typedef FILE_DATA ENV_DATA;
 typedef struct _envelope_library
 {
 	UINT8 EnvCount;
@@ -142,7 +154,7 @@ typedef struct _psg_drum_library
 	UINT8 DrumCount;
 	PSG_DRUM_DATA* DrumData;
 } PSG_DRUM_LIB;
-typedef struct _smps_initial_settings
+typedef struct _smps_initial_configuration
 {
 	UINT8 Timing_DefMode;
 	UINT8 Timing_Lock;
@@ -151,8 +163,9 @@ typedef struct _smps_initial_settings
 } SMPS_CFG_INIT;
 typedef struct _drum_track_library
 {
-	UINT16 DataLen;
-	UINT8* Data;
+	//UINT16 DataLen;
+	//UINT8* Data;
+	FILE_DATA File;
 	UINT8 DrumCount;
 	UINT16 DrumBase;
 	UINT16* DrumList;
@@ -166,7 +179,7 @@ typedef struct _pan_animation_library
 	UINT16 AniBase;
 	UINT16* AniList;
 } PAN_ANI_LIB;
-typedef struct _smps_settings
+typedef struct _smps_configuration	// global SMPS driver configuration
 {
 	SMPS_CFG_INIT InitCfg;
 	
@@ -186,22 +199,13 @@ typedef struct _smps_settings
 	UINT8 VolMode;
 	UINT8 DrumChnMode;
 	
-	UINT8 UsageCounter;
-	UINT8 SeqFlags;
-	UINT16 SeqBase;		// Z80 only: Sequence Base Offset
-	UINT16 SeqLength;
-	UINT8* SeqData;
-	
-	INS_LIB* InsLib;
 	DRUM_LIB DrumLib;
 	PSG_DRUM_LIB PSGDrumLib;
-	UINT16 GlbInsBase;
-	UINT16 GlbInsLen;
-	UINT8* GlbInsData;
-	INS_LIB GlbInsLib;
+	UINT16 GblInsBase;
+	FILE_DATA GblIns;
+	INS_LIB GblInsLib;
 	
 	UINT8 FMChnCnt;
-	//UINT8* FMChnList;
 	UINT8 FMChnList[0x10];
 	UINT8 PSGChnCnt;
 	UINT8 PSGChnList[0x04];
@@ -229,9 +233,24 @@ typedef struct _smps_settings
 	
 	CMD_LIB CmdList;
 	CMD_LIB CmdMetaList;
+} SMPS_CFG;
+
+typedef struct _smps_settings	// sequence-specific settings
+{
+	const SMPS_CFG* Cfg;
+	char CfgExtFCC[4];	// Four-Char-Code: extention of files that use this configuration
+						// Using this, I can reload the SMPS configuration and re-link everything later.
+	
+	UINT8 UsageCounter;
+	UINT8 SeqFlags;
+	UINT16 SeqBase;		// Z80 only: Sequence Base Offset
+	FILE_DATA Seq;
+	
+	UINT16 InsBase;
+	INS_LIB InsLib;
 	
 	UINT16* LoopPtrs;
-} SMPS_CFG;
+} SMPS_SET;
 
 
 #endif // __SMPS_STRUCTS_H__

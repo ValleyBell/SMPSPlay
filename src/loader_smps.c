@@ -30,11 +30,13 @@ extern UINT8 DebugMsgs;
 INLINE UINT16 ReadBE16(const UINT8* Data);
 INLINE UINT16 ReadLE16(const UINT8* Data);
 INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
-INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
-INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG* SmpsCfg);
+INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet);
+INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet);
 
 //UINT8 GuessSMPSOffset(SMPS_CFG* SmpsCfg);
 //UINT8 SmpsOffsetFromFilename(const char* FileName, UINT16* RetOffset);
+static void DuplicateInsTable(const INS_LIB* InsLibSrc, INS_LIB* InsLibDst);
+static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, UINT8* FileData, UINT32 StartOfs);
 //UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg);
 static void MarkDrumNote(DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note);
 static void MarkDrum_Sub(DAC_CFG* DACDrv, const DRUM_DATA* DrumData);
@@ -60,13 +62,14 @@ INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg)
 		return ReadLE16(Data);
 }
 
-INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg)
+INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet)
 {
-	return ReadRawPtr(Data, SmpsCfg) - SmpsCfg->SeqBase;
+	return ReadRawPtr(Data, SmpsSet->Cfg) - SmpsSet->SeqBase;
 }
 
-INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG* SmpsCfg)
+INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet)
 {
+	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
 	UINT16 PtrVal;
 	UINT8 Offset;
 	
@@ -75,7 +78,7 @@ INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG
 	if (! Offset)
 	{
 		// absolute
-		return PtrVal - SmpsCfg->SeqBase;
+		return PtrVal - SmpsSet->SeqBase;
 	}
 	else
 	{
@@ -85,8 +88,9 @@ INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG
 	}
 }
 
-UINT8 GuessSMPSOffset(SMPS_CFG* SmpsCfg)
+UINT8 GuessSMPSOffset(SMPS_SET* SmpsSet)
 {
+	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
 	UINT32 FileLen;
 	UINT8* FileData;
 	UINT16 InsPtr;
@@ -101,8 +105,8 @@ UINT8 GuessSMPSOffset(SMPS_CFG* SmpsCfg)
 	if ((SmpsCfg->PtrFmt & PTRFMT_OFSMASK) != 0x00)
 		return 0x00;
 	
-	FileLen = SmpsCfg->SeqLength;
-	FileData = SmpsCfg->SeqData;
+	FileLen = SmpsSet->Seq.Len;
+	FileData = SmpsSet->Seq.Data;
 	if (! FileLen || FileData == NULL)
 		return 0xFF;
 	
@@ -126,7 +130,7 @@ UINT8 GuessSMPSOffset(SMPS_CFG* SmpsCfg)
 	for (CurTrk = 0x00; CurTrk < SmpsCfg->AddChnCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
 		TrkOfs[TrkCount] = ReadRawPtr(&FileData[CurPos], SmpsCfg);
 	
-	SmpsCfg->SeqBase = 0x0000;
+	SmpsSet->SeqBase = 0x0000;
 	// Search for first track
 	TempOfs = 0xFFFF;
 	for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++)
@@ -138,7 +142,7 @@ UINT8 GuessSMPSOffset(SMPS_CFG* SmpsCfg)
 		TempOfs = InsPtr;
 	// Calculate the sequence's ROM offset based on the assumption that
 	// it starts immediately after the header.
-	SmpsCfg->SeqBase = TempOfs - CurPos;
+	SmpsSet->SeqBase = TempOfs - CurPos;
 	
 	return 0x00;
 }
@@ -174,13 +178,25 @@ UINT8 SmpsOffsetFromFilename(const char* FileName, UINT16* RetOffset)
 	return 0x00;
 }
 
-static void CreateInstrumentTable(SMPS_CFG* SmpsCfg, UINT32 FileLen, UINT8* FileData, UINT32 StartOfs)
+static void DuplicateInsTable(const INS_LIB* InsLibSrc, INS_LIB* InsLibDst)
 {
+	free(InsLibDst->InsPtrs);
+	
+	InsLibDst->InsPtrs = (UINT8**)malloc(InsLibSrc->InsCount * sizeof(UINT8*));
+	memcpy(InsLibDst->InsPtrs, InsLibSrc->InsPtrs, InsLibSrc->InsCount * sizeof(UINT8*));
+	InsLibDst->InsCount = InsLibSrc->InsCount;
+	
+	return;
+}
+
+static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, UINT8* FileData, UINT32 StartOfs)
+{
+	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
 	INS_LIB* InsLib;
 	UINT32 CurPos;
 	UINT16 TempOfs;
 	
-	InsLib = (INS_LIB*)malloc(sizeof(INS_LIB));
+	InsLib = &SmpsSet->InsLib;
 	InsLib->InsCount = (FileLen - StartOfs) / SmpsCfg->InsRegCnt;
 	if (InsLib->InsCount > 0x100)
 		InsLib->InsCount = 0x100;
@@ -190,18 +206,18 @@ static void CreateInstrumentTable(SMPS_CFG* SmpsCfg, UINT32 FileLen, UINT8* File
 	for (TempOfs = 0; TempOfs < InsLib->InsCount; TempOfs ++, CurPos += SmpsCfg->InsRegCnt)
 		InsLib->InsPtrs[TempOfs] = &FileData[CurPos];
 	
-	SmpsCfg->InsLib = InsLib;
 	return;
 }
 
-UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
+UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 {
+	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
 	UINT32 FileLen;
 	UINT8* FileData;
 	UINT8* FileMask;
-	CMD_LIB* CmdList;
-	CMD_LIB* CmdMetaList;
-	DAC_CFG* DACDrv;
+	const CMD_LIB* CmdList;
+	const CMD_LIB* CmdMetaList;
+	DAC_CFG* DACDrv;	// can't be const, because I set the Usage counters
 	UINT16 InsPtr;
 	UINT8 FMTrkCnt;
 	UINT8 PSGTrkCnt;
@@ -222,16 +238,16 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 	UINT8 UsageMask;
 	UINT8 IsDrmTrk;
 	
-	FileLen = SmpsCfg->SeqLength;
-	FileData = SmpsCfg->SeqData;
+	FileLen = SmpsSet->Seq.Len;
+	FileData = SmpsSet->Seq.Data;
 	if (! FileLen || FileData == NULL)
 		return 0xFF;
 	CmdList = &SmpsCfg->CmdList;
 	CmdMetaList = &SmpsCfg->CmdMetaList;
-	DACDrv = &SmpsCfg->DACDrv;
+	DACDrv = (DAC_CFG*)&SmpsCfg->DACDrv;
 	
 	CurPos = 0x00;
-	InsPtr = ReadPtr(&FileData[CurPos + 0x00], SmpsCfg);
+	InsPtr = ReadPtr(&FileData[CurPos + 0x00], SmpsSet);
 	FMTrkCnt = FileData[CurPos + 0x02];
 	PSGTrkCnt = FileData[CurPos + 0x03];
 	if (FMTrkCnt > SmpsCfg->FMChnCnt || PSGTrkCnt > SmpsCfg->PSGChnCnt)
@@ -244,60 +260,67 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 	
 	TrkCount = 0x00;
 	for (CurTrk = 0x00; CurTrk < FMTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
-		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsCfg);
+		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
 	for (CurTrk = 0x00; CurTrk < PSGTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x06)
-		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsCfg);
+		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
 	for (CurTrk = 0x00; CurTrk < SmpsCfg->AddChnCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
-		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsCfg);
+		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
 	
 	if (SmpsCfg->InsMode & INSMODE_INT)
 	{
 		// interleaved instruments ALWAYS use external files
 		// (requires instrument pointers due to variable instrument size)
-		SmpsCfg->InsLib = &SmpsCfg->GlbInsLib;
+		SmpsSet->InsLib.Type = INSTYPE_GBL;
+		SmpsSet->InsBase = 0x0000;
+		DuplicateInsTable(&SmpsCfg->GblInsLib, &SmpsSet->InsLib);
 	}
 	else if (InsPtr && (UINT32)InsPtr + SmpsCfg->InsRegCnt <= FileLen)
 	{
-		CreateInstrumentTable(SmpsCfg, FileLen, FileData, InsPtr);
+		SmpsSet->InsLib.Type = INSTYPE_SEQ;
+		SmpsSet->InsBase = InsPtr;
+		CreateInstrumentTable(SmpsSet, FileLen, FileData, InsPtr);
 	}
-	else if (SmpsCfg->GlbInsData != NULL)
+	else if (SmpsCfg->GblInsLib.InsCount)
 	{
-		InsPtr += SmpsCfg->SeqBase;
-		if (SmpsCfg->GlbInsBase == 0x0000)	// an instrument set offset of 0 enforces "use always the full table"
+		InsPtr += SmpsSet->SeqBase;
+		if (SmpsCfg->GblInsBase == 0x0000)	// an instrument set offset of 0 enforces "use always the full table"
 			InsPtr = 0x0000;
-		if (InsPtr > SmpsCfg->GlbInsBase && InsPtr < SmpsCfg->GlbInsBase + SmpsCfg->GlbInsLen)
+		
+		SmpsSet->InsLib.Type = INSTYPE_GBL;
+		if (InsPtr > SmpsCfg->GblInsBase && InsPtr < SmpsCfg->GblInsBase + SmpsCfg->GblIns.Len)
 		{
-			UINT16 BaseOfs;
-			
 			// read from the middle of the Instrument Table, if the song's Table Offset is
 			// TblStart < SongTblOfs < TblEnd
 			// (TblStart == SongTblOfs is done in the else block)
-			BaseOfs = InsPtr - SmpsCfg->GlbInsBase;
-			CreateInstrumentTable(SmpsCfg, SmpsCfg->GlbInsLen, SmpsCfg->GlbInsData, BaseOfs);
+			SmpsSet->InsBase = InsPtr - SmpsCfg->GblInsBase;
+			CreateInstrumentTable(SmpsSet, SmpsCfg->GblIns.Len, SmpsCfg->GblIns.Data, SmpsSet->InsBase);
 		}
 		else
 		{
-			SmpsCfg->InsLib = &SmpsCfg->GlbInsLib;
+			SmpsSet->InsBase = 0x0000;
+			DuplicateInsTable(&SmpsCfg->GblInsLib, &SmpsSet->InsLib);
 		}
 	}
 	else
 	{
-		SmpsCfg->InsLib = NULL;
+		SmpsSet->InsLib.Type = INSTYPE_NONE;
+		SmpsSet->InsLib.InsCount = 0x00;
+		SmpsSet->InsLib.InsPtrs = NULL;
 	}
-	SmpsCfg->UsageCounter = 0x01;
-	SmpsCfg->LoopPtrs = (UINT16*)malloc(TrkCount * sizeof(UINT16));
+	SmpsSet->UsageCounter = 0x01;
+	SmpsSet->LoopPtrs = (UINT16*)malloc(TrkCount * sizeof(UINT16));
 	
 	// reset DAC usage
 	for (TempOfs = 0x00; TempOfs < DACDrv->SmplCount; TempOfs ++)
 		DACDrv->Smpls[TempOfs].UsageID = 0xFF;
 	
-	SmpsCfg->SeqFlags = 0x00;
+	SmpsSet->SeqFlags = 0x00;
 	
 	FileMask = (UINT8*)malloc(FileLen);
 	for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++)
 	{
 		CurPos = TrkOfs[CurTrk];
-		SmpsCfg->LoopPtrs[CurTrk] = 0x0000;
+		SmpsSet->LoopPtrs[CurTrk] = 0x0000;
 		if (CurPos >= FileLen)
 		{
 			if (DebugMsgs & 0x04)
@@ -399,7 +422,7 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 			case CF_GOTO:
 				OldPos = CurPos;
 				TempOfs = CurPos + CmdList->CmdData[CurCmd].JumpOfs;
-				CurPos = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsCfg);
+				CurPos = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
 				if (CurPos >= FileLen)
 				{
 					if (DebugMsgs & 0x04)
@@ -415,7 +438,7 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 				UsageMask = (1 << (9 - StackPos)) - 1;
 				if (FileMask[CurPos] & UsageMask)
 				{
-					SmpsCfg->LoopPtrs[CurTrk] = CurPos;
+					SmpsSet->LoopPtrs[CurTrk] = CurPos;
 					TrkMode = 0x00;
 					if (StackPos < 0x08 && (DebugMsgs & 0x04))
 					{
@@ -451,7 +474,7 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 					UsageMask = (1 << (9 - StackPos)) - 1;
 					if (FileMask[CurPos] & UsageMask)
 					{
-						SmpsCfg->LoopPtrs[CurTrk] = CurPos;
+						SmpsSet->LoopPtrs[CurTrk] = CurPos;
 						TrkMode = 0x00;
 					}
 				}
@@ -459,7 +482,7 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 			case CF_LOOP_EXIT:
 				LoopID = FileData[CurPos + 0x01] & 0x07;
 				TempOfs = CurPos + CmdList->CmdData[CurCmd].JumpOfs;
-				LoopPtrs[LoopID] = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsCfg);
+				LoopPtrs[LoopID] = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
 				break;
 			case CF_GOSUB:
 				if (! StackPos)
@@ -478,7 +501,7 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 				
 				OldPos = CurPos;
 				TempOfs = CurPos + CmdList->CmdData[CurCmd].JumpOfs;
-				CurPos = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsCfg);
+				CurPos = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
 				StackPtrsE[StackPos] = CurPos;
 				CmdLen = 0x00;
 				if (CurPos >= FileLen)
@@ -570,7 +593,7 @@ UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg)
 			case CF_FADE_IN_SONG:
 				if (CmdList->CmdData[CurCmd].Len == 0x01)
 					TrkMode = 0x00;	// Sonic 1's Fade In command also terminates the song.
-				SmpsCfg->SeqFlags |= SEQFLG_NEED_SAVE;
+				SmpsSet->SeqFlags |= SEQFLG_NEED_SAVE;
 				break;
 			}
 			
@@ -648,34 +671,25 @@ static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Note)
 	return;
 }
 
-void FreeSMPSFile(SMPS_CFG* SmpsCfg)
+void FreeSMPSFile(SMPS_SET* SmpsSet)
 {
-	if (SmpsCfg->UsageCounter)
+	if (SmpsSet->UsageCounter)
 	{
-		SmpsCfg->UsageCounter --;
-		if (SmpsCfg->UsageCounter)
+		SmpsSet->UsageCounter --;
+		if (SmpsSet->UsageCounter)
 			return;
 	}
 	
-	if (SmpsCfg->SeqData != NULL)
-	{
-		free(SmpsCfg->SeqData);
-		SmpsCfg->SeqData = NULL;
-	}
-	if (SmpsCfg->InsLib != NULL)
-	{
-		if (SmpsCfg->InsLib != &SmpsCfg->GlbInsLib)
-		{
-			free(SmpsCfg->InsLib->InsPtrs);
-			free(SmpsCfg->InsLib);
-		}
-		SmpsCfg->InsLib = NULL;
-	}
+	FreeFileData(&SmpsSet->Seq);
 	
-	if (SmpsCfg->LoopPtrs != NULL)
+	SmpsSet->InsLib.InsCount = 0x00;
+	free(SmpsSet->InsLib.InsPtrs);
+	SmpsSet->InsLib.InsPtrs = NULL;
+	
+	if (SmpsSet->LoopPtrs != NULL)
 	{
-		free(SmpsCfg->LoopPtrs);
-		SmpsCfg->LoopPtrs = NULL;
+		free(SmpsSet->LoopPtrs);
+		SmpsSet->LoopPtrs = NULL;
 	}
 	
 	return;

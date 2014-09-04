@@ -11,8 +11,8 @@ void InitDriver(void);
 #define UPDATEEVT_TIMER	0x01
 void UpdateAll(UINT8 Event);
 
-void PlayMusic(SMPS_CFG* SmpsFileConfig);
-void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX);
+void PlayMusic(SMPS_SET* SmpsFileSet);
+void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX);
 
 void FadeOutMusic(void);
 

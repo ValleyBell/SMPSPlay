@@ -56,19 +56,19 @@ void DoNoteOff(TRK_RAM* Trk);
 static void DoPSGNoteOff(TRK_RAM* Trk);
 void Do2OpNote(void);
 static UINT16 DoPitchSlide(TRK_RAM* Trk);
-INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID);
+const INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID);
 void SendFMIns(TRK_RAM* Trk, const UINT8* InsData);
 void RefreshVolume(TRK_RAM* Trk);
 void RefreshFMVolume(TRK_RAM* Trk);
 void SendSSGEG(TRK_RAM* Trk, const UINT8* Data, UINT8 ForceMaxAtk);
 
-static void InitMusicPlay(SMPS_CFG* SmpsFileConfig);
+static void InitMusicPlay(const SMPS_CFG* SmpsFileConfig);
 static UINT8 CheckTrkRange(UINT8 TrkID, UINT8 BestTrkID, UINT8 FirstTrk, UINT8 TrkEnd);
 static UINT8 CheckTrkID(UINT8 TrkID, UINT8 ChnBits);
 static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UINT8 Mode,
 						   UINT8 ChnListSize, const UINT8* ChnList, UINT8 TickMult, UINT8 TrkBase);
-//void PlayMusic(SMPS_CFG* SmpsFileConfig);
-//void PlaySFX(SMPS_CFG* SmpsFileConfig, UINT8 SpecialSFX);
+//void PlayMusic(SMPS_SET* SmpsFileSet);
+//void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX);
 void GetSFXChnPtrs(UINT8 ChannelMask, UINT8* MusicTrk, UINT8* SFXTrk, UINT8* SpcSFXTrk);
 UINT8 GetChannelTrack(UINT8 ChannelMask, UINT8 TrkCount, const TRK_RAM* Tracks);
 

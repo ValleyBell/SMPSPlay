@@ -26,11 +26,11 @@ INLINE UINT16 ReadBE16(const UINT8* Data);
 INLINE UINT16 ReadLE16(const UINT8* Data);
 INLINE void WriteLE16(UINT8* Data, UINT16 Value);
 INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
-INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
-INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_CFG* SmpsCfg);
+INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet);
+INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet);
 
 //void PlayDrumNote(TRK_RAM* Trk, UINT8 Note);
-static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData);
+static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData);
 //void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note)
 
 
@@ -59,15 +59,15 @@ INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg)
 		return ReadLE16(Data);
 }
 
-INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg)
+INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet)
 {
-	return ReadRawPtr(Data, SmpsCfg) - SmpsCfg->SeqBase;
+	return ReadRawPtr(Data, SmpsSet->Cfg) - SmpsSet->SeqBase;
 }
 
 
 void PlayDrumNote(TRK_RAM* Trk, UINT8 Note)
 {
-	DRUM_LIB* DrumLib = &Trk->SmpsCfg->DrumLib;
+	const DRUM_LIB* DrumLib = &Trk->SmpsSet->Cfg->DrumLib;
 	
 	if (Note < 0x80)
 		return;
@@ -94,12 +94,13 @@ void PlayDrumNote(TRK_RAM* Trk, UINT8 Note)
 	return;
 }
 
-static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
+static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 {
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
 	TRK_RAM* DrumTrk;
 	DRUM_TRK_RAM* DrumTrk2Op;
 	const DRUM_TRK_LIB* DTrkLib;
-	SMPS_CFG* DTrkCfg;
+	SMPS_SET* DTrkSet;
 	const UINT8* DTrkData;
 	UINT16 DrumOfs;
 	
@@ -138,25 +139,24 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 		DrumTrk->ChannelMask = Trk->ChannelMask & 0x0F;
 		DoNoteOff(DrumTrk);
 		
-		DTrkLib = &Trk->SmpsCfg->FMDrums;
+		DTrkLib = &SmpsCfg->FMDrums;
 		if (DrumData->DrumID >= DTrkLib->DrumCount)
 			return;
 		
 		// Initialize configuration structures
-		DTrkCfg = &SmpsRAM.DrumCfg[0x00];	// 0x00 - FM drums
-		*DTrkCfg = *Trk->SmpsCfg;
+		DTrkSet = &SmpsRAM.DrumSet[0x00];	// 0x00 - FM drums
+		*DTrkSet = *Trk->SmpsSet;
 		DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
-		DTrkData = &DTrkLib->Data[DrumOfs];
-		DTrkCfg->SeqBase = DTrkLib->DrumBase;
-		DTrkCfg->SeqLength = DTrkLib->DataLen;
-		DTrkCfg->SeqData = DTrkLib->Data;
+		DTrkData = &DTrkLib->File.Data[DrumOfs];
+		DTrkSet->SeqBase = DTrkLib->DrumBase;
+		DTrkSet->Seq = DTrkLib->File;
 		
 		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
-		DrumTrk->SmpsCfg = DTrkCfg;
+		DrumTrk->SmpsSet = DTrkSet;
 		DrumTrk->PlaybkFlags = PBKFLG_ACTIVE;
 		DrumTrk->ChannelMask = Trk->ChannelMask & 0x0F;	// make it FM6 or FM3
 		DrumTrk->TickMult = 1;
-		DrumTrk->Pos = ReadPtr(&DTrkData[0x00], DTrkCfg);
+		DrumTrk->Pos = ReadPtr(&DTrkData[0x00], DTrkSet);
 		DrumTrk->Transpose = DTrkData[0x02] + Trk->Transpose;
 		DrumTrk->Volume = DTrkData[0x03] + Trk->Volume;
 		DrumTrk->ModEnv = DTrkData[0x04];
@@ -173,7 +173,7 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 		// Also, MegaMan Wily Wars, song 07 (MM1 Dr Wily Stage 1) relies on that behaviour.
 		ResetSpcFM3Mode();
 		
-		if (DrumTrk->Pos >= DTrkCfg->SeqLength)
+		if (DrumTrk->Pos >= DTrkSet->Seq.Len)
 			DrumTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 		break;
 	case DRMTYPE_PSG:
@@ -182,25 +182,24 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 			return;
 		DoNoteOff(Trk);
 		
-		DTrkLib = &Trk->SmpsCfg->PSGDrums;
+		DTrkLib = &SmpsCfg->PSGDrums;
 		if (DrumData->DrumID >= DTrkLib->DrumCount)
 			return;
 		
 		// Initialize configuration structures
-		DTrkCfg = &SmpsRAM.DrumCfg[0x01];	// 0x01 - PSG drums
-		*DTrkCfg = *Trk->SmpsCfg;
+		DTrkSet = &SmpsRAM.DrumSet[0x01];	// 0x01 - PSG drums
+		*DTrkSet = *Trk->SmpsSet;
 		DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
-		DTrkData = &DTrkLib->Data[DrumOfs];
-		DTrkCfg->SeqBase = DTrkLib->DrumBase;
-		DTrkCfg->SeqLength = DTrkLib->DataLen;
-		DTrkCfg->SeqData = DTrkLib->Data;
+		DTrkData = &DTrkLib->File.Data[DrumOfs];
+		DTrkSet->SeqBase = DTrkLib->DrumBase;
+		DTrkSet->Seq = DTrkLib->File;
 		
 		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
-		DrumTrk->SmpsCfg = DTrkCfg;
+		DrumTrk->SmpsSet = DTrkSet;
 		DrumTrk->PlaybkFlags = PBKFLG_ACTIVE;
 		DrumTrk->ChannelMask = 0xC0;
 		DrumTrk->TickMult = 1;
-		DrumTrk->Pos = ReadPtr(&DTrkData[0x00], DTrkCfg);;
+		DrumTrk->Pos = ReadPtr(&DTrkData[0x00], DTrkSet);;
 		DrumTrk->Transpose = DTrkData[0x02];
 		DrumTrk->Volume = DTrkData[0x03];
 		DrumTrk->ModEnv = DTrkData[0x04];
@@ -210,7 +209,7 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 		DrumTrk->PanAFMS = 0xC0;
 		DrumTrk->RemTicks = 0x01;
 		
-		if (DrumTrk->Pos >= DTrkCfg->SeqLength)
+		if (DrumTrk->Pos >= DTrkSet->Seq.Len)
 			DrumTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 		break;
 	case DRMTYPE_FM2OP:
@@ -223,7 +222,7 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 		DrumTrk2Op->PlaybkFlags &= 0x01;	// mask all bits but the Channel Select out
 		Do2OpNote();						// refresh Note State
 		
-		DTrkLib = &Trk->SmpsCfg->FMDrums;
+		DTrkLib = &SmpsCfg->FMDrums;
 		if (DrumData->DrumID >= DTrkLib->DrumCount)
 			return;
 		
@@ -236,7 +235,7 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 		
 		// Initialize configuration structures
 		DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
-		DTrkData = &DTrkLib->Data[DrumOfs];
+		DTrkData = &DTrkLib->File.Data[DrumOfs];
 		
 		memset(DrumTrk2Op, 0x00, sizeof(DRUM_TRK_RAM));
 		DrumTrk2Op->Trk = Trk;
@@ -250,8 +249,8 @@ static void DoDrum(TRK_RAM* Trk, DRUM_DATA* DrumData)
 		DrumTrk2Op->RemTicks = DTrkData[0x09];
 		
 		DrumOfs = ReadLE16(&DTrkData[0x01]) - DTrkLib->DrumBase;
-		if (DrumOfs < DTrkLib->DataLen)
-			SendFMIns(Trk, &DTrkLib->Data[DrumOfs]);
+		if (DrumOfs < DTrkLib->File.Len)
+			SendFMIns(Trk, &DTrkLib->File.Data[DrumOfs]);
 		Do2OpNote();
 		break;
 	}
@@ -323,8 +322,8 @@ void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note)
 
 void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note)
 {
-	PSG_DRUM_LIB* DrumLib = &Trk->SmpsCfg->PSGDrumLib;
-	PSG_DRUM_DATA* TempDrum;
+	const PSG_DRUM_LIB* DrumLib = &Trk->SmpsSet->Cfg->PSGDrumLib;
+	const PSG_DRUM_DATA* TempDrum;
 	UINT8 TempVol;
 	
 	if (Note < 0x80)

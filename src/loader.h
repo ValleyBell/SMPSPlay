@@ -77,6 +77,8 @@ void FreePanAniData(PAN_ANI_LIB* PAniLib);
 UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg);
 void FreeGlobalInstrumentLib(SMPS_CFG* SmpsCfg);
 
+void FreeFileData(FILE_DATA* File);
+
 // loader_data.c
 void LoadDACData(const char* FileName, DAC_CFG* DACDrv);
 void FreeDACData(DAC_CFG* DACDrv);
@@ -85,10 +87,10 @@ UINT8 LoadEnvelopeData(const char* FileName, ENV_LIB* EnvLib);
 void FreeEnvelopeData(ENV_LIB* EnvLib);
 
 // loader_smps.c
-UINT8 GuessSMPSOffset(SMPS_CFG* SmpsCfg);
+UINT8 GuessSMPSOffset(SMPS_SET* SmpsSet);
 UINT8 SmpsOffsetFromFilename(const char* FileName, UINT16* RetOffset);
-UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg);
-void FreeSMPSFile(SMPS_CFG* SmpsCfg);
+UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet);
+void FreeSMPSFile(SMPS_SET* SmpsSet);
 
 // loader_ini.c
 SMPS_EXT_DEF* GetExtentionData(EXT_LIST* ExtList, const char* ExtStr);

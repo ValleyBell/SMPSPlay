@@ -61,7 +61,7 @@ typedef struct _adsr_volume_data
 #define PBKFLG_HOLD_ALL		0x200	// Bit 9 - hold all coming notes [preSMPS Z80 only]
 typedef struct _track_ram
 {
-	SMPS_CFG* SmpsCfg;
+	SMPS_SET* SmpsSet;
 	
 	UINT16 PlaybkFlags;	// 00 - Playback Flags (actually 8-bit, but that's not enough for all Z80 and 68k bits)
 	UINT8 ChannelMask;	// 01 - Channel Bits (various chip-dependent bits)
@@ -198,9 +198,9 @@ typedef struct _fade_in_info
 #define TRKMODE_SPCSFX	0x80
 typedef struct _sound_ram
 {
-	SMPS_CFG MusCfg;
-	SMPS_CFG SFXCfg[SFX_TRKCNT + SPCSFX_TRKCNT];
-	SMPS_CFG DrumCfg[0x02];
+	SMPS_SET MusSet;
+	SMPS_SET SFXSet[SFX_TRKCNT + SPCSFX_TRKCNT];
+	SMPS_SET DrumSet[0x02];
 	
 	// SMPS Z80 Type 1:
 	// 1C00/1C01 - Data Bank
@@ -276,7 +276,7 @@ typedef struct _sound_ram
 
 typedef struct _music_save_state
 {
-	SMPS_CFG MusCfg;
+	SMPS_SET MusSet;
 	UINT8 InUse;
 	UINT8 DacChVol[2];
 	UINT8 MusicPaused;
