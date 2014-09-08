@@ -575,6 +575,9 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 					break;
 				}
 				break;
+			case CF_CONT_SFX:
+				SmpsSet->SeqFlags |= SEQFLG_CONT_SFX;
+				break;
 			//case CF_PLAY_DAC:
 			case CF_PLAY_PWM:
 			case CF_DAC_CYMN:

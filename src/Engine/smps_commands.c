@@ -1084,6 +1084,37 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	case CF_NOTE_STOP_MODE:
 		Trk->NStopRevMode = Data[0x00] ? (0x10 | Data[0x00]) : 0x00;
 		break;
+	case CF_SPINDASH_REV:
+		switch(CFlag->SubType)
+		{
+		case CFS_SDREV_INC:
+			Trk->Transpose += SmpsRAM.SpinDashRev;
+			if (Trk->Transpose != 0x10)
+				SmpsRAM.SpinDashRev ++;
+			break;
+		case CFS_SDREV_RESET:
+			SmpsRAM.SpinDashRev = 0;
+			break;
+		}
+		break;
+	case CF_CONT_SFX:
+		if (SmpsRAM.ContSfxFlag != 0x80)
+		{
+			SmpsRAM.ContSfxID = 0x00;
+			SmpsRAM.ContSfxFlag = 0x00;
+		}
+		else
+		{
+			SmpsRAM.ContSfxLoop --;
+			if (! SmpsRAM.ContSfxLoop)
+				SmpsRAM.ContSfxFlag = 0x00;
+			
+			Trk->Pos += CFlag->JumpOfs;
+			Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
+			Extra_LoopEndCheck(Trk);
+			CmdLen = 0x00;
+		}
+		break;
 	case CF_DAC_PS4:
 	case CF_DAC_CYMN:
 	case CF_DAC_GAXE3:

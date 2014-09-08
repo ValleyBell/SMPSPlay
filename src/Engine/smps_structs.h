@@ -87,7 +87,10 @@ typedef struct _file_data
 #define DRMTYPE_FM2OP	0x04
 #define DRMTYPE_NONE	0x00
 
+// Music:
 #define SEQFLG_NEED_SAVE	0x01
+// SFX:
+#define SEQFLG_CONT_SFX		0x10
 
 #define INSTYPE_NONE	0xFF
 #define INSTYPE_SEQ		0x00	// data is part of the sequence

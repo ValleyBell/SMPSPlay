@@ -258,6 +258,10 @@ typedef struct _sound_ram
 	UINT16 FM3Freqs_Mus[4];		// 1C2A - Special FM3 Frequencies: Music
 	
 	UINT8 CondJmpVal;
+	UINT8 SpinDashRev;		// 1C27 - Spindash Rev. Counter [Sonic 3K]
+	UINT8 ContSfxID;		// 1C25 - Continuous SFX: current SFX ID [Sonic 3K]
+	UINT8 ContSfxFlag;		// 1C26 - Continuous SFX: Enable Flag [Sonic 3K]
+	UINT8 ContSfxLoop;		// 1C31 - Continuous SFX: Loop Counter [Sonic 3K]
 	
 	// 1C32 - GetSFXChnPtrs saves the current Channel ID to this byte
 	// 1C33 - PlayMusic variable: Track Header offset

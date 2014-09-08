@@ -36,9 +36,9 @@
 	#define CFS_VOL_CC_FM			0x20	// E6 [Sonic 3K]
 	#define CFS_VOL_CC_PSG			0x21	// EC [SMPS Z80 Type 2]
 	#define CFS_VOL_CC_FMP			0x22	// E5 (FM+PSG)
-	#define CFS_VOL_CC_FMP2			0x23	// E5 [S3K] (FM+PSG, broken)
+	#define CFS_VOL_CC_FMP2			0x23	// E5 [Sonic 3K] (FM+PSG, broken)
 	#define CFS_VOL_ABS				0x40	// F0 [preSMPS] (absolute Volume)
-	#define CFS_VOL_ABS_S3K			0x80	// E4 [S3K] (absolute Volume, 00..7F min...max scale for FM and PSG)
+	#define CFS_VOL_ABS_S3K			0x80	// E4 [Sonic 3K] (absolute Volume, 00..7F min...max scale for FM and PSG)
 	#define CFS_VOL_ABS_HF			0x81	// FF 07 [Hybrid Front] (absolute Volume + global)
 	#define CFS_VOL_ABS_HF2			0x82	// E5 [Hybrid Front] (broken, like FF 07 with first parameter ignored)
 	#define CFS_VOL_ABS_TMP			0x83	// E4 [Tempo 32x]
@@ -157,12 +157,16 @@
 
 // Special Game-Specific Flags
 // ---------------------------
-#define CF_FADE_IN_SONG			0x80	// E4 [Sonic 1] / E2 [S3K]
+#define CF_FADE_IN_SONG			0x80	// E4 [Sonic 1] / E2 [Sonic 3K]
 #define CF_SND_OFF				0x81	// F9 [Sonic 1]
 #define CF_NOTE_STOP_REV		0x83	// FF 06 [Ristar] (Reversed Note Stop)
 	#define CFS_NSREV_CYMN			0x00
 	#define CFS_NSREV_RST			0x01
 #define CF_NOTE_STOP_MODE		0x84	// FC [Sonic 2 Recreation]
+#define CF_SPINDASH_REV			0x85
+	#define CFS_SDREV_INC			0x00	// E9 [Sonic 3K]
+	#define CFS_SDREV_RESET			0x01	// FF 07 [Sonic 3K]
+#define CF_CONT_SFX				0x86	// FC [Sonic 3K]
 
 #define CF_DAC_PS4				0x90
 	#define CFS_PS4_VOLCTRL			0x00

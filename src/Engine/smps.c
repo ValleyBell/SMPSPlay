@@ -310,12 +310,16 @@ void UpdateMusic(void)
 	
 	if (PlayingTimer == -1)
 		PlayingTimer = 0;
-	if (SmpsRAM.LoadSaveRequest)
-		RestoreMusic(&MusicSaveState);
 	
 	DoPause();
 	if (SmpsRAM.PauseMode)
 		return;
+	
+	if (SmpsRAM.LoadSaveRequest)
+	{
+		SmpsRAM.LoadSaveRequest = 0x00;
+		RestoreMusic(&MusicSaveState);
+	}
 	if (SmpsRAM.MusSet == NULL)
 		return;
 	
@@ -2297,7 +2301,24 @@ void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX)
 	UINT8 SpcSFXTrkID;
 	UINT8 MusTrkID;
 	TRK_RAM* SFXTrk;
-	TRK_RAM* MusTrk;
+	
+	if (SmpsFileSet->SeqFlags & SEQFLG_CONT_SFX)
+	{
+		//SFXTrkID = SFX_ID;
+		SFXTrkID = (SmpsFileSet->SeqBase >> 4) & 0xFF;
+		if (SmpsRAM.ContSfxID == SFXTrkID)
+		{
+			SmpsRAM.ContSfxFlag = 0x80;
+			SmpsRAM.ContSfxLoop = SmpsFileSet->Seq.Data[0x03];
+			return;	// don't process the SFX command further
+		}
+		else
+		{
+			SmpsRAM.ContSfxID = SFXTrkID;
+			SmpsRAM.ContSfxFlag = 0x00;
+			SmpsRAM.ContSfxLoop = SmpsFileSet->Seq.Data[0x03];
+		}
+	}
 	
 	SmpsSet = (SMPS_SET*)malloc(sizeof(SMPS_SET));	// create a copy of the struct for the SMPS driver
 	*SmpsSet = *SmpsFileSet;
@@ -2305,6 +2326,9 @@ void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX)
 	
 	Data = SmpsSet->Seq.Data;
 	CurPos = 0x00;
+	
+	//if (! (SmpsSet->SeqFlags & SEQFLG_SPINDASH))
+	//	SmpsRAM.SpinDashRev = 0;
 	
 	//InsLibPtr = ReadPtr(&Data[CurPos + 0x00], SmpsSet);
 	TickMult = Data[CurPos + 0x02];
@@ -2326,12 +2350,12 @@ void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX)
 			if (SFXTrkID == 0xFF)
 				continue;
 			SFXTrk = &SmpsRAM.SFXTrks[SFXTrkID];
+			
+			if (SpcSFXTrkID != 0xFF)
+				SmpsRAM.SpcSFXTrks[SpcSFXTrkID].PlaybkFlags |= PBKFLG_OVERRIDDEN;
 		}
 		if (MusTrkID != 0xFF)
-		{
-			MusTrk = &SmpsRAM.MusicTrks[MusTrkID];
-			MusTrk->PlaybkFlags |= PBKFLG_OVERRIDDEN;
-		}
+			SmpsRAM.MusicTrks[MusTrkID].PlaybkFlags |= PBKFLG_OVERRIDDEN;
 		
 		memset(SFXTrk, 0x00, sizeof(TRK_RAM));
 		if (SpecialSFX)
@@ -2374,7 +2398,6 @@ void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX)
 		DoNoteOff(SFXTrk);
 		DisableSSGEG(SFXTrk);
 	}
-	
 	
 	return;
 }
@@ -2937,8 +2960,6 @@ void RestoreMusic(MUS_STATE* MusState)
 {
 	UINT8 CurTrk;
 	TRK_RAM* TempTrk;
-	
-	SmpsRAM.LoadSaveRequest = 0x00;
 	
 	if (! MusState->InUse)
 		return;
