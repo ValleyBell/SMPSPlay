@@ -270,6 +270,8 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"PAFMS_PAN_L", CFS_PAFMS_PAN_L},
 	{"PAFMS_PAN_R", CFS_PAFMS_PAN_R},
 	
+	{"DET_HOLD", CFS_DET_HOLD},
+	
 	{"VOL_NN_FM", CFS_VOL_NN_FM},
 	{"VOL_NN_PSG", CFS_VOL_NN_PSG},
 	{"VOL_NN_FMP", CFS_VOL_NN_FMP},
@@ -287,6 +289,8 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"VOL_ABS_HF2", CFS_VOL_ABS_HF2},
 	{"VOL_ABS_TMP", CFS_VOL_ABS_TMP},
 	{"VOL_SPC_TMP", CFS_VOL_SPC_TMP},
+	{"VOL_ABS_COI", CFS_VOL_ABS_COI},
+	{"VOL_SET_BASE", CFS_VOL_SET_BASE},
 	{"VOL_ABS_PDRM", CFS_VOL_ABS_PDRM},
 	{"VOL_CHG_PDRM", CFS_VOL_CHG_PDRM},
 	
@@ -335,6 +339,7 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	
 	{"MUSP_Z80", CFS_MUSP_Z80},
 	{"MUSP_68K", CFS_MUSP_68K},
+	{"MUSP_COI", CFS_MUSP_COI},
 	
 	{"FDIN_START", CFS_FDIN_START},
 	{"FDIN_CANCEL", CFS_FDIN_CANCEL},
@@ -346,7 +351,10 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"TMULT_ALL", CFS_TMULT_ALL},
 	
 	{"TIME_SET", CFS_TIME_SET},
+	{"TIME_SET_BE", CFS_TIME_SET_BE},
 	{"TIME_ADD", CFS_TIME_ADD},
+	{"TIME_ADD_BE", CFS_TIME_ADD_BE},
+	{"TIME_ADD_0A", CFS_TIME_ADD_0A},
 	{"TIME_SPC", CFS_TIME_SPC},
 	
 	{"CJMP_NZ", CFS_CJMP_NZ},
@@ -922,10 +930,12 @@ void LoadCommandDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 		{
 			TrimToken(ColumnPtrs[CurCol - 1]);
 		}
-		if (ColumnPtrs[3] == NULL)
+		if (ColumnPtrs[3] == NULL || ColumnPtrs[0][0] == '\0')
 			continue;	// need at least the Len column
 		
-		CF_ID = (UINT8)strtoul(ColumnPtrs[0], NULL, 0x10);
+		CF_ID = (UINT8)strtoul(ColumnPtrs[0], &LToken, 0x10);
+		if (LToken == ColumnPtrs[0])
+			continue;
 		CF_IDList[CF_ID] = CurCF;
 		CFBuffer[CurCF].Type = GetOptionValue(OPT_CFLAGS, ColumnPtrs[1]);
 		CFBuffer[CurCF].SubType = GetOptionValue(OPT_CFLAGS_SUB, ColumnPtrs[2]);

@@ -192,7 +192,22 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		WriteFMMain(Trk, 0xB4, Trk->PanAFMS);
 		break;
 	case CF_DETUNE:		// E1 Detune
-		if (CFlag->Len <= 2)
+		if (CmdLen & 0x80)
+		{
+			CmdLen &= 0x7F;
+			// Castle Of Illusion:
+			//	PSG channel: eat 2 parameters
+			//	FM channel: do as intended
+			if (Trk->ChannelMask & 0x80)
+			{
+				CmdLen ++;
+				break;
+			}
+		}
+		
+		if (CFlag->SubType == CFS_DET_HOLD)
+			Trk->PlaybkFlags |= PBKFLG_HOLD;
+		if (CmdLen <= 2)
 			Trk->Detune = (INT8)Data[0x00];
 		else
 			Trk->Detune = ReadBE16(&Data[0x00]);
@@ -455,6 +470,26 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 					// continue with "Pause Music"
 					TempByt = 0x00;
 				}
+			}
+		}
+		if (CFlag->SubType == CFS_MUSP_COI)
+		{
+			//if (! SmpsRAM.1C13)
+			//	TempByt = 0x00;	// enforce music resume
+			if (TempByt == 0x04)
+				TempByt = 0x01;	// pause music
+			else if (TempByt == 0x05)
+				TempByt = 0x00;	// unpause music
+			else
+			{
+				CMD_FLAGS EndFlag;
+				
+				//SmpsRAM.1C13 = 0x01;
+				EndFlag.Type = CF_TRK_END;
+				EndFlag.SubType = CFS_TEND_STD;
+				EndFlag.Len = 0x00;
+				DoCoordinationFlag(Trk, &EndFlag);
+				break;
 			}
 		}
 		
@@ -827,34 +862,51 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		switch(CFlag->SubType)
 		{
 		case CFS_TIME_SET:
+		case CFS_TIME_SET_BE:
 			if (CmdLen == 0x02)
 			{
 				SmpsRAM.TimerBVal = Data[0x00];
 			}
 			else if (CmdLen == 0x03)
 			{
-				SmpsRAM.TimerAVal = ReadLE16(&Data[0x00]);
+				if (CFlag->SubType == CFS_TIME_SET_BE)
+					SmpsRAM.TimerAVal = ReadBE16(&Data[0x00]);
+				else
+					SmpsRAM.TimerAVal = ReadLE16(&Data[0x00]);
 			}
 			else if (CmdLen == 0x04)
 			{
-				SmpsRAM.TimerAVal = ReadLE16(&Data[0x00]);
+				if (CFlag->SubType == CFS_TIME_SET_BE)
+					SmpsRAM.TimerAVal = ReadBE16(&Data[0x00]);
+				else
+					SmpsRAM.TimerAVal = ReadLE16(&Data[0x00]);
 				SmpsRAM.TimerBVal = Data[0x02];
 			}
 			break;
 		case CFS_TIME_ADD:
+		case CFS_TIME_ADD_BE:
 			if (CmdLen == 0x02)
 			{
 				SmpsRAM.TimerBVal += Data[0x00];
 			}
 			else if (CmdLen == 0x03)
 			{
-				SmpsRAM.TimerAVal += ReadLE16(&Data[0x00]);
+				if (CFlag->SubType == CFS_TIME_SET_BE)
+					SmpsRAM.TimerAVal += ReadBE16(&Data[0x00]);
+				else
+					SmpsRAM.TimerAVal += ReadLE16(&Data[0x00]);
 			}
 			else if (CmdLen == 0x04)
 			{
-				SmpsRAM.TimerAVal += ReadLE16(&Data[0x00]);
+				if (CFlag->SubType == CFS_TIME_SET_BE)
+					SmpsRAM.TimerAVal += ReadBE16(&Data[0x00]);
+				else
+					SmpsRAM.TimerAVal += ReadLE16(&Data[0x00]);
 				SmpsRAM.TimerBVal += Data[0x02];
 			}
+			break;
+		case CFS_TIME_ADD_0A:
+			SmpsRAM.TimerAVal += Data[0x00];
 			break;
 		case CFS_TIME_SPC:
 			if (CmdLen == 0x02)
@@ -948,6 +1000,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		if (CFlag->SubType & CFS_CJMP_RESET)
 			SmpsRAM.CondJmpVal = 0x00;
 		
+		if (DebugMsgs & 0x01)
+			printf("Conditional Jump on Channel %02X at %04X: %s\n", Trk->ChannelMask, Trk->Pos,
+					TempByt ? "taken" : "not taken");
 		if (! TempByt)	// if condition NOT true, continue normally
 			break;
 		// fall through
@@ -1125,6 +1180,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		break;
 	}
 	
+	CmdLen &= 0x7F;	// strip the 0x80 bit off, in case the routine above didn't.
 	Trk->Pos += CmdLen;
 	
 	return;
@@ -1332,6 +1388,21 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 				Trk->Volume += Params[0x00];	// FM channel - change volume
 				RefreshFMVolume(Trk);
 			}
+			break;
+		case CFS_VOL_ABS_COI:
+			if (Trk->ChannelMask & 0x80)
+			{
+				Trk->Volume = Params[0x00];
+			}
+			else
+			{
+				Trk->Volume = Params[0x00] >> 2;
+				Trk->Volume += Trk->CoI_VolBase;
+				RefreshFMVolume(Trk);
+			}
+			break;
+		case CFS_VOL_SET_BASE:
+			Trk->CoI_VolBase = Params[0x00];
 			break;
 		case CFS_VOL_ABS_PDRM:
 			SmpsRAM.NoiseDrmVol = Params[0x00];

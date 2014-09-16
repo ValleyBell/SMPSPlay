@@ -17,6 +17,7 @@
 	#define CFS_PAFMS_PAN_L			0x11	// FF (preSMPS 68k)
 	#define CFS_PAFMS_PAN_R			0x12	// FE (preSMPS 68k)
 #define CF_DETUNE				0x02	// E1
+	#define CFS_DET_HOLD			0x01	// E5 [Castle of Illusion]
 #define CF_SET_COMM				0x03	// E2 (set Communication Byte)
 #define CF_VOLUME				0x04	// E6/EC
 // Note: I probably need:
@@ -43,6 +44,8 @@
 	#define CFS_VOL_ABS_HF2			0x82	// E5 [Hybrid Front] (broken, like FF 07 with first parameter ignored)
 	#define CFS_VOL_ABS_TMP			0x83	// E4 [Tempo 32x]
 	#define CFS_VOL_SPC_TMP			0x84	// E6 [Tempo 32x] (change FM volume, set PSG volume)
+	#define CFS_VOL_ABS_COI			0x85	// F1 [Castle of Illusion]
+	#define CFS_VOL_SET_BASE		0x86	// FF [Castle of Illusion]
 	#define CFS_VOL_ABS_PDRM		0xC0
 	#define CFS_VOL_CHG_PDRM		0xC1	// E4 [Master System SMPS]
 #define CF_HOLD					0x05	// E7 (known as "no attack")
@@ -122,7 +125,10 @@
 #define CF_TIMING				0x42	// EA/EB [SMPS Z80 Type 1, YM2612 Timer]
 	#define CFS_TIME_SET			0x00	// EA (set timing)
 	#define CFS_TIME_ADD			0x01	// EB (add to timing)
+	#define CFS_TIME_SET_BE			0x02	// EA (set timing, Big Endian values) [Castle of Illusion]
+	#define CFS_TIME_ADD_BE			0x03
 	#define CFS_TIME_SPC			0x10	// EB (add or set timing, modify Timing Mode) [some SMPS Z80 Type 1]
+	#define CFS_TIME_ADD_0A			0x11	// F5 (add 8-bit value to Timer A) [Castle of Illusion]
 #define CF_TIMING_MODE			0x43	// FF 00 [SMPS Z80 Type 1, Timing Mode]
 
 // Driver Control Flags
@@ -131,6 +137,7 @@
 #define CF_MUS_PAUSE			0x61	// FF 01 / FF 03
 	#define CFS_MUSP_Z80			0x00	// FF 03 [SMPS Z80]
 	#define CFS_MUSP_68K			0x01	// FF 01 [SMPS 68k]
+	#define CFS_MUSP_COI			0x80	// FC [Castle of Illusion]
 #define CF_COPY_MEM				0x62	// FF 04 [SMPS Z80]
 #define CF_FADE_IN				0x63	// FF 03/04 [SMPS 68k]
 	#define CFS_FDIN_START			0x00	// FF 03

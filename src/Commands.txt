@@ -23,6 +23,9 @@ PANAFMS - set Pan, AMS or FMS bits (YM2612 register B4)
 
 DETUNE - set Finetuning value (value added to raw frequency)
 	command E1, size 02
+    Note: A blank sub-type is the default behaviour.
+  DET_HOLD - like DETUNE and HOLD combined
+	command E5, size 82, Castle of Illusion
 
 SET_COMM - set Communication Byte (read by the game to synchronize it with music)
 	command E2, size 02
@@ -72,6 +75,10 @@ VOLUME - change or set channel volume
 	command E4, size 02, Tempo 32x
   VOL_SPC_TMP - change FM volume/set PSG volume
 	command E6, size 02, Tempo 32x
+  VOL_ABS_COI - set volume
+	command F1, size 02, Castle of Illusion
+  VOL_SET_BASE - set volume base value (this value is added to the volume set by VOL_ABS_COI)
+	command FF, size 02, Castle of Illusion
   VOL_ABS_PDRM - set volume of PSG Noise drums
 	size 02
   VOL_CHG_PDRM - change volume of PSG Noise drums
@@ -235,9 +242,15 @@ TIMING - set YM2612 Timers
 	command EA, size 02/03/04
   TIME_ADD - change to Timer value by adding the parameter values to it
 	command EB, size 02/03/04
+  TIME_SET_BE - same as TIME_SET, but the values are Big Endian
+	command EA, size 02/03/04, Castle of Illusion
+  TIME_ADD_BE - same as TIME_ADD, but the values are Big Endian
+	command EB, size 02/03/04
   TIME_SPC - set/change Timers depending on the 4 high bits [TODO: explain]
 	command EB, size 03/04, Magical Hat no Buttobi Turbo! Daibouken, Timer A and/or B only
 	command FF 08, size 02, Magical Hat no Buttobi Turbo! Daibouken, Timer B only
+  TIME_ADD_0A - add unsigned 8-bit value to 16-bit Timer A value
+	command F5, size 02, Castle of Illusion
 
 TIMING_MODE - set update timing mode (use VInt or use YM2612 timers)
 	command FF 00, size 02, SMPS Z80 Type 1
@@ -250,11 +263,13 @@ SND_CMD - play Sound ID (or put it into the sound queue)
 
 MUS_PAUSE - Pause/Resume Music
   MUSP_Z80 - Z80 version, always resumes all channels
-	FF 02/03 (SMPS Z80), size 02
+	command FF 02/03 (SMPS Z80), size 02
   MUSP_68K - 68k version, uses a separate bit to indicate paused channels (more safe) and sets the Pan bits to 0 when pausing
 	command FF 01 (SMPS 68k), size 02/82
 	Note: If size is 82 and the first parameter (Pause Mode) is negative, then the music will resume with a fade in.
 	      In that case there's an additional parameter following, describing the fade speed. (special Golden Axe III command)
+  MUSP_COI - Castle of Illusion version, uses a separate bit for paused channels, similar to MUSP_68K
+	command FC, size 02
 	
 	In SMPSPlay, the Z80 version will use an additional bit for the Pause state, too, to prevent crashing.
 

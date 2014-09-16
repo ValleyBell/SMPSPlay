@@ -119,6 +119,7 @@ typedef struct _track_ram
 	INT8 PS4_DacMode;	// DAC On/Off, Volume Control On/Off
 	UINT8 PS4_AltTrkMode;
 	UINT8 GA3_DacMode;	// 2-note DAC mode on/off
+	UINT8 CoI_VolBase;	// Volume Base value (added to all volume changes)
 	
 	UINT8 LoopStack[TRK_STACK_SIZE];	// 28-2F - Loop Data and GoSub Stack
 	UINT16 LoopOfs;		// [not in driver] Loop Offset (for loop detection)
