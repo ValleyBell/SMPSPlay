@@ -174,6 +174,11 @@
 	#define CFS_SDREV_INC			0x00	// E9 [Sonic 3K]
 	#define CFS_SDREV_RESET			0x01	// FF 07 [Sonic 3K]
 #define CF_CONT_SFX				0x86	// FC [Sonic 3K]
+#define CF_VOL_QUICK			0x87
+	#define CFS_VQ_SET_3B			0x03	// D8..DF [late Master System SMPS]
+	#define CFS_VQ_SET_4B			0x04
+	#define CFS_VQ_SET_4B_WOI		0x10	// D0..DF [World Of Illusion Beta]
+	#define CFS_VQ_SET_4B_WOI2		0x11	// D0..DF [World Of Illusion Final]
 
 #define CF_DAC_PS4				0x90
 	#define CFS_PS4_VOLCTRL			0x00
@@ -195,10 +200,6 @@
 
 
 //#define CF_			0x00
-#define CFSMS_VOL_FX			0xC0
-#define CFSMS_FREQ_ENV			0xC1
-#define CFSMS_VOL_ENV			0xC2
-#define CFSMS_VOL_QUICK			0xC3
 #define CFSCD_PAN				0xD0
 //#define CFSCD_				0xD1
 

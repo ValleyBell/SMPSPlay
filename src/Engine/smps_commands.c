@@ -51,6 +51,8 @@ INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET
 static void cfMetaHandler(TRK_RAM* Trk, UINT8 Command);
 static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag);
 static UINT8 GetInsRegPtrs(TRK_RAM* Trk, const UINT8** RetRegPtr, const UINT8** RetInsPtr, UINT8 Register);
+static void cfSetIns_PSG(TRK_RAM* Trk, UINT8 InsID);
+static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params);
 static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params);
 static UINT8 cfSpecialDAC(TRK_RAM* Trk, const CMD_FLAGS* CFlag);
 INLINE UINT16* GetFM3FreqPtr(void);
@@ -215,9 +217,42 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	case CF_SET_COMM:	// E2 Set Communication Byte
 		SmpsRAM.CommData = Data[0x00];
 		break;
-	case CFSMS_VOL_QUICK:
+	case CF_VOL_QUICK:
 		Data --;
-		Trk->Volume = *Data & 0x07;
+		switch(CFlag->SubType)
+		{
+		case CFS_VQ_SET_3B:
+			Trk->Volume = *Data & 0x07;
+			if (! (Trk->ChannelMask & 0xF8))
+				RefreshFMVolume(Trk);
+			break;
+		case CFS_VQ_SET_4B:
+			Trk->Volume = *Data & 0x0F;
+			if (! (Trk->ChannelMask & 0xF8))
+				RefreshFMVolume(Trk);
+			break;
+		case CFS_VQ_SET_4B_WOI:
+			Trk->Volume = *Data & 0x0F;
+			if (! (Trk->ChannelMask & 0xF8))
+			{
+				Trk->Volume = 0x10 + (Trk->Volume * 0x04);
+				RefreshFMVolume(Trk);
+			}
+			break;
+		case CFS_VQ_SET_4B_WOI2:
+			TempByt = *Data & 0x0F;
+			Trk->Volume = Trk->CoI_VolBase + TempByt;
+			if (! (Trk->ChannelMask & 0xF8))
+			{
+				TempByt *= 0x04;
+				if (! SmpsRAM.TrkMode)
+					Trk->Volume = 0x10 + Trk->CoI_VolBase + TempByt;	// Music Mode
+				else
+					Trk->Volume = TempByt;	// SFX/Special SFX Mode
+				RefreshFMVolume(Trk);
+			}
+			break;
+		}
 		break;
 	case CF_VOLUME:		// E5/E6/EC Change Volume
 		CmdLen = cfVolume(Trk, CFlag, &Data[0x00]);
@@ -274,92 +309,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		}
 		break;
 	case CF_INSTRUMENT:	// EF/F5 Set Instrument
-		if ((CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FM ||	// EF Set FM Instrument
-			(CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FMP)
-		{
-			const INS_LIB* InsLib = &Trk->SmpsSet->InsLib;
-			const UINT8* InsPtr;
-			
-			if ((CFlag->SubType & CFS_INS_IMASK) == CFS_INS_FMP && (Trk->ChannelMask & 0x80))
-			{
-				// [Sonic 3K] The PSG instrument is set for the EF flag, too.
-				Trk->Instrument = Data[0x00];
-				if (Trk->Instrument > SmpsCfg->VolEnvs.EnvCount)
-				{
-					if (DebugMsgs & 0x01)
-						printf("Error: Invalid PSG instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
-					Trk->Instrument = 0x00;
-				}
-				// Then continue handling variable command length
-			}
-			
-			Trk->FMInsSong = 0x00;	// [not in the driver] reset Instrument Song ID (checked when restoring BGM track)
-			if (CmdLen & 0x80)
-			{
-				// EF ii [ss] - Set FM Instrument ii (can use instrument library of song ss)
-				UINT8 CurOp;
-				
-				CmdLen &= 0x7F;
-				TempByt = Data[0x00];
-				if (TempByt & 0x80)
-					CmdLen ++;
-				if ((CFlag->SubType & CFS_INS_CMASK) == CFS_INS_C)
-				{
-					if (Trk->ChannelMask & 0x80)
-						break;	// PSG channel - return
-				}
-				
-				//SetMaxRelRate:
-				for (CurOp = 0x00; CurOp < 0x10; CurOp += 0x04)
-					WriteFMMain(Trk, 0x80 | CurOp, 0xFF);
-				
-				Trk->Instrument = TempByt;
-				if (TempByt & 0x80)
-				{
-					Trk->FMInsSong = Data[0x01];
-					TempByt &= 0x7F;
-					InsLib = GetSongInsLib(Trk, Trk->FMInsSong);
-				}
-			}
-			else
-			{
-				// EF ii - Set FM Instrument
-				if ((CFlag->SubType & CFS_INS_CMASK) == CFS_INS_C)
-				{
-					if (Trk->ChannelMask & 0x80)
-						break;	// PSG channel - return [SMPS Z80]
-				}
-				
-				Trk->Instrument = Data[0x00];
-				TempByt = Trk->Instrument;
-			}
-			if (InsLib == NULL)
-				break;
-			if (TempByt >= InsLib->InsCount)
-			{
-				if (DebugMsgs & 0x01)
-					printf("Error: Invalid FM instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
-				break;
-			}
-			InsPtr = InsLib->InsPtrs[TempByt];
-			SendFMIns(Trk, InsPtr);
-		}
-		else if ((CFlag->SubType & CFS_INS_IMASK) == CFS_INS_PSG)	// F5 Set PSG Instrument (Volume Envelope)
-		{
-			if ((CFlag->SubType & CFS_INS_CMASK) == CFS_INS_C)
-			{
-				if (! (Trk->ChannelMask & 0x80))
-					break;	// FM channel - return [SMPS Z80]
-			}
-			
-			Trk->Instrument = Data[0x00];
-			if (Trk->Instrument > SmpsCfg->VolEnvs.EnvCount)	// 1-based, so not >=
-			{
-				if (DebugMsgs & 0x01)
-					printf("Error: Invalid PSG instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
-				Trk->Instrument = 0x00;
-			}
-		}
+		cfSetInstrument(Trk, CFlag, &Data[0x00]);
 		break;
 	case CF_PSG_NOISE:
 		if (CFlag->SubType == CFS_PNOIS_SRES)
@@ -651,7 +601,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			Trk->ModEnv |= 0x80;
 			break;
 		case CFS_MODS_OFF:	// F4/FD Modulation Off
-			Trk->ModEnv &= 0x7F;
+			Trk->ModEnv &= ~0x80;
 			break;
 		}
 		break;
@@ -1213,6 +1163,103 @@ static UINT8 GetInsRegPtrs(TRK_RAM* Trk, const UINT8** RetRegPtr, const UINT8** 
 	}
 	
 	return 0xFF;
+}
+
+static void cfSetIns_PSG(TRK_RAM* Trk, UINT8 InsID)
+{
+	const ENV_LIB* VolEnvLib = &Trk->SmpsSet->Cfg->VolEnvs;
+	
+	Trk->Instrument = InsID;
+	if (Trk->Instrument > VolEnvLib->EnvCount)	// 1-based, so not >=
+	{
+		if (DebugMsgs & 0x01)
+			printf("Error: Invalid PSG instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
+		Trk->Instrument = 0x00;
+	}
+	
+	return;
+}
+
+static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
+{
+	const ENV_LIB* VolEnvLib = &Trk->SmpsSet->Cfg->VolEnvs;
+	const INS_LIB* InsLib = &Trk->SmpsSet->InsLib;
+	UINT8 CmdLen;
+	UINT8 InsID;
+	
+	CmdLen = CFlag->Len;
+	if (CmdLen & 0x80)
+	{
+		CmdLen &= 0x7F;	// SMPS Z80: if the Instrument ID is negative, it takes an additional Song ID parameter byte
+		if (Params[0x00] & 0x80)
+			CmdLen ++;
+	}
+	
+	switch(CFlag->SubType & CFS_INS_IMASK)
+	{
+	case CFS_INS_FMP:
+		if (Trk->ChannelMask & 0x80)
+		{
+			// [Sonic 3K] The PSG instrument is set for the EF flag, too.
+			cfSetIns_PSG(Trk, Params[0x00]);
+			break;
+		}
+		// fall through for FM instruments
+	case CFS_INS_FM:	// EF Set FM Instrument
+		if ((CFlag->SubType & CFS_INS_CMASK) == CFS_INS_C)
+		{
+			if (Trk->ChannelMask & 0x80)
+				break;	// PSG channel - return [SMPS Z80]
+		}
+		
+		Trk->FMInsSong = 0x00;	// [not in the driver] reset Instrument Song ID (checked when restoring BGM track)
+		if (CFlag->Len & 0x80)
+		{
+			// EF ii [ss] - Set FM Instrument ii (can use instrument library of song ss)
+			UINT8 CurOp;
+			
+			//SetMaxRelRate:
+			for (CurOp = 0x00; CurOp < 0x10; CurOp += 0x04)
+				WriteFMMain(Trk, 0x80 | CurOp, 0xFF);
+			
+			InsID = Params[0x00];
+			Trk->Instrument = InsID;
+			if (InsID & 0x80)
+			{
+				Trk->FMInsSong = Params[0x01];
+				InsID &= 0x7F;
+				InsLib = GetSongInsLib(Trk, Trk->FMInsSong);	// get new Instrument Library
+			}
+		}
+		else
+		{
+			// EF ii - Set FM Instrument
+			InsID = Params[0x00];
+			Trk->Instrument = InsID;
+		}
+		
+		if (InsLib == NULL)
+			break;
+		if (InsID >= InsLib->InsCount)
+		{
+			if (DebugMsgs & 0x01)
+				printf("Error: Invalid FM instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
+			break;
+		}
+		SendFMIns(Trk, InsLib->InsPtrs[InsID]);
+		break;
+	case CFS_INS_PSG:	// F5 Set PSG Instrument (Volume Envelope)
+		if ((CFlag->SubType & CFS_INS_CMASK) == CFS_INS_C)
+		{
+			if (! (Trk->ChannelMask & 0x80))
+				break;	// FM channel - return [SMPS Z80]
+		}
+		
+		cfSetIns_PSG(Trk, Params[0x00]);
+		break;
+	}
+	
+	return CmdLen;
 }
 
 static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)

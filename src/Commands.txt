@@ -78,7 +78,7 @@ VOLUME - change or set channel volume
   VOL_ABS_COI - set volume
 	command F1, size 02, Castle of Illusion
   VOL_SET_BASE - set volume base value (this value is added to the volume set by VOL_ABS_COI)
-	command FF, size 02, Castle of Illusion
+	command FF, size 02, Castle of Illusion, World of Illusion
   VOL_ABS_PDRM - set volume of PSG Noise drums
 	size 02
   VOL_CHG_PDRM - change volume of PSG Noise drums
@@ -243,9 +243,9 @@ TIMING - set YM2612 Timers
   TIME_ADD - change to Timer value by adding the parameter values to it
 	command EB, size 02/03/04
   TIME_SET_BE - same as TIME_SET, but the values are Big Endian
-	command EA, size 02/03/04, Castle of Illusion
+	command EA, size 03/04, Castle of Illusion
   TIME_ADD_BE - same as TIME_ADD, but the values are Big Endian
-	command EB, size 02/03/04
+	command EB, size 03/04
   TIME_SPC - set/change Timers depending on the 4 high bits [TODO: explain]
 	command EB, size 03/04, Magical Hat no Buttobi Turbo! Daibouken, Timer A and/or B only
 	command FF 08, size 02, Magical Hat no Buttobi Turbo! Daibouken, Timer B only
@@ -337,6 +337,28 @@ NOTE_STOP_REV - Reversed Note Stop, stops the note after (Note Length - x) frame
   NSREV_CYMN - stop after (Note Length - x) frames (0 stops after 256 frames)
 	command FF 07, size 02, Chou Yakyuu Miracle Nine
 
+NOTE_STOP_MODE - set Note Stop Mode
+	command FC, size 02, Sonic 2 Recreation
+
+SPINDASH_REV - Spindash Rev Counter
+  SDREV_INC - increment counter
+	command E9, size 01, Sonic 3K
+  SDREV_RESET - reset counter
+	command FF 07, size 01, Sonic 3K
+
+CONT_SFX - Continuous SFX Loop
+	command FC, size 03, Sonic 3K - jumps to the offset parameter, if the Cont. SFX counter is still > 0
+
+VOL_QUICK - use bits of the command ID to set the channel volume
+  VQ_SET_3B - 3-bit volume: (Command ID & 07)
+	commands D8..DF, size 01, Master System SMPS
+  VQ_SET_4B - 4-bit volume: (Command ID & 0F)
+	size 01
+  VQ_SET_4B_WOI - 4-bit volume: PSG: set to (Command ID & 0F), FM: set to 10 + (Command ID & 0F)
+	commands D0..DF, size 01, World of Illusion (Beta)
+  VQ_SET_4B_WOI2 - 4-bit volume: like VQ_SET_4B_WOI, but also adds the Volume Base value.
+	commands D0..DF, size 01, World of Illusion (Final)
+
 DAC_PS4 - special DAC flags for Phantasy Star IV
 	Note: DAC_VOLCTRL is present in every song and is used to trigger PS4's special mode for the DAC channel.
   DAC_VOLCTRL - set Volume Control mode
@@ -372,6 +394,3 @@ DAC_GAXE3 - special DAC flags for Golden Axe III
 
 DAC_PLAY_MODE - set DAC Play Mode
 	command FA, size 02, Sonic 2 Recreation - sets various DAC flags like reversed play, looping or flip-flop
-
-VOL_QUICK - set Volume to (Command ID & 07)
-	commands D8..DF, size 01, Master System SMPS
