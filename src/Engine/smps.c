@@ -953,7 +953,7 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 	}
 	
 	Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
-	if (Trk->PlaybkFlags & PBKFLG_HOLD_ALL)
+	if (Trk->PlaybkFlags & PBKFLG_HOLD_LOCK)
 		Trk->PlaybkFlags |= PBKFLG_HOLD;
 	
 	while(Data[Trk->Pos] >= /*0xE0*/SmpsCfg->CmdList.FlagBase)

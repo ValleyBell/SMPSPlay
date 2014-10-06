@@ -33,6 +33,28 @@ static const UINT8 ChouYMN_Vols[0x10] =
 
 static const UINT16 S2R_Vols[0x04] = {0x100, 0xD7, 0xB5, 0x98};	// 0 db, -1.5 db, -3.0 db, -4.5 db
 
+static const UINT8 CoI_PSG_AtkRates[0x20] = {
+	0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+	0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
+	0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18,
+	0x19, 0x1C, 0x1F, 0x2F, 0x3F, 0x5F, 0x7F, 0xFF};
+static const UINT8 CoI_PSG_DecRates[0x20] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05,
+	0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+	0x18, 0x1C, 0x1F, 0x2F, 0x3F, 0x5F, 0x7F, 0xFF};
+static const UINT8 CoI_PSG_SusLevels[0x10] = {
+	0x00, 0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70,
+	0x80, 0x90, 0xA0, 0xB0, 0xC0, 0xD0, 0xE0, 0xFF};
+static const UINT8 CoI_PSG_SusRates[0x20] = {
+	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+	0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F,
+	0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+	0x18, 0x1C, 0x1F, 0x2F, 0x3F, 0x5F, 0x7F, 0xFF};
+static const UINT8 CoI_PSG_RelRates[0x10] = {
+	0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+	0x09, 0x0B, 0x0D, 0x10, 0x1F, 0x3F, 0x7F, 0xFF};
+
 
 
 // from smps_extra.c
@@ -258,16 +280,26 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		CmdLen = cfVolume(Trk, CFlag, &Data[0x00]);
 		break;
 	case CF_HOLD:		// E7 Hold Note
-		if (CmdLen < 0x02)
+		switch(CFlag->SubType)
 		{
+		case CFS_HOLD_ON:
 			Trk->PlaybkFlags |= PBKFLG_HOLD;
-		}
-		else
-		{
+			break;
+		case CFS_HOLD_OFF:
+			Trk->PlaybkFlags &= ~PBKFLG_HOLD;
+			break;
+		case CFS_HOLD_LOCK:
 			if (Data[0x00] == 0x01)
-				Trk->PlaybkFlags |= PBKFLG_HOLD_ALL;
+				Trk->PlaybkFlags |= (PBKFLG_HOLD_LOCK | PBKFLG_HOLD);
 			else
-				Trk->PlaybkFlags &= ~(PBKFLG_HOLD_ALL | PBKFLG_HOLD);	// DoNoteOff() is done when processing the next note
+				Trk->PlaybkFlags &= ~(PBKFLG_HOLD_LOCK | PBKFLG_HOLD);
+			break;
+		case CFS_HOLD_LOCK_NEXT:
+			if (Data[0x00] == 0x01)
+				Trk->PlaybkFlags |= PBKFLG_HOLD_LOCK;	// This doesn't affect the next note.
+			else
+				Trk->PlaybkFlags &= ~(PBKFLG_HOLD_LOCK | PBKFLG_HOLD);	// DoNoteOff() is done when processing the next note
+			break;
 		}
 		break;
 	case CF_NOTE_STOP:	// E8 Note Stop
@@ -1184,8 +1216,10 @@ static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* 
 {
 	const ENV_LIB* VolEnvLib = &Trk->SmpsSet->Cfg->VolEnvs;
 	const INS_LIB* InsLib = &Trk->SmpsSet->InsLib;
+	UINT8 CFInsType;
 	UINT8 CmdLen;
 	UINT8 InsID;
+	const UINT8* InsData;
 	
 	CmdLen = CFlag->Len;
 	if (CmdLen & 0x80)
@@ -1195,7 +1229,40 @@ static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* 
 			CmdLen ++;
 	}
 	
-	switch(CFlag->SubType & CFS_INS_IMASK)
+	CFInsType = CFlag->SubType & CFS_INS_IMASK;
+	// At first, catch all special cases.
+	switch(CFInsType)
+	{
+	case CFS_INS_COI:
+		if (! (Trk->ChannelMask & 0x80))
+		{
+			CFInsType = CFS_INS_FM;
+			break;
+		}
+		CFInsType = 0xFF;	// prevent it from doing anything else
+		
+		// [Castle of Illusion] set ADSR values based on FM instrument data
+		Trk->Instrument = 0x80;	// set to Volume Envelope: ADSR
+		InsID = Params[0x00];
+		if (InsLib == NULL)
+			break;
+		if (InsID >= InsLib->InsCount)
+		{
+			if (DebugMsgs & 0x01)
+				printf("Error: Invalid PSG instrument %02X at %04X!\n", InsID, Trk->Pos);
+			break;
+		}
+		InsData = InsLib->InsPtrs[InsID];
+		Trk->ADSR.AtkRate = CoI_PSG_AtkRates[InsData[0x05] & 0x1F];
+		Trk->ADSR.DecRate = CoI_PSG_DecRates[InsData[0x09] & 0x1F];
+		Trk->ADSR.SusRate = CoI_PSG_SusRates[InsData[0x0D] & 0x1F];
+		Trk->ADSR.DecLvl = CoI_PSG_SusLevels[(InsData[0x11] & 0xF0) >> 4];
+		Trk->ADSR.RelRate = CoI_PSG_RelRates[(InsData[0x15] & 0x0F) >> 0];
+		Trk->ADSR.Level = 0xFF;
+		break;
+	}
+	
+	switch(CFInsType)
 	{
 	case CFS_INS_FMP:
 		if (Trk->ChannelMask & 0x80)

@@ -86,6 +86,16 @@ VOLUME - change or set channel volume
 
 HOLD - prevent next note from being retriggered, effectively holding it
 	command E7, size 01
+    Note: A blank sub-type equals the default behaviour: HOLD_ON.
+  HOLD_ON - set "hold" bit (default behaviour)
+	command E7, size 01
+  HOLD_OFF - clear "hold" bit
+	size 01
+  HOLD_LOCK - set (parameter == 1) or clear (else) "hold" and "hold lock" bits
+	The "hold lock" bit caused the "hold" bit to be set for all future notes.
+	command ED, size 02, Castle of Illusion
+  HOLD_LOCK_NEXT - like HOLD_LOCK, but (parameter == 1) takes affect after the next note
+	command EE, size 02, preSMPS
 
 NOTE_STOP - stop notes after x frames (disabled if x == 0)
 	command E8, size 02
@@ -117,7 +127,9 @@ INSTRUMENT - sets the channel instrument
   INS_a_PSG - set PSG instrument (PSG volume envelope)
 	command F5, size 02
   INS_C_FMP - set FM/PSG instrument, behaves like INS_C_FM, but works on FM and PSG channels
-	command EF, size 82 (Sonic 3K)
+	command EF, size 82, Sonic 3K
+  INS_C_COI - set FM instrument or PSG ADSR envelope (based on FM instrument data)
+	command EF, size 02, Castle of Illusion
 	
 	a can be N or C. (see notes for VOLUME)
 	If set to N, the channel mode check is disabled. (INS_N_FM on PSG channel can cause bugs and vice versa)

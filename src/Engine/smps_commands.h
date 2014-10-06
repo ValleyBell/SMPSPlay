@@ -49,6 +49,10 @@
 	#define CFS_VOL_ABS_PDRM		0xC0
 	#define CFS_VOL_CHG_PDRM		0xC1	// E4 [Master System SMPS]
 #define CF_HOLD					0x05	// E7 (known as "no attack")
+	#define CFS_HOLD_ON				0x00	// E7
+	#define CFS_HOLD_OFF			0x01
+	#define CFS_HOLD_LOCK			0x10	// ED [Castle of Illusion]
+	#define CFS_HOLD_LOCK_NEXT		0x11	// EE [preSMPS Z80]
 #define CF_NOTE_STOP			0x06	// E8
 	#define CFS_NSTOP_NORMAL		0x00	// SMPS 68k
 	#define CFS_NSTOP_MULT			0x01	// SMPS Z80 (value gets multiplied with the track's Tick Multiplier)
@@ -64,6 +68,7 @@
 	#define CFS_INS_FM				0x00	// EF
 	#define CFS_INS_PSG				0x01	// F5
 	#define CFS_INS_FMP				0x02	// EF [Sonic 3K]
+	#define CFS_INS_COI				0x03	// EF [Castle of Illusion]
 	#define CFS_INS_IMASK			0x0F
 	#define CFS_INS_N				0x00	// no channel check
 	#define CFS_INS_C				0x10	// with channel check
@@ -73,6 +78,7 @@
 	#define CFS_INS_C_FM			(CFS_INS_C | CFS_INS_FM)
 	#define CFS_INS_C_PSG			(CFS_INS_C | CFS_INS_PSG)
 	#define CFS_INS_C_FMP			(CFS_INS_C | CFS_INS_FMP)
+	#define CFS_INS_C_COI			(CFS_INS_C | CFS_INS_COI)
 #define CF_PSG_NOISE			0x09	// F3 (set PSG Noise)
 	#define CFS_PNOIS_SET			0x00	// F3 [SMPS 68k]
 	#define CFS_PNOIS_SET2			0x01	// F3 [early SMPS Z80]

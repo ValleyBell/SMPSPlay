@@ -58,7 +58,7 @@ typedef struct _adsr_volume_data
 #define PBKFLG_LOCKFREQ		0x40	// Bit 6 - lock frequency [Z80 only]
 #define PBKFLG_ACTIVE		0x80	// Bit 7 - track is active
 #define PBKFLG_PAUSED		0x100	// Bit 8 - track was paused via coordination flags [68k only]
-#define PBKFLG_HOLD_ALL		0x200	// Bit 9 - hold all coming notes [preSMPS Z80 only]
+#define PBKFLG_HOLD_LOCK	0x200	// Bit 9 - hold all coming notes [preSMPS Z80 only]
 typedef struct _track_ram
 {
 	SMPS_SET* SmpsSet;
