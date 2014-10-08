@@ -325,6 +325,8 @@ void UpdateMusic(void)
 	
 	SmpsRAM.MusMultUpdate = 1;
 	DoTempo();
+	if (! SmpsRAM.MusMultUpdate)
+		return;
 	DoFadeOut();
 	
 	SmpsRAM.TrkMode = TRKMODE_MUSIC;
@@ -345,6 +347,18 @@ void UpdateMusic(void)
 void UpdateSFX(void)
 {
 	UINT8 CurTrk;
+	
+	if (SmpsRAM.MusSet != NULL && SmpsRAM.MusSet->Cfg->TempoMode == TEMPO_TOUT_REV)
+	{
+		TRK_RAM* TempTrk;
+		
+		for (CurTrk = TRACK_MUS_PSG1; CurTrk < TRACK_MUS_PSG_END; CurTrk ++)
+		{
+			TempTrk = &SmpsRAM.MusicTrks[CurTrk];
+			if (TempTrk->PlaybkFlags & PBKFLG_ACTIVE)
+				UpdatePSGVolume(TempTrk, 0x00);
+		}
+	}
 	
 	SmpsRAM.TrkMode = TRKMODE_SFX;
 	for (CurTrk = 0; CurTrk < SFX_TRKCNT; CurTrk ++)
@@ -508,7 +522,7 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 		
 		if (DoNoteStop(Trk))
 		{
-			DoPSGNoteOff(Trk);
+			DoPSGNoteOff(Trk, 0x01);	// Master System SMPS
 			return;
 		}
 		Freq = DoPitchSlide(Trk);
@@ -851,7 +865,7 @@ static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 		// not in the driver, but why not?
 		if (DoNoteStop(Trk))
 		{
-			DoPSGNoteOff(Trk);
+			DoPSGNoteOff(Trk, 0x01);
 			return;
 		}
 		Freq = DoPitchSlide(Trk);
@@ -981,7 +995,7 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			Trk->Pos ++;
 			if (Note == 0x80)
 			{
-				DoPSGNoteOff(Trk);
+				DoPSGNoteOff(Trk, 0x00);
 				if (SmpsCfg->DelayFreq == DLYFREQ_RESET)
 					Trk->Frequency = (Trk->ChannelMask & 0x80) ? 0xFFFF : 0x0000;
 			}
@@ -1715,13 +1729,19 @@ void DoNoteOff(TRK_RAM* Trk)
 	return;
 }
 
-static void DoPSGNoteOff(TRK_RAM* Trk)
+static void DoPSGNoteOff(TRK_RAM* Trk, UINT8 OffByTimeout)
 {
+	UINT8 EnforceOff;
+	
 	// also known as SetRest
 	if (Trk->PlaybkFlags & PBKFLG_HOLD)
 		return;
 	
-	if (Trk->Instrument & 0x80)
+	if (Trk->SmpsSet->Cfg->TempoMode == TEMPO_TOUT_REV)	// Castle Of Illusion
+		EnforceOff = OffByTimeout;
+	else	// Master System SMPS
+		EnforceOff = 0x00;
+	if ((Trk->Instrument & 0x80) && ! EnforceOff)
 	{
 		Trk->ADSR.State &= 0x0F;
 		Trk->ADSR.State |= 0x80;	// set Release Phase
@@ -2255,6 +2275,9 @@ void PlayMusic(SMPS_SET* SmpsFileSet)
 			if (SmpsRAM.TempoInit & 0x80)
 				SmpsRAM.MusMultUpdate --;	// The first tick won't overflow and add 1 to the counter.
 			break;
+		case TEMPO_TOUT_REV:
+			SmpsRAM.TempoCntr = 1;
+			break;
 		}
 	}
 	CurPos += 0x06;
@@ -2561,6 +2584,16 @@ static void DoTempo(void)
 				SmpsRAM.MusMultUpdate ++;	// make all tracks updated twice
 			return;
 		}
+	case TEMPO_TOUT_REV:
+		if (! SmpsRAM.TempoInit)
+			return;	// Tempo 00 - never delayed
+		
+		SmpsRAM.TempoCntr --;
+		if (! SmpsRAM.TempoCntr)
+			SmpsRAM.TempoCntr = SmpsRAM.TempoInit;	// reset counter + update once
+		else
+			SmpsRAM.MusMultUpdate --;	// prevent update
+		return;	// don't use the "inject delay" routine for this tempo
 	}
 	
 	// Delay all tracks by 1 frame.

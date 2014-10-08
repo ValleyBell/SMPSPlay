@@ -59,7 +59,7 @@ static UINT8 DoADSR(TRK_RAM* Trk);
 
 void DoNoteOn(TRK_RAM* Trk);
 void DoNoteOff(TRK_RAM* Trk);
-static void DoPSGNoteOff(TRK_RAM* Trk);
+static void DoPSGNoteOff(TRK_RAM* Trk, UINT8 OffByTimeout);
 void Do2OpNote(void);
 static UINT16 DoPitchSlide(TRK_RAM* Trk);
 const INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID);

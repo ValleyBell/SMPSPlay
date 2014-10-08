@@ -32,6 +32,7 @@ typedef struct _file_data
 #define TEMPO_OVERFLOW2	0x02	// Sonic 2/OutRunners
 #define TEMPO_TOUT_OFLW	0x03	// Golden Axe III
 #define TEMPO_OFLW_MULT	0x04	// Shadow Squadron 32x
+#define TEMPO_TOUT_REV	0x05	// Castle of Illusion
 
 #define T1TICK_NOTEMPO	0x00	// DoTempo before PlayMusic (not executed during first tick after PlayMusic) (most SMPS 68k/Z80)
 #define T1TICK_DOTEMPO	0x01	// PlayMusic before DoTempo
