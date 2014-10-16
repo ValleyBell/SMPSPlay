@@ -4,7 +4,6 @@
 // Thanks to nextvolume for NetBSD support
 
 #include <stdio.h>
-#include <malloc.h>
 
 #ifdef WIN32
 #include <windows.h>

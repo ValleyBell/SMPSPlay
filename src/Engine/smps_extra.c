@@ -5,6 +5,7 @@
 //
 // Note: Loop detection is still far from perfect and still fails quite often.
 
+#define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
 #include <stddef.h>	// for NULL
 #include <malloc.h>
 #include <memory.h>

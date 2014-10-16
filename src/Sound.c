@@ -1,3 +1,7 @@
+#define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
+#include <memory.h>
+#include <malloc.h>
+
 #include "chips/mamedef.h"
 #include "Sound.h"
 #include "Stream.h"

@@ -163,6 +163,7 @@
 	#define CFS_CJMP_RESET			0x80
 	#define CFS_CJMP_NZ_RESET		(CFS_CJMP_RESET | CFS_CJMP_NZ)
 	#define CFS_CJMP_Z_RESET		(CFS_CJMP_RESET | CFS_CJMP_Z)
+	#define CFS_CJMP_RESET_VAR		0xFF
 #define CF_META_CF				0x7E	// FF
 #define CF_TRK_END				0x7F	// F2/E3
 	#define CFS_TEND_STD			0x00	// F2

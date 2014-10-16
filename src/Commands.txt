@@ -317,6 +317,8 @@ COND_JUMP - Conditional Jump
   CJMP_NZ_RESET - jump when global value is != 0 and reset it to 0
   CJMP_Z_RESET - jump when global value is == 0 and reset it to 0
 	command E3, size 03, Tempo 32x
+  CJMP_RESET_VAR - reset Conditional Jump value only (don't jump)
+	command E9, size 01, Fatal Labyrinth
 
 GOSUB - subroutine jump: save the current offset to the stack and jump
 	command F8, size 03

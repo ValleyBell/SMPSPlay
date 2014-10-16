@@ -1,8 +1,10 @@
 // Shared Routines for INI Loader
 // ------------------------------
 // Written by Valley Bell, 2014
+#define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
 #include <stdio.h>
 #include <stdlib.h>	// for strtoul()
+#include <malloc.h>
 #include <string.h>
 #include <ctype.h>	// for isspace()
 #include "stdtype.h"

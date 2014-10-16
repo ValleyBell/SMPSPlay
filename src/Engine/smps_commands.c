@@ -966,6 +966,12 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	// Jump and Control Flags
 	// ----------------------
 	case CF_COND_JUMP:		// FF 07 Conditional Jump
+		if (CFlag->SubType == CFS_CJMP_RESET_VAR)
+		{
+			SmpsRAM.CondJmpVal = 0x00;
+			break;
+		}
+		
 		TempByt = 0;
 		switch(CFlag->SubType & 0x0F)
 		{
