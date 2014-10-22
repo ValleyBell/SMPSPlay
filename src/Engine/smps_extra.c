@@ -222,7 +222,6 @@ static void DumpDACSounds(DAC_CFG* DACDrv)
 		return;
 	
 	OldDPCMTbl = NULL;
-	CurDPCMTbl = NULL;
 	if (VGM_DataBlkCompress)
 	{
 		// Check, if there is a compressed sample
@@ -236,7 +235,7 @@ static void DumpDACSounds(DAC_CFG* DACDrv)
 			{
 				// write DPCM Delta-Table
 				vgm_write_large_data(VGMC_YM2612, 0xFF, 0x10, 0, 0, TempSmpl->DPCMArr);
-				OldDPCMTbl = CurDPCMTbl;
+				OldDPCMTbl = TempSmpl->DPCMArr;
 				break;
 			}
 		}
@@ -266,6 +265,7 @@ static void DumpDACSounds(DAC_CFG* DACDrv)
 				{
 					// write new DPCM Delta-Table
 					vgm_write_large_data(VGMC_YM2612, 0xFF, 0x10, 0, 0, CurDPCMTbl);
+					OldDPCMTbl = CurDPCMTbl;
 				}
 				vgm_write_large_data(VGMC_YM2612, 0x01, TempSmpl->Size, TempSmpl->Size << 1, 0x80, TempSmpl->Data);
 			}

@@ -130,6 +130,7 @@ static const OPT_LIST OPT_DRUMTYPE[] =
 	{"PSG", DRMTYPE_PSG},
 	{"DAC", DRMTYPE_DAC},
 	{"2OpFM", DRMTYPE_FM2OP},
+	{"FMDAC", DRMTYPE_FMDAC},
 	{NULL, DRMTYPE_NONE}};
 
 static const UINT16 DEF_FMFREQ_VAL[13] =
@@ -346,6 +347,8 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"MUSP_Z80", CFS_MUSP_Z80},
 	{"MUSP_68K", CFS_MUSP_68K},
 	{"MUSP_COI", CFS_MUSP_COI},
+	{"MUSP_GBL_ON", CFS_MUSP_GBL_ON},
+	{"MUSP_GBL_OFF", CFS_MUSP_GBL_OFF},
 	
 	{"FDIN_START", CFS_FDIN_START},
 	{"FDIN_CANCEL", CFS_FDIN_CANCEL},
@@ -383,6 +386,7 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"VQ_SET_4B", CFS_VQ_SET_4B},
 	{"VQ_SET_4B_WOI", CFS_VQ_SET_4B_WOI},
 	{"VQ_SET_4B_WOI2", CFS_VQ_SET_4B_WOI2},
+	{"VQ_SET_4B_QS", CFS_VQ_SET_4B_QS},
 	
 	{"PS4_VOLCTRL", CFS_PS4_VOLCTRL},
 	{"PS4_VOLUME", CFS_PS4_VOLUME},
@@ -449,6 +453,7 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 		return;
 	}
 	
+	SmpsCfg->NoteBase = 0x80;	// 00-7F = Delay, 80-DF = Rest/Note
 	SmpsCfg->FMChnCnt = sizeof(FMCHN_ORDER);
 	memcpy(SmpsCfg->FMChnList, FMCHN_ORDER, SmpsCfg->FMChnCnt);
 	SmpsCfg->PSGChnCnt = sizeof(PSGCHN_ORDER);

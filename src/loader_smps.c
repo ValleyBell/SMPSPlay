@@ -38,8 +38,8 @@ INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET
 static void DuplicateInsTable(const INS_LIB* InsLibSrc, INS_LIB* InsLibDst);
 static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, UINT8* FileData, UINT32 StartOfs);
 //UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg);
-static void MarkDrumNote(DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note);
-static void MarkDrum_Sub(DAC_CFG* DACDrv, const DRUM_DATA* DrumData);
+static void MarkDrumNote(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note);
+static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData);
 static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Note);
 //void FreeSMPSFile(SMPS_CFG* SmpsCfg);
 
@@ -371,7 +371,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 					if (IsDrmTrk)
 					{
 						if (! (TrkMode & PBKFLG_SPCMODE))	// if not Phantasy Star IV
-							MarkDrumNote(DACDrv, &SmpsCfg->DrumLib, FileData[CurPos]);
+							MarkDrumNote(SmpsCfg, DACDrv, &SmpsCfg->DrumLib, FileData[CurPos]);
 						else if (TrkMode & PBKFLG_RAWFREQ)	// handle PS4 special mode
 							MarkDrum_DACNote(DACDrv, FileData[CurPos]);
 					}
@@ -608,7 +608,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	return 0x00;
 }
 
-static void MarkDrumNote(DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note)
+static void MarkDrumNote(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note)
 {
 	if (Note < 0x80)
 		return;
@@ -617,7 +617,7 @@ static void MarkDrumNote(DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note)
 	if (DrumLib->Mode == DRMMODE_NORMAL)
 	{
 		if (Note < DrumLib->DrumCount)
-			MarkDrum_Sub(DACDrv, &DrumLib->DrumData[Note]);
+			MarkDrum_Sub(SmpsCfg, DACDrv, &DrumLib->DrumData[Note]);
 	}
 	else
 	{
@@ -625,29 +625,47 @@ static void MarkDrumNote(DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note)
 		
 		TempNote = (Note & DrumLib->Mask1);// >> DrumLib->Shift1;
 		if (TempNote && TempNote < DrumLib->DrumCount)
-			MarkDrum_Sub(DACDrv, &DrumLib->DrumData[TempNote]);
+			MarkDrum_Sub(SmpsCfg, DACDrv, &DrumLib->DrumData[TempNote]);
 		
 		TempNote = (Note & DrumLib->Mask2);// >> DrumLib->Shift2;
 		if (TempNote && TempNote < DrumLib->DrumCount)
-			MarkDrum_Sub(DACDrv, &DrumLib->DrumData[TempNote]);
+			MarkDrum_Sub(SmpsCfg, DACDrv, &DrumLib->DrumData[TempNote]);
 	}
 	
 	return;
 }
 
-static void MarkDrum_Sub(DAC_CFG* DACDrv, const DRUM_DATA* DrumData)
+static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData)
 {
+	const DRUM_TRK_LIB* DTrkLib;
+	UINT16 DrumID;
 	UINT16 SmplID;
+	UINT16 DrumOfs;
 	
-	if (DrumData->Type != DRMTYPE_DAC)
+	switch(DrumData->Type)
+	{
+	case DRMTYPE_DAC:
+		if (DrumData->DrumID >= DACDrv->TblCount)
+			return;
+		DrumID = DrumData->DrumID;
+		break;
+	case DRMTYPE_FMDAC:
+		DTrkLib = &SmpsCfg->FMDrums;
+		if (DrumData->DrumID >= DTrkLib->DrumCount)
+			return;
+		
+		DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
+		DrumID = DTrkLib->File.Data[DrumOfs + 0x05] - 0x01;
+		break;
+	default:
 		return;
-	
-	if (DrumData->DrumID >= DACDrv->TblCount)
+	}
+	if (DrumID >= DACDrv->TblCount)
 		return;
-	SmplID = DACDrv->SmplTbl[DrumData->DrumID].Sample;
+	SmplID = DACDrv->SmplTbl[DrumID].Sample;
 	if (SmplID >= DACDrv->SmplCount)
 		return;
-	
+		
 	DACDrv->Smpls[SmplID].UsageID = 0xFE;
 	
 	return;

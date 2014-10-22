@@ -68,6 +68,9 @@ History
 	added "Tempo1Tick" setting, allowing for more accurate jitter emulation
 	added full support for the SMPS variant used in Sonic 2 Recreation
 	added support for music save states used by the Sonic series 1-up tunes
+	added SFX commands from Sonic 3 & Knuckles
+	added full support for Mickey Mouse: Castle of Illusion (including FM -> PSG ADSR conversion)
+	added "FMDAC" drum type for Mercs
 2014-08-17 - 2.01
 	added proper support for Master System SMPS (incl. PSG drums, additional commands)
 	added preSMPS instrument format (register-data pairs)

@@ -15,6 +15,7 @@
 #include "dac.h"
 
 #define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, 0x00, Reg, Data)
+#define WriteFMII(Reg, Data)	ym2612_fm_write(0x00, 0x01, Reg, Data)
 #define WritePSG(Data)			sn76496_psg_write(0x00, Data)
 
 
@@ -69,10 +70,10 @@ void PlayDrumNote(TRK_RAM* Trk, UINT8 Note)
 {
 	const DRUM_LIB* DrumLib = &Trk->SmpsSet->Cfg->DrumLib;
 	
-	if (Note < 0x80)
+	if (Note < Trk->SmpsSet->Cfg->NoteBase)
 		return;
 	
-	Note &= 0x7F;
+	Note -= Trk->SmpsSet->Cfg->NoteBase;
 	if (DrumLib->Mode == DRMMODE_NORMAL)
 	{
 		if (Note < DrumLib->DrumCount)
@@ -132,6 +133,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		}
 		break;
 	case DRMTYPE_FM:
+	case DRMTYPE_FMDAC:
 		DrumTrk = &SmpsRAM.MusicTrks[TRACK_MUS_FM6];
 		if (DrumTrk->PlaybkFlags & PBKFLG_OVERRIDDEN)
 			return;
@@ -168,12 +170,21 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DrumTrk->PanAFMS = 0xC0;
 		DrumTrk->RemTicks = 0x01;
 		
-		if (DrumTrk->Instrument < DTrkLib->InsLib.InsCount)
-			SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument]);
-		
-		// Note: This is always called, even on SMPS drivers that play drums on another channel than FM3.
-		// Also, MegaMan Wily Wars, song 07 (MM1 Dr Wily Stage 1) relies on that behaviour.
-		ResetSpcFM3Mode();
+		if (DrumData->Type == DRMTYPE_FM)
+		{
+			if (DrumTrk->Instrument < DTrkLib->InsLib.InsCount)
+				SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument]);
+			
+			// Note: This is always called, even on SMPS drivers that play drums on another channel than FM3.
+			// Also, MegaMan Wily Wars, song 07 (MM1 Dr Wily Stage 1) relies on that behaviour.
+			ResetSpcFM3Mode();
+		}
+		else if (DrumData->Type == DRMTYPE_FMDAC)
+		{
+			DAC_SetRate(Trk->ChannelMask & 0x01, DTrkData[0x06], 0x00);
+			WriteFMII(0xB6, DTrkData[0x07]);
+			DAC_Play(Trk->ChannelMask & 0x01, DrumTrk->Instrument - 0x01);
+		}
 		
 		if (DrumTrk->Pos >= DTrkSet->Seq.Len)
 			DrumTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
@@ -273,7 +284,7 @@ void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note)
 		return;
 	
 	// special Phantasy Star IV mode
-	Note &= 0x7F;
+	Note -= Trk->SmpsSet->Cfg->NoteBase;
 	if (Trk->PS4_AltTrkMode != 0x01)
 	{
 		if (! Note)	// DAC note here
@@ -331,12 +342,12 @@ void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note)
 	const PSG_DRUM_DATA* TempDrum;
 	UINT8 TempVol;
 	
-	if (Note < 0x80)
+	if (Note < Trk->SmpsSet->Cfg->NoteBase)
 		return;
 	if (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)
 		return;
 	
-	Note &= 0x7F;
+	Note -= Trk->SmpsSet->Cfg->NoteBase;
 	if (Note >= DrumLib->DrumCount)
 	{
 		Trk->PlaybkFlags |= PBKFLG_ATREST;

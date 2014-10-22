@@ -274,6 +274,16 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				RefreshFMVolume(Trk);
 			}
 			break;
+		case CFS_VQ_SET_4B_QS:
+			TempByt = *Data & 0x0F;
+			Trk->Volume = Trk->CoI_VolBase + TempByt;
+			if (! (Trk->ChannelMask & 0xF8))
+			{
+				TempByt *= 0x04;
+				Trk->Volume = Trk->CoI_VolBase + TempByt;
+				RefreshFMVolume(Trk);
+			}
+			break;
 		}
 		break;
 	case CF_VOLUME:		// E5/E6/EC Change Volume
@@ -422,7 +432,22 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		//	SMPS Z80
 		//	SMPS 68k
 		//	Golden Axe III
-		TempByt = Data[0x00];
+		if (CFlag->SubType & 0x10)
+		{
+			switch(CFlag->SubType)
+			{
+			case CFS_MUSP_GBL_ON:
+				SmpsRAM.PauseMode = 0x01;
+				break;
+			case CFS_MUSP_GBL_OFF:
+				SmpsRAM.PauseMode = 0x80;
+				break;
+			}
+			break;
+		}
+		
+		// CmdLen is checked for safety.
+		TempByt = (CmdLen > 0x01) ? Data[0x00] : 0x01;
 		if (CmdLen & 0x80)
 		{
 			CmdLen &= 0x7F;
@@ -539,8 +564,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				SrcAddr ++;	Trk->Pos ++;
 				ByteCnt --;
 			}
-#endif
+#else
 			Trk->Pos += ByteCnt;
+#endif
 			CmdLen = 0x00;
 		}
 		break;
@@ -572,17 +598,27 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			UINT8 DacSnd;
 			
 			DacChn = CFlag->SubType & 0x0F;
-			if (CmdLen == 0x03)
+			switch(CmdLen)
 			{
-				// handle Zaxxon Motherbase 2000 32X
+			case 0x02:
+				DacSnd = Data[0x00] & 0x7F;
+				break;
+			case 0x03:	// Zaxxon Motherbase 2000 32X
 				// EA bb dd - DAC Sound dd, Bank bb
 				DAC_SetBank(DacChn, Data[0x00] & 0x7F);
 				DacSnd = Data[0x01] & 0x7F;
+				break;
+			case 0x04:	// Mercs
+				DacSnd = Data[0x01] & 0x7F;
+				DAC_SetRate(DacChn, Data[0x02], 0x00);
+				WriteFMII(0xB6, Data[0x03]);
+				break;
+			default:
+				DacChn = 0xFF;
+				break;
 			}
-			else
-			{
-				DacSnd = Data[0x00] & 0x7F;
-			}
+			if (DacChn == 0xFF)
+				break;	// handle invalid command sizes
 			
 			//SmpsRAM._1C3C = DacSnd;
 			DAC_Play(DacChn, DacSnd - 0x01);

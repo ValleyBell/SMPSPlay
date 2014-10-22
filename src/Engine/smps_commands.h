@@ -143,6 +143,8 @@
 #define CF_MUS_PAUSE			0x61	// FF 01 / FF 03
 	#define CFS_MUSP_Z80			0x00	// FF 03 [SMPS Z80]
 	#define CFS_MUSP_68K			0x01	// FF 01 [SMPS 68k]
+	#define CFS_MUSP_GBL_ON			0x10	// FF 03 [Mercs]
+	#define CFS_MUSP_GBL_OFF		0x11
 	#define CFS_MUSP_COI			0x80	// FC [Castle of Illusion]
 #define CF_COPY_MEM				0x62	// FF 04 [SMPS Z80]
 #define CF_FADE_IN				0x63	// FF 03/04 [SMPS 68k]
@@ -186,6 +188,7 @@
 	#define CFS_VQ_SET_4B			0x04
 	#define CFS_VQ_SET_4B_WOI		0x10	// D0..DF [World Of Illusion Beta]
 	#define CFS_VQ_SET_4B_WOI2		0x11	// D0..DF [World Of Illusion Final]
+	#define CFS_VQ_SET_4B_QS		0x12	// D0..DF [Quack Shot]
 
 #define CF_DAC_PS4				0x90
 	#define CFS_PS4_VOLCTRL			0x00

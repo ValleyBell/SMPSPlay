@@ -152,6 +152,7 @@ FM_COMMAND - send command to FM chip (2 parameters: register, data)
 PLAY_DAC - play DAC sound
 	command EA, size 02, SMPS Z80 Type 2
 	command EA, size 03, Zaxxon Motherbase 2000 32X, sets DAC bank to first parameter, second parameter is the DAC sound
+	command E4, size 04, Mercs (DAC sound, speed, pan bits)
 
 PLAY_PWM - play PWM sample
 	command FD, size 03, Tempo 32x
@@ -282,7 +283,11 @@ MUS_PAUSE - Pause/Resume Music
 	      In that case there's an additional parameter following, describing the fade speed. (special Golden Axe III command)
   MUSP_COI - Castle of Illusion version, uses a separate bit for paused channels, similar to MUSP_68K
 	command FC, size 02
-	
+  MUSP_GBL_ON - set Sound Driver's Pause Mode to 01 (pause request)
+	command FF 03, size 01, Mercs
+  MUSP_GBL_OFF - set Sound Driver's Pause Mode to 80 (resume request)
+	size 01
+
 	In SMPSPlay, the Z80 version will use an additional bit for the Pause state, too, to prevent crashing.
 
 COPY_MEM - copy Memory bytes

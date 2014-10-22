@@ -86,6 +86,7 @@ typedef struct _file_data
 #define DRMTYPE_PSG		0x02
 #define DRMTYPE_DAC		0x03
 #define DRMTYPE_FM2OP	0x04
+#define DRMTYPE_FMDAC	0x05
 #define DRMTYPE_NONE	0x00
 
 // Music:
@@ -235,6 +236,7 @@ typedef struct _smps_configuration	// global SMPS driver configuration
 	DRUM_TRK_LIB FMDrums;
 	DRUM_TRK_LIB PSGDrums;
 	
+	UINT8 NoteBase;
 	CMD_LIB CmdList;
 	CMD_LIB CmdMetaList;
 } SMPS_CFG;

@@ -610,7 +610,7 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 				return;
 		}
 		
-		if (Data[Trk->Pos] & 0x80)
+		if (Data[Trk->Pos] >= SmpsCfg->NoteBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			Trk->DAC.Snd = Data[Trk->Pos];
@@ -630,7 +630,7 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 			}
 			else if (Trk->SpcDacMode == DCHNMODE_S2R)
 			{
-				Trk->DAC.Snd -= 0x80;
+				Trk->DAC.Snd -= SmpsCfg->NoteBase;
 				if (! Trk->DAC.Snd)
 					Trk->PlaybkFlags |= PBKFLG_ATREST;
 				else
@@ -639,7 +639,7 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 		}
 		
 		// read Duration for 00..7F
-		FinishTrkUpdate(Trk, ! (Data[Trk->Pos] & 0x80));
+		FinishTrkUpdate(Trk, (Data[Trk->Pos] < SmpsCfg->NoteBase));
 		
 		if (! (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN))
 		{
@@ -647,23 +647,23 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 			{
 			case DCHNMODE_NORMAL:
 			case DCHNMODE_VRDLX:
-				if (Trk->DAC.Snd >= 0x80)
+				if (Trk->DAC.Snd >= SmpsCfg->NoteBase)
 					PlayDrumNote(Trk, Trk->DAC.Snd);
 				break;
 			case DCHNMODE_PS4:
-				if (Trk->DAC.Snd >= 0x80)
+				if (Trk->DAC.Snd >= SmpsCfg->NoteBase)
 					PlayPS4DrumNote(Trk, Trk->DAC.Snd);
 				break;
 			case DCHNMODE_GAXE3:
-				if (Trk->DAC.Snd >= 0x80)
+				if (Trk->DAC.Snd >= SmpsCfg->NoteBase)
 					PlayDrumNote(Trk, Trk->DAC.Snd);
-				if (Trk->DAC.Unused >= 0x80)
+				if (Trk->DAC.Unused >= SmpsCfg->NoteBase)
 					PlayDrumNote(Trk, Trk->DAC.Unused);
 				break;
 			case DCHNMODE_CYMN:
 				SmpsRAM.DacChVol[0x00] = 0x80 | (Trk->Volume & 0x0F);
 				RefreshDACVolume(Trk, Trk->SpcDacMode, 0x00, SmpsRAM.DacChVol[0x00]);
-				if (Trk->DAC.Snd >= 0x80)
+				if (Trk->DAC.Snd >= SmpsCfg->NoteBase)
 				{
 					if (! (Trk->PlaybkFlags & PBKFLG_HOLD))	// not in the driver, but seems to be intended
 						PlayDrumNote(Trk, Trk->DAC.Snd);
@@ -683,7 +683,7 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 				if (! (Trk->PlaybkFlags & PBKFLG_HOLD))
 				{
 					if (Trk->DAC.Snd < SmpsCfg->DrumLib.DrumCount)
-						PlayDrumNote(Trk, 0x80 | Trk->DAC.Snd);
+						PlayDrumNote(Trk, SmpsCfg->NoteBase + Trk->DAC.Snd);
 					else
 						DAC_Play(0x00, Trk->DAC.Snd - 0x01);
 				}
@@ -781,7 +781,7 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 				return;
 		}
 		
-		if (Data[Trk->Pos] & 0x80)
+		if (Data[Trk->Pos] >= SmpsCfg->NoteBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			Trk->DAC.Snd = Data[Trk->Pos];
@@ -799,7 +799,7 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 		}
 		
 		// read Duration for 00..7F
-		FinishTrkUpdate(Trk, ! (Data[Trk->Pos] & 0x80));
+		FinishTrkUpdate(Trk, (Data[Trk->Pos] < SmpsCfg->NoteBase));
 	}
 	else
 	{
@@ -843,7 +843,7 @@ static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 				return;
 		}
 		
-		if (Data[Trk->Pos] & 0x80)
+		if (Data[Trk->Pos] >= SmpsCfg->NoteBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			Trk->DAC.Snd = Data[Trk->Pos];
@@ -854,7 +854,7 @@ static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 			PlayPSGDrumNote(Trk, Note);
 		
 		// read Duration for 00..7F
-		FinishTrkUpdate(Trk, ! (Data[Trk->Pos] & 0x80));
+		FinishTrkUpdate(Trk, (Data[Trk->Pos] < SmpsCfg->NoteBase));
 		PrepareADSR(Trk);
 		
 		Freq = Trk->Frequency;
@@ -989,11 +989,11 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 	if (! (Trk->PlaybkFlags & PBKFLG_RAWFREQ))
 	{
 		Note = Data[Trk->Pos];
-		if (Note & 0x80)
+		if (Note >= SmpsCfg->NoteBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			Trk->Pos ++;
-			if (Note == 0x80)
+			if (Note == SmpsCfg->NoteBase)
 			{
 				DoPSGNoteOff(Trk, 0x00);
 				if (SmpsCfg->DelayFreq == DLYFREQ_RESET)
@@ -1007,7 +1007,7 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			
 			if (! (Trk->PlaybkFlags & PBKFLG_PITCHSLIDE))
 			{
-				if (Data[Trk->Pos] & 0x80)
+				if (Data[Trk->Pos] >= SmpsCfg->NoteBase)
 					ReuseDelay = 0x01;
 			}
 			else
@@ -1117,7 +1117,7 @@ static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 	INT16 Note;
 	UINT8 Octave;
 	
-	Note = NoteCmd - 0x81;
+	Note = NoteCmd - (SmpsCfg->NoteBase + 0x01);	// NoteCmd - 0x81
 	Note += Trk->Transpose;
 	if (Trk->ChannelMask & 0x80)
 	{
