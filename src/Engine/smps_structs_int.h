@@ -187,12 +187,14 @@ typedef struct _fade_out_info
 	UINT8 DlyInit;	// 1C0E - initial Timeout value
 	UINT8 DlyCntr;	// 1C0F - Timeout Counter
 } FADE_OUT_INF;
-typedef struct _fade_in_info
+typedef struct _fade_special_info
 {
 	UINT8 Mode;		// F028 - Mode
-	UINT8 FMInc;	// F029 - FM Increment
-	UINT8 PSGInc;	// F02A - PSG Increment
-} FADE_IN_INF;
+	UINT8 AddDAC;	// F02x - DAC Increment [Metal Head]
+	UINT8 AddFM;	// F029 - FM Increment
+	UINT8 AddPSG;	// F02A - PSG Increment
+	UINT8 AddPWM;	// F02x - PWM Increment [Metal Head]
+} FADE_SPC_INF;
 
 #define TRKMODE_MUSIC	0x00
 #define TRKMODE_SFX		0x01
@@ -237,7 +239,7 @@ typedef struct _sound_ram
 	// 1C0A-0C - Sound Queue (sound IDs that get checked against Sound Priority and moved to 1C09)
 	FADE_OUT_INF FadeOut;
 	
-	FADE_IN_INF FadeIn;		// SMPS 68k only
+	FADE_SPC_INF FadeSpc;	// SMPS 68k/Type 2 only
 	
 	UINT8 PauseMode;		// 1C10
 	UINT8 MusicPaused;		// 1C11

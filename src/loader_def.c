@@ -235,7 +235,7 @@ static const OPT_LIST OPT_CFLAGS[] =
 	
 	{"MUS_PAUSE", CF_MUS_PAUSE},
 	{"COPY_MEM", CF_COPY_MEM},
-	{"FADE_IN", CF_FADE_IN},
+	{"FADE_SPC", CF_FADE_SPC},
 	
 	{"GOTO", CF_GOTO},
 	{"LOOP", CF_LOOP},
@@ -350,8 +350,13 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"MUSP_GBL_ON", CFS_MUSP_GBL_ON},
 	{"MUSP_GBL_OFF", CFS_MUSP_GBL_OFF},
 	
-	{"FDIN_START", CFS_FDIN_START},
-	{"FDIN_CANCEL", CFS_FDIN_CANCEL},
+	{"FDSPC_FMPSG", CFS_FDSPC_FMPSG},
+	{"FDSPC_DFP", CFS_FDSPC_DFP},
+	{"FDSPC_DFPPWM", CFS_FDSPC_DFPPWM},
+	{"FDSPC_PSG", CFS_FDSPC_PSG},
+	{"FDSPC_FP_TRS", CFS_FDSPC_FP_TRS},
+	{"FDSPC_STOP", CFS_FDSPC_STOP},
+	{"FDSPC_STOP_TRS", CFS_FDSPC_STOP_TRS},
 	
 	{"TEMPO_SET", CFS_TEMPO_SET},
 	{"TEMPO_ADD", CFS_TEMPO_ADD},
@@ -650,6 +655,14 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				*FreqCntPtr = NewFreqCnt;
 				*FreqDataPtr = NewFreqData;
 			}
+			else if (! _stricmp(LToken, "FadeOutSteps"))
+				SmpsCfg->FadeOut.Steps = (UINT8)ParseNumber(RToken1, NULL, NULL);
+			else if (! _stricmp(LToken, "FadeOutDelay"))
+				SmpsCfg->FadeOut.Delay = (UINT8)ParseNumber(RToken1, NULL, NULL);
+			else if (! _stricmp(LToken, "FadeOutVolAddFM"))
+				SmpsCfg->FadeOut.AddFM = (UINT8)ParseNumber(RToken1, NULL, NULL);
+			else if (! _stricmp(LToken, "FadeOutVolAddPSG"))
+				SmpsCfg->FadeOut.AddPSG = (UINT8)ParseNumber(RToken1, NULL, NULL);
 			else if (! _stricmp(LToken, "DrumChMode"))
 				SmpsCfg->DrumChnMode = GetOptionValue(OPT_DRMCHNMODE, RToken1);
 			else if (! _stricmp(LToken, "DACChns"))
@@ -680,6 +693,19 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				SmpsCfg->InitCfg.Timing_TimerB = (UINT8)ParseNumber(RToken1, NULL, NULL);
 		}
 	}
+	if (! SmpsCfg->FadeOut.Steps)
+		SmpsCfg->FadeOut.Steps = 0x28;
+	if (! SmpsCfg->FadeOut.Delay)
+	{
+		if ((SmpsCfg->PtrFmt & PTRFMT_EMASK) == PTRFMT_BE)
+			SmpsCfg->FadeOut.Delay = 6;	// SMPS 68k
+		else
+			SmpsCfg->FadeOut.Delay = 3;	// SMPS Z80
+	}
+	if (! SmpsCfg->FadeOut.AddFM)
+		SmpsCfg->FadeOut.AddFM = 1;
+	if (! SmpsCfg->FadeOut.AddPSG)
+		SmpsCfg->FadeOut.AddPSG = 1;
 	
 	fclose(hFile);
 	

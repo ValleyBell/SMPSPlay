@@ -147,9 +147,14 @@
 	#define CFS_MUSP_GBL_OFF		0x11
 	#define CFS_MUSP_COI			0x80	// FC [Castle of Illusion]
 #define CF_COPY_MEM				0x62	// FF 04 [SMPS Z80]
-#define CF_FADE_IN				0x63	// FF 03/04 [SMPS 68k]
-	#define CFS_FDIN_START			0x00	// FF 03
-	#define CFS_FDIN_CANCEL			0x01	// FF 04
+#define CF_FADE_SPC				0x63	// FF 03/04
+	#define CFS_FDSPC_FMPSG			0x00	// FF 03 (FM + PSG) [SMPS 68k/Type 2]
+	#define CFS_FDSPC_DFP			0x01	// FF 03 (DAC + FM + PSG)
+	#define CFS_FDSPC_DFPPWM		0x02	// FF 03 (DAC + FM + PSG + PWM) [Metal Head]
+	#define CFS_FDSPC_PSG			0x03	// FF 03 (PSG only) [SMPS 68k/Pico]
+	#define CFS_FDSPC_FP_TRS		0x10	// FF 03 (FM + PSG) [Dynamite Headdy]
+	#define CFS_FDSPC_STOP			0x80	// FF 04 [SMPS 68k/Type 2]
+	#define CFS_FDSPC_STOP_TRS		0x81	// FF 04 [Dynamite Headdy]
 
 // Jump and Control Flags
 // ----------------------

@@ -327,6 +327,7 @@ void UpdateMusic(void)
 	DoTempo();
 	if (! SmpsRAM.MusMultUpdate)
 		return;
+	DoSpecialFade();
 	DoFadeOut();
 	
 	SmpsRAM.TrkMode = TRKMODE_MUSIC;
@@ -2605,10 +2606,30 @@ static void DoTempo(void)
 
 void FadeOutMusic(void)
 {
+	const SMPS_CFG* SmpsCfg = (SmpsRAM.MusSet != NULL) ? SmpsRAM.MusSet->Cfg : NULL;
 	FADE_OUT_INF* Fade = &SmpsRAM.FadeOut;
 	
-	Fade->Steps = 0x28 | 0x80;
-	Fade->DlyInit = 0x06;
+	if (SmpsCfg != NULL)
+	{
+		Fade->Steps = SmpsCfg->FadeOut.Steps | 0x80;
+		Fade->DlyInit = SmpsCfg->FadeOut.Delay;
+	}
+	else
+	{
+		Fade->Steps = 0x28 | 0x80;
+		Fade->DlyInit = 0x06;
+	}
+	Fade->DlyCntr = Fade->DlyInit;
+	
+	return;
+}
+
+void FadeOutMusic_Custom(UINT8 StepCnt, UINT8 DelayFrames)
+{
+	FADE_OUT_INF* Fade = &SmpsRAM.FadeOut;
+	
+	Fade->Steps = StepCnt | 0x80;
+	Fade->DlyInit = DelayFrames;
 	Fade->DlyCntr = Fade->DlyInit;
 	
 	return;
@@ -2616,6 +2637,7 @@ void FadeOutMusic(void)
 
 static void DoFadeOut(void)
 {
+	const SMPS_CFG* SmpsCfg = SmpsRAM.MusSet->Cfg;
 	FADE_OUT_INF* Fade = &SmpsRAM.FadeOut;
 	UINT8 CurTrk;
 	TRK_RAM* TempTrk;
@@ -2655,7 +2677,7 @@ static void DoFadeOut(void)
 		return;
 	}
 	
-	SmpsRAM.NoiseDrmVol ++;
+	SmpsRAM.NoiseDrmVol += SmpsCfg->FadeOut.AddPSG;
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
@@ -2668,13 +2690,67 @@ static void DoFadeOut(void)
 		// This gets more complicated for the few idiotic homebrew SMPS files
 		// which use negative volumes that overflow into a positive range.
 		PrevVol = TempTrk->Volume;
-		TempTrk->Volume ++;
+		if (TempTrk->ChannelMask & 0x80)
+			TempTrk->Volume += SmpsCfg->FadeOut.AddPSG;
+		else
+			TempTrk->Volume += SmpsCfg->FadeOut.AddFM;
 		if ((TempTrk->Volume & 0x80) && ! (PrevVol & 0x80))
-			TempTrk->Volume --;	// prevent overflow
+			TempTrk->Volume = 0x7F;	// prevent overflow
 		
 		if ((TempTrk->PlaybkFlags & PBKFLG_ACTIVE) && ! (TempTrk->PlaybkFlags & PBKFLG_OVERRIDDEN))
 			RefreshVolume(TempTrk);
 	}
+	
+	return;
+}
+
+static void DoSpecialFade(void)
+{
+	const SMPS_CFG* SmpsCfg = SmpsRAM.MusSet->Cfg;
+	FADE_SPC_INF* Fade = &SmpsRAM.FadeSpc;
+	INT8 FadeDir;
+	UINT8 CurTrk;
+	TRK_RAM* TempTrk;
+	UINT8 PrevVol;
+	
+	if (! Fade->Mode || Fade->Mode == 0x02)
+		return;	// Fading disabled - return
+	
+	FadeDir = (Fade->Mode & 0x80) ? +1 : -1;
+	
+	SmpsRAM.NoiseDrmVol += Fade->AddPSG * FadeDir;
+	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
+	{
+		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
+		
+		PrevVol = TempTrk->Volume;
+		if (TempTrk->ChannelMask & 0x80)
+		{
+			TempTrk->Volume += Fade->AddPSG * FadeDir;
+		}
+		else if (TempTrk->ChannelMask & 0x10)
+		{
+			if (TempTrk->ChannelMask & 0x08)
+				TempTrk->Volume += Fade->AddPWM * FadeDir;
+			else
+				TempTrk->Volume += Fade->AddDAC * FadeDir;
+		}
+		else
+		{
+			TempTrk->Volume += Fade->AddFM * FadeDir;
+		}
+		if (! (TempTrk->Volume & 0x80) || (PrevVol & 0x80))
+		{
+			// execute if no overflow
+			if ((TempTrk->PlaybkFlags & PBKFLG_ACTIVE) && ! (TempTrk->PlaybkFlags & PBKFLG_OVERRIDDEN))
+				RefreshVolume(TempTrk);
+		}
+	}
+	
+	if (Fade->Mode & 0x80)
+		Fade->Mode = 0x00;
+	else
+		Fade->Mode = 0x02;
 	
 	return;
 }

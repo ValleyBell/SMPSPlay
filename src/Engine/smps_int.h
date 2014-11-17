@@ -82,6 +82,7 @@ static void DoPause(void);
 static void DoTempo(void);
 //void FadeOutMusic(void);
 static void DoFadeOut(void);
+static void DoSpecialFade(void);
 
 //void StopAllSound(void);
 void ResetSpcFM3Mode(void);

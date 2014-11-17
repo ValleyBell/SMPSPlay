@@ -13,6 +13,7 @@
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
+#include <direct.h>		// for _mkdir()
 #include <conio.h>
 #include <windows.h>
 #include <sys/types.h>
@@ -142,6 +143,7 @@ int main(int argc, char* argv[])
 	PALMode = false;
 	FrameDivider = PALMode ? 50 : 60;
 	
+	_mkdir("dumps");
 	strcpy(SoundLogFile, "dumps/out.wav");
 	SoundLogging(Config.LogWave);
 	

@@ -16,6 +16,7 @@ void PlayMusic(SMPS_SET* SmpsFileSet);
 void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX);
 
 void FadeOutMusic(void);
+void FadeOutMusic_Custom(UINT8 StepCnt, UINT8 DelayFrames);
 
 void StopAllSound(void);
 

@@ -570,22 +570,82 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			CmdLen = 0x00;
 		}
 		break;
-	case CF_FADE_IN:
-		switch(CFlag->SubType)
+	case CF_FADE_SPC:
+		if (CFlag->SubType < 0x80)
 		{
-		case CFS_FDIN_START:
-			if (SmpsRAM.FadeIn.Mode == 2)
+			FADE_SPC_INF* Fade = &SmpsRAM.FadeSpc;
+			if (CFlag->SubType < 0x10)
 			{
-				CmdLen = 0x01;	// no more parameters
+				if (Fade->Mode == 0x02)
+				{
+					if (CmdLen & 0x80)
+						CmdLen = 0x01;	// no more parameters
+					break;
+				}
+				CmdLen &= 0x7F;
+			}
+			switch(CFlag->SubType)
+			{
+			case CFS_FDSPC_FMPSG:
+				Fade->Mode = 0x01;
+				Fade->AddDAC = 0x00;
+				Fade->AddFM = Data[0x00];
+				Fade->AddPSG = Data[0x01];
+				Fade->AddPWM = 0x00;
+				break;
+			case CFS_FDSPC_DFP:
+				Fade->Mode = 0x01;
+				Fade->AddDAC = Data[0x00];
+				Fade->AddFM = Data[0x01];
+				Fade->AddPSG = Data[0x02];
+				Fade->AddPWM = 0x00;
+				break;
+			case CFS_FDSPC_DFPPWM:
+				Fade->Mode = 0x01;
+				Fade->AddDAC = Data[0x00];
+				Fade->AddFM = Data[0x01];
+				Fade->AddPSG = Data[0x02];
+				Fade->AddPWM = Data[0x03];
+				break;
+			case CFS_FDSPC_PSG:
+				Fade->Mode = 0x01;
+				Fade->AddDAC = 0x00;
+				Fade->AddFM = 0x00;
+				Fade->AddPSG = Data[0x00];
+				Fade->AddPWM = 0x00;
+				break;
+			case CFS_FDSPC_FP_TRS:
+				if (! Fade->Mode)
+				{
+					Fade->Mode = 0x01;
+					TempByt = Fade->AddFM | Fade->AddPSG;
+					if (TempByt)
+					{
+						if (CmdLen & 0x80)
+							CmdLen = 0x01;
+						break;	// exit early
+					}
+					Fade->AddDAC = 0x00;
+					Fade->AddFM = Data[0x00];
+					Fade->AddPSG = Data[0x01];
+					Fade->AddPWM = 0x00;
+				}
+				CmdLen &= 0x7F;
 				break;
 			}
-			SmpsRAM.FadeIn.Mode = 1;
-			SmpsRAM.FadeIn.FMInc = Data[0x00];
-			SmpsRAM.FadeIn.PSGInc = Data[0x01];
-			break;
-		case CFS_FDIN_CANCEL:
-			SmpsRAM.FadeIn.Mode = 0x80;
-			break;
+		}
+		else
+		{
+			switch(CFlag->SubType)
+			{
+			case CFS_FDSPC_STOP:
+				SmpsRAM.FadeSpc.Mode = 0x80;
+				break;
+			case CFS_FDSPC_STOP_TRS:
+				if (SmpsRAM.FadeSpc.Mode == 0x02)
+					SmpsRAM.FadeSpc.Mode = 0x80;
+				break;
+			}
 		}
 		break;
 	case CF_DAC_BANK:
@@ -609,9 +669,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				DacSnd = Data[0x01] & 0x7F;
 				break;
 			case 0x04:	// Mercs
-				DacSnd = Data[0x01] & 0x7F;
-				DAC_SetRate(DacChn, Data[0x02], 0x00);
-				WriteFMII(0xB6, Data[0x03]);
+				DacSnd = Data[0x00] & 0x7F;
+				DAC_SetRate(DacChn, Data[0x01], 0x00);
+				WriteFMII(0xB6, Data[0x02]);
 				break;
 			default:
 				DacChn = 0xFF;

@@ -40,7 +40,7 @@ static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, UINT8* File
 //UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg);
 static void MarkDrumNote(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note);
 static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData);
-static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Note);
+static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Bank, UINT8 Note);
 //void FreeSMPSFile(SMPS_CFG* SmpsCfg);
 
 
@@ -237,6 +237,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	UINT8 LoopID;
 	UINT8 UsageMask;
 	UINT8 IsDrmTrk;
+	UINT8 DACBank;
 	
 	FileLen = SmpsSet->Seq.Len;
 	FileData = SmpsSet->Seq.Data;
@@ -335,6 +336,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 			IsDrmTrk = 0x01;
 		else
 			IsDrmTrk = 0x00;
+		DACBank = 0xFF;
 		
 		memset(FileMask, 0x00, FileLen);
 		memset(LoopPtrs, 0x00, sizeof(UINT16) * 0x08);
@@ -373,7 +375,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 						if (! (TrkMode & PBKFLG_SPCMODE))	// if not Phantasy Star IV
 							MarkDrumNote(SmpsCfg, DACDrv, &SmpsCfg->DrumLib, FileData[CurPos]);
 						else if (TrkMode & PBKFLG_RAWFREQ)	// handle PS4 special mode
-							MarkDrum_DACNote(DACDrv, FileData[CurPos]);
+							MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos]);
 					}
 					
 					CurPos ++;	// note
@@ -571,14 +573,35 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 						TrkMode &= ~PBKFLG_RAWFREQ;
 					break;
 				case CFS_PS4_SET_SND:
-					MarkDrum_DACNote(DACDrv, FileData[CurPos + 0x01]);
+					MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos + 0x01]);
 					break;
 				}
 				break;
 			case CF_CONT_SFX:
 				SmpsSet->SeqFlags |= SEQFLG_CONT_SFX;
 				break;
-			//case CF_PLAY_DAC:
+			case CF_DAC_BANK:
+				DACBank = FileData[CurPos + 0x01];
+				break;
+			case CF_PLAY_DAC:
+				switch(CmdLen)
+				{
+				case 0x02:
+					MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos + 0x01] & 0x7F);
+					break;
+				case 0x03:	// Zaxxon Motherbase 2000 32X
+					DACBank = FileData[CurPos + 0x01];
+					MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos + 0x02] & 0x7F);
+					break;
+				case 0x04:	// Mercs
+					MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos + 0x01] & 0x7F);
+					break;
+				default:
+					if (DebugMsgs & 0x04)
+						printf("Unknown DAC command (Pos 0x%04X)\n", CurPos);
+					break;
+				}
+				break;
 			case CF_PLAY_PWM:
 			case CF_DAC_CYMN:
 				if (DebugMsgs & 0x04)
@@ -671,7 +694,7 @@ static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DA
 	return;
 }
 
-static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Note)
+static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Bank, UINT8 Note)
 {
 	UINT8 TblID;
 	UINT16 SmplID;
@@ -681,6 +704,8 @@ static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Note)
 		return;
 	
 	TblID = Note - 0x01;
+	if (Bank < DACDrv->BankCount)
+		TblID += DACDrv->BankTbl[Bank];	// do banked sounds
 	if (TblID >= DACDrv->TblCount)
 		return;
 	SmplID = DACDrv->SmplTbl[TblID].Sample;

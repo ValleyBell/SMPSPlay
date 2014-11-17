@@ -227,6 +227,14 @@ typedef struct _smps_configuration	// global SMPS driver configuration
 	UINT8 FM3FreqCnt;
 	UINT16* FM3Freqs;
 	
+	struct
+	{
+		UINT8 Steps;
+		UINT8 Delay;
+		UINT8 AddFM;
+		UINT8 AddPSG;
+	} FadeOut;
+	
 	UINT8 EnvCmds[0x80];
 	ENV_LIB ModEnvs;
 	ENV_LIB VolEnvs;
