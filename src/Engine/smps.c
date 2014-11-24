@@ -328,7 +328,8 @@ void UpdateMusic(void)
 	if (! SmpsRAM.MusMultUpdate)
 		return;
 	DoSpecialFade();
-	DoFadeOut();
+	DoFade(0x01);	// FadeOut
+	DoFade(0x00);	// FadeIn
 	
 	SmpsRAM.TrkMode = TRKMODE_MUSIC;
 	while(SmpsRAM.MusMultUpdate)
@@ -2041,6 +2042,7 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 	SmpsRAM.NoiseDrmVol = 0x00;
 	ResetSpcFM3Mode();
 	SmpsRAM.FadeOut.Steps = 0x00;
+	SmpsRAM.FadeIn.Steps = 0x00;
 	
 	InitCfg = &SmpsCfg->InitCfg;
 	if (SmpsRAM.LockTimingMode == 0xFF)
@@ -2607,7 +2609,7 @@ static void DoTempo(void)
 void FadeOutMusic(void)
 {
 	const SMPS_CFG* SmpsCfg = (SmpsRAM.MusSet != NULL) ? SmpsRAM.MusSet->Cfg : NULL;
-	FADE_OUT_INF* Fade = &SmpsRAM.FadeOut;
+	FADE_INF* Fade = &SmpsRAM.FadeOut;
 	
 	if (SmpsCfg != NULL)
 	{
@@ -2626,7 +2628,7 @@ void FadeOutMusic(void)
 
 void FadeOutMusic_Custom(UINT8 StepCnt, UINT8 DelayFrames)
 {
-	FADE_OUT_INF* Fade = &SmpsRAM.FadeOut;
+	FADE_INF* Fade = &SmpsRAM.FadeOut;
 	
 	Fade->Steps = StepCnt | 0x80;
 	Fade->DlyInit = DelayFrames;
@@ -2635,37 +2637,77 @@ void FadeOutMusic_Custom(UINT8 StepCnt, UINT8 DelayFrames)
 	return;
 }
 
-static void DoFadeOut(void)
+static void DoFade(UINT8 FadeMode)
 {
 	const SMPS_CFG* SmpsCfg = SmpsRAM.MusSet->Cfg;
-	FADE_OUT_INF* Fade = &SmpsRAM.FadeOut;
+	const FADE_CFG* FadeCfg = FadeMode ? &SmpsCfg->FadeOut : &SmpsCfg->FadeIn;
+	FADE_INF* Fade = FadeMode ? &SmpsRAM.FadeOut : &SmpsRAM.FadeIn;
 	UINT8 CurTrk;
 	TRK_RAM* TempTrk;
 	UINT8 PrevVol;
+	INT8 FadeDir;
 	
 	if (! Fade->Steps)
 		return;	// Fading disabled - return
 	
 	if (Fade->Steps & 0x80)
 	{
-		// Maybe a loop checking for Channel Bits 0x80 and 0x10 would be a better solution.
-		//call StopDrumPSG:
-		SmpsRAM.MusicTrks[TRACK_MUS_DRUM].PlaybkFlags = 0x00;
-		SmpsRAM.MusicTrks[TRACK_MUS_DAC2].PlaybkFlags = 0x00;
-		//SmpsRAM.MusicTrks[TRACK_MUS_FM6].PlaybkFlags = 0x00;	// for SMPS Z80 with FM drums only
-#if 0
-		SmpsRAM.MusicTrks[TRACK_MUS_PSG3].PlaybkFlags = 0x00;
-		SmpsRAM.MusicTrks[TRACK_MUS_PSG1].PlaybkFlags = 0x00;
-		SmpsRAM.MusicTrks[TRACK_MUS_PSG2].PlaybkFlags = 0x00;
-		SilencePSG();
-#endif
-		
-		Fade->Steps &= ~0x80;	// Note: The driver clears this bit even if it wasn't set.
+		if (FadeMode)	// FadeOut
+		{
+			// Maybe a loop checking for Channel Bits 0x80 and 0x10 would be a better solution.
+			//call StopDrumPSG:
+			//SmpsRAM.MusicTrks[TRACK_MUS_DRUM].PlaybkFlags = 0x00;
+			//SmpsRAM.MusicTrks[TRACK_MUS_DAC2].PlaybkFlags = 0x00;
+			SmpsRAM.MusicTrks[TRACK_MUS_DRUM].PlaybkFlags |= PBKFLG_OVERRIDDEN;	// works better in combination with FadeIn
+			SmpsRAM.MusicTrks[TRACK_MUS_DAC2].PlaybkFlags |= PBKFLG_OVERRIDDEN;
+			//SmpsRAM.MusicTrks[TRACK_MUS_FM6].PlaybkFlags = 0x00;	// for SMPS Z80 with FM drums only
+	#if 0
+			SmpsRAM.MusicTrks[TRACK_MUS_PSG3].PlaybkFlags = 0x00;
+			SmpsRAM.MusicTrks[TRACK_MUS_PSG1].PlaybkFlags = 0x00;
+			SmpsRAM.MusicTrks[TRACK_MUS_PSG2].PlaybkFlags = 0x00;
+			SilencePSG();
+	#endif
+			
+			Fade->Steps &= ~0x80;	// Note: The driver clears this bit even if it wasn't set.
+		}
+		else	// FadeIn
+		{
+			Fade->Steps &= ~0x80;
+			
+			SmpsRAM.MusicTrks[TRACK_MUS_DRUM].PlaybkFlags |= PBKFLG_OVERRIDDEN;
+			SmpsRAM.MusicTrks[TRACK_MUS_DAC2].PlaybkFlags |= PBKFLG_OVERRIDDEN;
+			// Note: Similarly to the SMPS Z80 FadeOut routine,
+			//       Sonic 3K sets the 'overridden' bit on the PSG channels instead of fading them.
+			
+			SmpsRAM.NoiseDrmVol += FadeCfg->AddPSG * Fade->Steps;
+			for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
+			{
+				TempTrk = &SmpsRAM.MusicTrks[CurTrk];
+				if (TempTrk->ChannelMask & 0x80)
+					TempTrk->Volume += FadeCfg->AddPSG * Fade->Steps;
+				else
+					TempTrk->Volume += FadeCfg->AddFM * Fade->Steps;
+			}
+			Fade->DlyCntr = 1;	// enforce volume refresh
+		}
 	}
 	
-	Fade->DlyCntr --;
-	if (Fade->DlyCntr)
-		return;
+	if (SmpsCfg->FadeMode == FADEMODE_Z80)
+	{
+		// delay by (n-1) frames / execute every n-th frame
+		Fade->DlyCntr --;
+		if (Fade->DlyCntr)
+			return;
+	}
+	else //if (SmpsCfg->FadeMode == FADEMODE_68K)
+	{
+		// delay by n frames / execute every (n+1)-th frame
+		if (Fade->DlyCntr)
+		{
+			Fade->DlyCntr --;
+			return;
+		}
+	}
 	// Timeout expired
 	
 	//ApplyFading:
@@ -2673,29 +2715,53 @@ static void DoFadeOut(void)
 	Fade->Steps --;
 	if (! Fade->Steps)
 	{
-		StopAllSound();
-		return;
+		if (FadeMode)	// FadeOut
+		{
+			StopAllSound();
+			return;
+		}
+		else	// FadeIn
+		{
+			SmpsRAM.MusicTrks[TRACK_MUS_DRUM].PlaybkFlags &= ~PBKFLG_OVERRIDDEN;
+			SmpsRAM.MusicTrks[TRACK_MUS_DAC2].PlaybkFlags &= ~PBKFLG_OVERRIDDEN;
+			// and continue
+		}
 	}
 	
-	SmpsRAM.NoiseDrmVol += SmpsCfg->FadeOut.AddPSG;
+	FadeDir = FadeMode ? +1 : -1;
+	SmpsRAM.NoiseDrmVol += FadeCfg->AddPSG * FadeDir;
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
 		
 #if 0
-		TempTrk->Volume ++;
-		if (TempTrk->Volume & 0x80)
-			TempTrk->Volume --;	// prevent overflow
+		if (FadeMode)
+		{
+			TempTrk->Volume ++;
+			if (TempTrk->Volume & 0x80)
+				TempTrk->Volume --;	// prevent overflow
+		}
+		else
+		{
+			TempTrk->Volume --;
+		}
 #endif
 		// This gets more complicated for the few idiotic homebrew SMPS files
 		// which use negative volumes that overflow into a positive range.
 		PrevVol = TempTrk->Volume;
 		if (TempTrk->ChannelMask & 0x80)
-			TempTrk->Volume += SmpsCfg->FadeOut.AddPSG;
+			TempTrk->Volume += FadeCfg->AddPSG * FadeDir;
 		else
-			TempTrk->Volume += SmpsCfg->FadeOut.AddFM;
-		if ((TempTrk->Volume & 0x80) && ! (PrevVol & 0x80))
-			TempTrk->Volume = 0x7F;	// prevent overflow
+			TempTrk->Volume += FadeCfg->AddFM * FadeDir;
+		if (FadeMode)
+		{
+			if ((TempTrk->Volume & 0x80) && ! (PrevVol & 0x80))
+				TempTrk->Volume = 0x7F;	// prevent overflow
+		}
+		else
+		{
+			// TODO: possible overflow check here
+		}
 		
 		if ((TempTrk->PlaybkFlags & PBKFLG_ACTIVE) && ! (TempTrk->PlaybkFlags & PBKFLG_OVERRIDDEN))
 			RefreshVolume(TempTrk);

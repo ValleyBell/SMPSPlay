@@ -94,6 +94,10 @@ static const OPT_LIST OPT_VOLMODE[] =
 	{"BIT7", VOLMODE_BIT7},
 	{"ALGOSET", VOLMODE_ALGO | VOLMODE_SETVOL},
 	{NULL, 0}};
+static const OPT_LIST OPT_FADEMODE[] =
+{	{"Z80", FADEMODE_Z80},
+	{"68K", FADEMODE_Z80},
+	{NULL, 0}};
 static const OPT_LIST OPT_DRMCHNMODE[] =
 {	{"NORMAL", DCHNMODE_NORMAL},
 	{"PS4", DCHNMODE_PS4},
@@ -464,6 +468,7 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 	SmpsCfg->PSGChnCnt = sizeof(PSGCHN_ORDER);
 	memcpy(SmpsCfg->PSGChnList, PSGCHN_ORDER, SmpsCfg->PSGChnCnt);
 	SmpsCfg->AddChnCnt = 0x00;
+	SmpsCfg->FadeMode = 0xFF;
 	
 	Group = 0xFF;
 	CstRegList = NULL;
@@ -655,6 +660,8 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				*FreqCntPtr = NewFreqCnt;
 				*FreqDataPtr = NewFreqData;
 			}
+			else if (! _stricmp(LToken, "FadeMode"))
+				SmpsCfg->FadeMode = GetOptionValue(OPT_FADEMODE, RToken1);
 			else if (! _stricmp(LToken, "FadeOutSteps"))
 				SmpsCfg->FadeOut.Steps = (UINT8)ParseNumber(RToken1, NULL, NULL);
 			else if (! _stricmp(LToken, "FadeOutDelay"))
@@ -693,19 +700,22 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				SmpsCfg->InitCfg.Timing_TimerB = (UINT8)ParseNumber(RToken1, NULL, NULL);
 		}
 	}
+	
+	Group = ((SmpsCfg->PtrFmt & PTRFMT_EMASK) == PTRFMT_BE);	// Big Endian pointers -> SMPS 68k
+	// set default fade values
+	if (! SmpsCfg->FadeMode)
+		SmpsCfg->FadeMode = Group ? FADEMODE_68K : FADEMODE_Z80;
 	if (! SmpsCfg->FadeOut.Steps)
 		SmpsCfg->FadeOut.Steps = 0x28;
 	if (! SmpsCfg->FadeOut.Delay)
-	{
-		if ((SmpsCfg->PtrFmt & PTRFMT_EMASK) == PTRFMT_BE)
-			SmpsCfg->FadeOut.Delay = 6;	// SMPS 68k
-		else
-			SmpsCfg->FadeOut.Delay = 3;	// SMPS Z80
-	}
+		SmpsCfg->FadeOut.Delay = Group ? 3 : 6;	// 3 for SMPS 68k, 6 for SMPS Z80
 	if (! SmpsCfg->FadeOut.AddFM)
 		SmpsCfg->FadeOut.AddFM = 1;
 	if (! SmpsCfg->FadeOut.AddPSG)
 		SmpsCfg->FadeOut.AddPSG = 1;
+	
+	if (! SmpsCfg->FadeIn.Steps)
+		SmpsCfg->FadeIn = SmpsCfg->FadeOut;
 	
 	fclose(hFile);
 	

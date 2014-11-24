@@ -71,6 +71,9 @@ History
 	added SFX commands from Sonic 3 & Knuckles
 	added full support for Mickey Mouse: Castle of Illusion (including FM -> PSG ADSR conversion)
 	added "FMDAC" drum type for Mercs
+	fixed missing DAC sounds in VGM logs
+	added per-driver fading settings
+	added Fade In support used by Sonic games
 2014-08-17 - 2.01
 	added proper support for Master System SMPS (incl. PSG drums, additional commands)
 	added preSMPS instrument format (register-data pairs)

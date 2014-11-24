@@ -181,12 +181,12 @@ enum SPCSFX_TRACKS
 };
 
 
-typedef struct _fade_out_info
+typedef struct _fade_info
 {
 	UINT8 Steps;	// 1C0D - remaining steps
 	UINT8 DlyInit;	// 1C0E - initial Timeout value
 	UINT8 DlyCntr;	// 1C0F - Timeout Counter
-} FADE_OUT_INF;
+} FADE_INF;
 typedef struct _fade_special_info
 {
 	UINT8 Mode;		// F028 - Mode
@@ -237,7 +237,8 @@ typedef struct _sound_ram
 	
 	// 1C09 - PlaySound ID (00 = StopAllSound, 80 = do nothing)
 	// 1C0A-0C - Sound Queue (sound IDs that get checked against Sound Priority and moved to 1C09)
-	FADE_OUT_INF FadeOut;
+	FADE_INF FadeOut;
+	FADE_INF FadeIn;
 	
 	FADE_SPC_INF FadeSpc;	// SMPS 68k/Type 2 only
 	

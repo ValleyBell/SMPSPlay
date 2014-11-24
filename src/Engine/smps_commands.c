@@ -428,10 +428,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		//SmpsRAM._1C09 = Data[0x00];
 		break;
 	case CF_MUS_PAUSE:
-		// TODO: Look how this works in:
-		//	SMPS Z80
-		//	SMPS 68k
-		//	Golden Axe III
+		// Verified with SMPS Z80 and SMPS 68k.
 		if (CFlag->SubType & 0x10)
 		{
 			switch(CFlag->SubType)
@@ -1174,6 +1171,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			DoCoordinationFlag(Trk, &EndFlag);
 			
 			SmpsRAM.LoadSaveRequest = 0x01;
+			SmpsRAM.FadeIn.Steps = SmpsCfg->FadeOut.Steps | 0x80;
+			SmpsRAM.FadeIn.DlyInit = 2;
+			SmpsRAM.FadeIn.DlyCntr = 2;
 		}
 		else
 		{
@@ -1185,8 +1185,8 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		// TODO: start Fade In
 		break;
 	case CF_SND_OFF:
-		WriteFMI(0x88, 0x0F);
-		WriteFMI(0x8C, 0x0F);
+		WriteFMMain(Trk, 0x88, 0x0F);
+		WriteFMMain(Trk, 0x8C, 0x0F);
 		break;
 	case CF_NOTE_STOP_REV:
 		// Ristar:

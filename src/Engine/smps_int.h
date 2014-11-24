@@ -81,7 +81,8 @@ UINT8 GetChannelTrack(UINT8 ChannelMask, UINT8 TrkCount, const TRK_RAM* Tracks);
 static void DoPause(void);
 static void DoTempo(void);
 //void FadeOutMusic(void);
-static void DoFadeOut(void);
+//void FadeOutMusic_Custom(UINT8 StepCnt, UINT8 DelayFrames);
+static void DoFade(UINT8 FadeMode);
 static void DoSpecialFade(void);
 
 //void StopAllSound(void);

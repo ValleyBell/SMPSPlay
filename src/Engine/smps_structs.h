@@ -72,6 +72,9 @@ typedef struct _file_data
 #define DCHNMODE_VRDLX	0x04	// Virtua Racing Deluxe 32x
 #define DCHNMODE_S2R	0x05	// Sonic 2 Recreation
 
+#define FADEMODE_Z80	0x00	// delay by (n-1) ticks
+#define FADEMODE_68K	0x01	// delay by n ticks
+
 #define ENVCMD_DATA		0x00	// not a command, but usual envelope data
 #define ENVCMD_RESET	0x01	// reset Envelope (set env. index to 0)
 #define ENVCMD_HOLD		0x02	// hold Envelope at current level
@@ -117,6 +120,14 @@ typedef struct _instrument_library
 	UINT16 InsCount;
 	UINT8** InsPtrs;
 } INS_LIB;
+typedef struct _fade_configuration
+{
+	UINT8 Steps;
+	UINT8 Delay;
+	UINT8 AddFM;
+	UINT8 AddPSG;
+} FADE_CFG;
+
 /*typedef struct _envelope_data
 {
 	UINT8 Len;
@@ -227,13 +238,9 @@ typedef struct _smps_configuration	// global SMPS driver configuration
 	UINT8 FM3FreqCnt;
 	UINT16* FM3Freqs;
 	
-	struct
-	{
-		UINT8 Steps;
-		UINT8 Delay;
-		UINT8 AddFM;
-		UINT8 AddPSG;
-	} FadeOut;
+	UINT8 FadeMode;
+	FADE_CFG FadeOut;
+	FADE_CFG FadeIn;
 	
 	UINT8 EnvCmds[0x80];
 	ENV_LIB ModEnvs;
