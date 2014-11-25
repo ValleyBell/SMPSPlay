@@ -19,20 +19,24 @@ typedef struct _dac_state
 	const DAC_TABLE* DACTblPtr;
 	const UINT8* DPCMData;
 	const UINT8* SmplData;
-	UINT32 SmplLen;
+	
+	// semi-constant variables
 	UINT32 FreqForce;	// FreqForce and RateForce force override the current playback speed.
 	UINT32 RateForce;	// The priority order (highest to lowest) is: FreqForce, RateForce, OverriddenRate, Rate
+	UINT16 BaseSmpl;	// for banked sounds
+	UINT16 Volume;		// sample volume (0x100 = 100%)
+	UINT8 PbBaseFlags;	// global Playback Flags
+	UINT8 PbFlags;		// Playback Flags for current DAC sound
+	
+	// working variables
 	UINT32 Pos;
 	UINT32 PosFract;	// 16.16 fixed point (upper 16 bits are used during calculation)
 	UINT32 DeltaFract;	// 16.16 fixed point Position Step
-	UINT16 Volume;
+	UINT32 SmplLen;		// remaining samples
+	
 	INT16 OutSmpl;		// needs to be 16-bit to allow volumes > 100%
-	UINT8 Compr;
-	UINT8 PbBaseFlags;
-	UINT8 PbFlags;
-	UINT8 DPCMState;
-	UINT8 DPCMNibble;
-	UINT16 BaseSmpl;	// for banked sounds
+	UINT8 DPCMState;	// current DPCM sample value
+	UINT8 DPCMNibble;	// 00 - high nibble, 01 - low nibble
 } DAC_STATE;
 
 
@@ -41,6 +45,8 @@ typedef struct _dac_state
 static UINT32 CalcDACFreq(UINT32 Rate);
 static UINT32 CalcDACDelta_Hz(UINT32 FreqHz);
 static UINT32 CalcDACDelta_Rate(UINT32 Rate);
+static UINT8 GetNextSample(DAC_STATE* ChnState, INT16* RetSmpl);
+static UINT8 HandleSampleEnd(DAC_STATE* ChnState);
 //void UpdateDAC(UINT32 Samples);
 //void DAC_Reset(void);
 //void DAC_ResetOverride(void);
@@ -170,14 +176,107 @@ static UINT32 CalcDACDelta_Rate(UINT32 Rate)	// returns 16.16 fixed point delta
 	return (UINT32)((Numerator + Divisor / 2) / Divisor);
 }
 
+static UINT8 GetNextSample(DAC_STATE* ChnState, INT16* RetSmpl)
+{
+	if (ChnState->DACSmplPtr->Compr == COMPR_PCM)
+	{
+		*RetSmpl = ChnState->SmplData[ChnState->Pos] - 0x80;
+		if (ChnState->PbFlags & DACFLAG_REVERSE)
+			ChnState->Pos --;
+		else
+			ChnState->Pos ++;
+		ChnState->SmplLen --;
+	}
+	else if (ChnState->DACSmplPtr->Compr == COMPR_DPCM)
+	{
+		UINT8 NibbleData;
+		
+		NibbleData = ChnState->SmplData[ChnState->Pos];
+		if (! (ChnState->PbFlags & DACFLAG_REVERSE))
+		{
+			// forward
+			if (! ChnState->DPCMNibble)
+			{
+				NibbleData >>= 4;
+			}
+			else
+			{
+				//NibbleData >>= 0;
+				ChnState->Pos ++;
+				ChnState->SmplLen --;
+			}
+			NibbleData &= 0x0F;
+			ChnState->DPCMState += ChnState->DPCMData[NibbleData];
+		}
+		else
+		{
+			// backward
+			if (ChnState->DPCMNibble)
+			{
+				NibbleData >>= 4;
+				ChnState->Pos --;
+				ChnState->SmplLen --;
+			}
+			NibbleData &= 0x0F;
+			ChnState->DPCMState -= ChnState->DPCMData[NibbleData];
+		}
+		ChnState->DPCMNibble ^= 0x01;
+		*RetSmpl = ChnState->DPCMState - 0x80;
+	}
+	
+	if (! ChnState->SmplLen)
+		return HandleSampleEnd(ChnState);
+	return 0x00;
+}
+
+static UINT8 HandleSampleEnd(DAC_STATE* ChnState)
+{
+	UINT8 RestartSmpl;
+	UINT8 VgmSmplID;
+	
+	RestartSmpl = (ChnState->PbFlags & DACFLAG_LOOP);
+	if (ChnState->PbFlags & DACFLAG_FLIP_FLOP)
+	{
+		if (! (ChnState->PbFlags & DACFLAG_FF_STATE))
+			RestartSmpl |= 0x02;
+		else if (ChnState->PbFlags & DACFLAG_LOOP)
+			RestartSmpl |= 0x02;
+		ChnState->PbFlags ^= (DACFLAG_REVERSE | DACFLAG_FF_STATE);
+	}
+	if (! RestartSmpl)
+	{
+		ChnState->DACSmplPtr = NULL;
+		return 0x01;
+	}
+	
+	ChnState->SmplLen = ChnState->DACSmplPtr->Size;
+	if (ChnState->PbFlags & DACFLAG_REVERSE)
+		ChnState->Pos = ChnState->SmplLen - 1;
+	else
+		ChnState->Pos = 0x00;
+	ChnState->DPCMState = 0x80;
+	
+	VgmSmplID = ChnState->DACSmplPtr->UsageID;
+	if (VgmSmplID < 0xFE)
+	{
+		if (ChnState->PbFlags & DACFLAG_REVERSE)
+			vgm_write_stream_data_command(0x00, 0x05, VgmSmplID | 0x100000);
+		else
+			vgm_write_stream_data_command(0x00, 0x05, VgmSmplID);
+	}
+	
+	return 0x00;
+}
+
 void UpdateDAC(UINT32 Samples)
 {
 	DAC_STATE* ChnState;
 	UINT8 CurChn;
-	INT16 OutSmpl;
 	UINT8 FnlSmpl;
+	INT16 OutSmpl;
 	UINT16 ProcessedSmpls;	// if 0, nothing is sent to the YM2612
 	UINT8 DacStopSignal;
+	UINT8 ChnStop;
 	
 	if (DACDrv == NULL)
 		return;
@@ -195,99 +294,19 @@ void UpdateDAC(UINT32 Samples)
 			if (ChnState->DACSmplPtr == NULL)
 				continue;
 			
+			ChnStop = 0;
 			ChnState->PosFract += ChnState->DeltaFract;
-			while(ChnState->PosFract >= 0x10000)
+			while(ChnState->PosFract >= 0x10000 && ! ChnStop)
 			{
 				ChnState->PosFract -= 0x10000;
-				if (ChnState->Compr == COMPR_PCM)
-				{
-					ChnState->OutSmpl = ChnState->SmplData[ChnState->Pos] - 0x80;
-					if (ChnState->PbFlags & DACFLAG_REVERSE)
-						ChnState->Pos --;
-					else
-						ChnState->Pos ++;
-					ChnState->SmplLen --;
-				}
-				else if (ChnState->Compr == COMPR_DPCM)
-				{
-					UINT8 NibbleData;
-					
-					NibbleData = ChnState->SmplData[ChnState->Pos];
-					if (! (ChnState->PbFlags & DACFLAG_REVERSE))
-					{
-						if (! ChnState->DPCMNibble)
-						{
-							NibbleData >>= 4;
-						}
-						else
-						{
-							//NibbleData >>= 0;
-							ChnState->Pos ++;
-							ChnState->SmplLen --;
-						}
-						NibbleData &= 0x0F;
-						ChnState->DPCMState += ChnState->DPCMData[NibbleData];
-					}
-					else
-					{
-						if (ChnState->DPCMNibble)
-						{
-							NibbleData >>= 4;
-							ChnState->Pos --;
-							ChnState->SmplLen --;
-						}
-						NibbleData &= 0x0F;
-						ChnState->DPCMState -= ChnState->DPCMData[NibbleData];
-					}
-					ChnState->DPCMNibble ^= 0x01;
-					ChnState->OutSmpl = ChnState->DPCMState - 0x80;
-				}
 				
+				ChnStop = GetNextSample(ChnState, &ChnState->OutSmpl);
 				if (ChnState->Volume != 0x100)
 					ChnState->OutSmpl = (ChnState->OutSmpl * ChnState->Volume) >> 8;
 				
 				ProcessedSmpls ++;
-				
-				if (! ChnState->SmplLen)
-				{
-					UINT8 RestartSmpl;
-					
-					RestartSmpl = (ChnState->PbFlags & DACFLAG_LOOP);
-					if (ChnState->PbFlags & DACFLAG_FLIP_FLOP)
-					{
-						if (! (ChnState->PbFlags & DACFLAG_FF_STATE))
-							RestartSmpl = 0x01;
-						else if (ChnState->PbFlags & DACFLAG_LOOP)
-							RestartSmpl = 0x01;
-						ChnState->PbFlags ^= (DACFLAG_REVERSE | DACFLAG_FF_STATE);
-					}
-					
-					if (RestartSmpl)
-					{
-						ChnState->SmplLen = ChnState->DACSmplPtr->Size;
-						if (ChnState->PbFlags & DACFLAG_REVERSE)
-							ChnState->Pos = ChnState->SmplLen - 1;
-						else
-							ChnState->Pos = 0x00;
-						ChnState->DPCMState = 0x80;
-						
-						RestartSmpl = ChnState->DACSmplPtr->UsageID;
-						if (RestartSmpl < 0xFE)
-						{
-							if (ChnState->PbFlags & DACFLAG_REVERSE)
-								vgm_write_stream_data_command(0x00, 0x05, RestartSmpl | 0x100000);
-							else
-								vgm_write_stream_data_command(0x00, 0x05, RestartSmpl);
-						}
-					}
-					else
-					{
-						ChnState->DACSmplPtr = NULL;
-						DacStopSignal = 1;
-						break;
-					}
-				}
 			}
+			DacStopSignal |= ChnStop;
 			OutSmpl += ChnState->OutSmpl;
 		}	// end for (CurChn)
 		
@@ -306,6 +325,8 @@ void UpdateDAC(UINT32 Samples)
 	
 	if (DacStopSignal)
 	{
+		// Loop over all channels and check, if one of them is still running.
+		// If not, the DAC can be turned off. (As most DAC drivers do it.)
 		ProcessedSmpls = 0;
 		for (CurChn = 0; CurChn < DACDrv->Cfg.Channels; CurChn ++)
 		{
@@ -319,6 +340,49 @@ void UpdateDAC(UINT32 Samples)
 	
 	return;
 }
+
+#if 0
+// Reference code ported from the PWM driver used by Knuckles Chaotix.
+// I assume that it's the default PWM driver from the 32x development kit.
+static void ProcessPWMSample(void)
+{
+	ChnState->PosFract += ChnState->DeltaFract;
+	if (ChnState->PosFract < 0x10000)
+	{
+		Out1_L += ChnState->SmplDataL;
+		Out2_L += ChnState->SmplDataL;
+		Out1_R += ChnState->SmplDataR;
+		Out2_R += ChnState->SmplDataR;
+		return;
+	}
+	ChnState->PosFract -= 0x10000;
+	
+	ChnState->SmplLen --;
+	if (! ChnState->SmplLen)
+	{
+		ChnState->Pos = ChnState->DACSmplPtr->LoopOfs;
+		if (! ChnState->Pos)
+			return;
+		ChnState->SmplLen = ChnState->DACSmplPtr->Size - ChnState->DACSmplPtr->LoopOfs;
+	}
+	SmplData = ChnState->SmplData[ChnState->Pos] - 0x80;
+	ChnState->Pos ++;
+	
+	NewSmpData = SmplData * VolL >> 4;
+	OldSmpData = ChnState->SmplDataL;
+	ChnState->SmplDataL = NewSmpData;
+	Out2_L += NewSmpData;
+	Out1_L += (OldSmpData + NewSmpData) / 2;
+	
+	NewSmpData = SmplData * VolR >> 4;
+	OldSmpData = ChnState->SmplDataR;
+	ChnState->SmplDataR = NewSmpData;
+	Out2_R += NewSmpData;
+	Out1_R += (OldSmpData + NewSmpData) / 2;
+	
+	return;
+}
+#endif
 
 
 void DAC_Reset(void)
@@ -465,7 +529,6 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 	DACChn->DACTblPtr = TempEntry;
 	DACChn->DPCMData = TempSmpl->DPCMArr;
 	DACChn->SmplData = TempSmpl->Data;
-	DACChn->Compr = TempSmpl->Compr;
 	DACChn->DPCMState = 0x80;
 	DACChn->DPCMNibble = 0x00;
 	DACChn->OutSmpl = 0x0000;
