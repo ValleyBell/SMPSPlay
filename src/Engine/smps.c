@@ -327,8 +327,11 @@ void UpdateMusic(void)
 	DoTempo();
 	if (! SmpsRAM.MusMultUpdate)
 		return;
+	
 	DoSpecialFade();
 	DoFade(0x01);	// FadeOut
+	if (SmpsRAM.MusSet == NULL)	// The FadeOut routine calls StopAllSound, so it NULLs the music set.
+		return;
 	DoFade(0x00);	// FadeIn
 	
 	SmpsRAM.TrkMode = TRKMODE_MUSIC;

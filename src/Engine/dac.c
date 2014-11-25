@@ -33,6 +33,8 @@ typedef struct _dac_state
 	UINT32 PosFract;	// 16.16 fixed point (upper 16 bits are used during calculation)
 	UINT32 DeltaFract;	// 16.16 fixed point Position Step
 	UINT32 SmplLen;		// remaining samples
+	INT16 SmplLast;
+	INT16 SmplNext;
 	
 	INT16 OutSmpl;		// needs to be 16-bit to allow volumes > 100%
 	UINT8 DPCMState;	// current DPCM sample value
@@ -47,6 +49,7 @@ static UINT32 CalcDACDelta_Hz(UINT32 FreqHz);
 static UINT32 CalcDACDelta_Rate(UINT32 Rate);
 static UINT8 GetNextSample(DAC_STATE* ChnState, INT16* RetSmpl);
 static UINT8 HandleSampleEnd(DAC_STATE* ChnState);
+static INT16 UpdateChannels(UINT16* ProcSmpls, UINT8* StopSignal);
 //void UpdateDAC(UINT32 Samples);
 //void DAC_Reset(void);
 //void DAC_ResetOverride(void);
@@ -246,6 +249,7 @@ static UINT8 HandleSampleEnd(DAC_STATE* ChnState)
 	if (! RestartSmpl)
 	{
 		ChnState->DACSmplPtr = NULL;
+		ChnState->SmplLast = ChnState->SmplNext = 0x0000;
 		return 0x01;
 	}
 	
@@ -268,47 +272,80 @@ static UINT8 HandleSampleEnd(DAC_STATE* ChnState)
 	return 0x00;
 }
 
-void UpdateDAC(UINT32 Samples)
+static INT16 UpdateChannels(UINT16* ProcSmpls, UINT8* StopSignal)
 {
 	DAC_STATE* ChnState;
 	UINT8 CurChn;
-	UINT8 FnlSmpl;
 	INT16 OutSmpl;
 	UINT16 ProcessedSmpls;	// if 0, nothing is sent to the YM2612
 	UINT8 DacStopSignal;
 	UINT8 ChnStop;
 	
-	if (DACDrv == NULL)
-		return;
-	
-	ym2612_w(0x00, 0x00, 0x2A);
-	
-	while(Samples)
+	ProcessedSmpls = 0;
+	DacStopSignal = 0;
+	OutSmpl = 0x0000;
+	for (CurChn = 0; CurChn < DACDrv->Cfg.Channels; CurChn ++)
 	{
-		ProcessedSmpls = 0;
-		DacStopSignal = 0;
-		OutSmpl = 0x0000;
-		for (CurChn = 0; CurChn < DACDrv->Cfg.Channels; CurChn ++)
+		ChnState = &DACChnState[CurChn];
+		if (ChnState->DACSmplPtr == NULL)
+			continue;
+		
+		ChnState->PosFract += ChnState->DeltaFract;
+		ChnStop = 0;
+		if (DACDrv->Cfg.SmplMode == DACSM_NORMAL)
 		{
-			ChnState = &DACChnState[CurChn];
-			if (ChnState->DACSmplPtr == NULL)
-				continue;
-			
-			ChnStop = 0;
-			ChnState->PosFract += ChnState->DeltaFract;
 			while(ChnState->PosFract >= 0x10000 && ! ChnStop)
 			{
 				ChnState->PosFract -= 0x10000;
-				
 				ChnStop = GetNextSample(ChnState, &ChnState->OutSmpl);
-				if (ChnState->Volume != 0x100)
-					ChnState->OutSmpl = (ChnState->OutSmpl * ChnState->Volume) >> 8;
-				
 				ProcessedSmpls ++;
 			}
-			DacStopSignal |= ChnStop;
+		}
+		else //if (DACDrv->Cfg.SmplMode == DACSM_INTERPLT)
+		{
+			while(ChnState->PosFract >= 0x10000 && ! ChnStop)
+			{
+				ChnState->PosFract -= 0x10000;
+				ChnState->SmplLast = ChnState->SmplNext;
+				ChnStop = GetNextSample(ChnState, &ChnState->SmplNext);
+			}
+			ChnState->PosFract &= 0xFFFF;	// in case ChnStop is true
+			ChnState->OutSmpl = (ChnState->SmplLast * (0x10000 - ChnState->PosFract) +
+								 ChnState->SmplNext * ChnState->PosFract) >> 16;
+			ProcessedSmpls ++;
+		}
+		
+		DacStopSignal |= ChnStop;
+		if (ChnState->Volume == 0x100)
 			OutSmpl += ChnState->OutSmpl;
-		}	// end for (CurChn)
+		else
+			OutSmpl += (ChnState->OutSmpl * ChnState->Volume) >> 8;
+	}	// end for (CurChn)
+	
+	if (ProcSmpls != NULL)
+		*ProcSmpls = ProcessedSmpls;
+	if (StopSignal != NULL)
+		*StopSignal |= DacStopSignal;	// keep old bits set
+	return OutSmpl;
+}
+
+void UpdateDAC(UINT32 Samples)
+{
+	UINT8 CurChn;
+	UINT8 FnlSmpl;
+	INT16 OutSmpl;
+	UINT16 ProcessedSmpls;	// if 0, nothing is sent to the YM2612
+	UINT8 DacStopSignal;
+	UINT8 RunningChns;
+	
+	if (DACDrv == NULL)
+		return;
+	
+	DacStopSignal = 0x00;
+	ym2612_w(0x00, 0x00, 0x2A);	// YM2612: Register 2A: DAC Data
+	while(Samples)
+	{
+		OutSmpl = UpdateChannels(&ProcessedSmpls, &DacStopSignal);
 		
 		if (ProcessedSmpls)
 		{
@@ -318,7 +355,7 @@ void UpdateDAC(UINT32 Samples)
 			else if (OutSmpl > 0x7F)
 				OutSmpl = 0x7F;
 			FnlSmpl = (UINT8)(0x80 + OutSmpl);
-			ym2612_w(0x00, 0x01, FnlSmpl);	// write directly to chip, skipping VGM logging
+			ym2612_w(0x00, 0x01, FnlSmpl);	// write data directly to chip, skipping VGM logging
 		}
 		Samples --;
 	}
@@ -327,14 +364,13 @@ void UpdateDAC(UINT32 Samples)
 	{
 		// Loop over all channels and check, if one of them is still running.
 		// If not, the DAC can be turned off. (As most DAC drivers do it.)
-		ProcessedSmpls = 0;
+		RunningChns = 0;
 		for (CurChn = 0; CurChn < DACDrv->Cfg.Channels; CurChn ++)
 		{
-			ChnState = &DACChnState[CurChn];
-			if (ChnState->DACSmplPtr != NULL)
-				ProcessedSmpls ++;
+			if (DACChnState[CurChn].DACSmplPtr != NULL)
+				RunningChns ++;
 		}
-		if (! ProcessedSmpls)
+		if (! RunningChns)
 			SetDACState(0x00);	// also does WriteFMI(0x2B, 0x00);
 	}
 	
@@ -388,12 +424,15 @@ static void ProcessPWMSample(void)
 void DAC_Reset(void)
 {
 	UINT8 CurChn;
+	DAC_STATE* DACChn;
 	
 	for (CurChn = 0; CurChn < MAX_DAC_CHNS; CurChn ++)
 	{
-		DACChnState[CurChn].DACSmplPtr = NULL;
-		//DACChnState[CurChn].PbBaseFlags = 0x00;
-		//DACChnState[CurChn].Volume = 0x100;
+		DACChn = &DACChnState[CurChn];
+		DACChn->DACSmplPtr = NULL;
+		//DACChn->PbBaseFlags = 0x00;
+		//DACChn->Volume = 0x100;
+		DACChn->SmplLast = DACChn->SmplNext = 0x0000;
 	}
 	
 	DAC_ResetOverride();
@@ -405,6 +444,7 @@ void DAC_ResetOverride(void)
 {
 	UINT16 CurSmpl;
 	UINT8 CurChn;
+	DAC_STATE* DACChn;
 	
 	if (DACDrv != NULL)
 	{
@@ -414,12 +454,13 @@ void DAC_ResetOverride(void)
 	
 	for (CurChn = 0; CurChn < MAX_DAC_CHNS; CurChn ++)
 	{
-		DACChnState[CurChn].FreqForce = 0;
-		DACChnState[CurChn].RateForce = 0;
-		DACChnState[CurChn].PbBaseFlags = 0x00;
-		//DACChnState[CurChn].PbFlags = 0x00;
-		DACChnState[CurChn].Volume = 0x100;
-		DACChnState[CurChn].BaseSmpl = 0x00;
+		DACChn = &DACChnState[CurChn];
+		DACChn->FreqForce = 0;
+		DACChn->RateForce = 0;
+		DACChn->PbBaseFlags = 0x00;
+		//DACChn->PbFlags = 0x00;
+		DACChn->Volume = 0x100;
+		DACChn->BaseSmpl = 0x00;
 	}
 	
 	return;
@@ -478,6 +519,7 @@ void DAC_Stop(UINT8 Chn)
 		return;
 	
 	DACChn->DACSmplPtr = NULL;
+	DACChn->SmplLast = DACChn->SmplNext = 0x0000;
 	vgm_write_stream_data_command(0x00, 0x04, 0x00);
 	
 	for (CurChn = 0; CurChn < MAX_DAC_CHNS; CurChn ++)
@@ -532,6 +574,8 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 	DACChn->DPCMState = 0x80;
 	DACChn->DPCMNibble = 0x00;
 	DACChn->OutSmpl = 0x0000;
+	DACChn->SmplLast = DACChn->SmplNext;
+	DACChn->SmplNext = 0x0000;
 	
 	DACChn->PbFlags = TempEntry->Flags;
 	DACChn->PbFlags |= (DACChn->PbBaseFlags & ~DACFLAG_REVERSE);
@@ -547,7 +591,10 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 		DACChn->Pos = DACChn->SmplLen - 1;
 	else
 		DACChn->Pos = 0x00;
-	DACChn->PosFract = 0x00;
+	if (DACDrv->Cfg.SmplMode == DACSM_NORMAL)
+		DACChn->PosFract = 0x0000;
+	else //if (DACDrv->Cfg.SmplMode == DACSM_INTERPLT)
+		DACChn->PosFract = 0x10000;	// make it read the next sample immediately
 	
 	if (DACChn->FreqForce)
 	{

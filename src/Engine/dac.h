@@ -26,6 +26,8 @@ typedef struct _dac_table
 #define DACRM_DELAY		0x00
 #define DACRM_OVERFLOW	0x01
 #define DACRM_NOVERFLOW	0x02
+#define DACSM_NORMAL	0x00
+#define DACSM_INTERPLT	0x01	// do linear interpolation between samples
 typedef struct _dac_settings
 {
 	UINT32 BaseCycles;
@@ -36,6 +38,7 @@ typedef struct _dac_settings
 	UINT32 BaseRate;
 	UINT32 Divider;	// Note: .2 (decimal) Fixed Point, i.e. 123 means 1.23
 	UINT8 RateMode;
+	UINT8 SmplMode;	// Resample Mode
 	
 	UINT8 Channels;
 	UINT8 VolDiv;

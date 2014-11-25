@@ -202,6 +202,8 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 				CfgData->CompressVGMs = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "FM6DACOff"))
 				CfgData->FM6DACOff = GetBoolValue(RToken1, "True", "False");
+			else if (! _stricmp(LToken, "ResmplForce"))
+				CfgData->ResmplForce = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "DebugMsgs"))
 				CfgData->DebugMsgs = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "AudioBuffers"))

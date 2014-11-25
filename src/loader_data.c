@@ -91,6 +91,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 	DACDrv->Cfg.Channels = 1;
 	DACDrv->Cfg.VolDiv = 1;
 	DACDrv->Cfg.RateMode = DACRM_DELAY;
+	DACDrv->Cfg.SmplMode = DACSM_NORMAL;
 	DSmpl.DPCMData = NULL;
 	
 	strcpy(BasePath, FileName);
@@ -162,6 +163,8 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 				DACDrv->Cfg.LoopCycles = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "LoopSamples"))
 				DACDrv->Cfg.LoopSamples = (UINT32)strtoul(RToken1, NULL, 0);
+			else if (! _stricmp(LToken, "ResampleMode"))
+				DACDrv->Cfg.SmplMode = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "RateMode"))
 				DACDrv->Cfg.RateMode = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "RateOverflow"))

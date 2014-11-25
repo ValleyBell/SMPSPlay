@@ -105,6 +105,7 @@ int main(int argc, char* argv[])
 	vgm_init();
 	memset(&Config, 0x00, sizeof(CONFIG_DATA));
 	Config.FM6DACOff = 0xFF;
+	Config.ResmplForce = 0xFF;
 	
 	LoadConfigurationFiles(&Config, "config.ini");
 	DebugMsgs = Config.DebugMsgs;
@@ -124,6 +125,14 @@ int main(int argc, char* argv[])
 		{
 			NewSmpsEDef = &Config.ExtList.ExtData[smps_playing];
 			NewSmpsEDef->SmpsCfg.FM6DACOff = Config.FM6DACOff;
+		}
+	}
+	if (Config.ResmplForce != 0xFF)
+	{
+		for (smps_playing = 0; smps_playing < Config.ExtList.ExtCount; smps_playing ++)
+		{
+			NewSmpsEDef = &Config.ExtList.ExtData[smps_playing];
+			NewSmpsEDef->SmpsCfg.DACDrv.Cfg.SmplMode = Config.ResmplForce;
 		}
 	}
 	

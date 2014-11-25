@@ -47,6 +47,7 @@ typedef struct _config_data
 	UINT8 ExtFilter;
 	UINT8 CompressVGMs;
 	UINT8 FM6DACOff;
+	UINT8 ResmplForce;
 	UINT8 DebugMsgs;
 	UINT8 LogWave;
 	UINT32 AudioBufs;
