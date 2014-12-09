@@ -377,6 +377,18 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 						else if (TrkMode & PBKFLG_RAWFREQ)	// handle PS4 special mode
 							MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos]);
 					}
+					else if (SmpsCfg->DrumChnMode == DCHNMODE_SMGP2 && CurTrk == 1)
+					{
+						if (FileData[CurPos] != SmpsCfg->NoteBase)
+						{
+							//if (FileData[CurPos] + Trk->Transp < 0xB0)
+							//	MarkDrum_DACNote(DACDrv, DACBank, 0x86);
+							//else
+							//	MarkDrum_DACNote(DACDrv, DACBank, 0x87);
+							MarkDrum_DACNote(DACDrv, DACBank, 0x86);
+							MarkDrum_DACNote(DACDrv, DACBank, 0x87);
+						}
+					}
 					
 					CurPos ++;	// note
 					if (TrkMode & PBKFLG_PITCHSLIDE)

@@ -792,9 +792,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			Trk->PanAni.Type = Data[0x00];
 			if (Trk->PanAni.Type)
 			{
-				if (DebugMsgs & 0x02)
-					printf("Chn %02X %s Pan Ani: %02X %02X %02X %02X %02X\n",
-							Trk->ChannelMask, "68k", Data[0x00], Data[0x01], Data[0x02], Data[0x03], Data[0x04]);
+				//if (DebugMsgs & 0x02)
+				//	printf("Chn %02X %s Pan Ani: %02X %02X %02X %02X %02X\n",
+				//			Trk->ChannelMask, "68k", Data[0x00], Data[0x01], Data[0x02], Data[0x03], Data[0x04]);
 				Trk->PanAni.Anim = Data[0x01] - 1;	// Z80 is 0-based, 68k is 1-based
 				Trk->PanAni.AniIdx = Data[0x02];
 				Trk->PanAni.AniLen = Data[0x03] + 1;	// SMPS 68k plays [0..n] instead of [0..n-1]
@@ -808,9 +808,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		else
 		{
 			Trk->PanAni.Type = Data[0x00];
-			if (Trk->PanAni.Type && (DebugMsgs & 0x02))
-				printf("Chn %02X %s Pan Ani: %02X %02X %02X %02X %02X\n",
-						Trk->ChannelMask, "Z80", Data[0x00], Data[0x01], Data[0x02], Data[0x03], Data[0x04]);
+			//if (Trk->PanAni.Type && (DebugMsgs & 0x02))
+			//	printf("Chn %02X %s Pan Ani: %02X %02X %02X %02X %02X\n",
+			//			Trk->ChannelMask, "Z80", Data[0x00], Data[0x01], Data[0x02], Data[0x03], Data[0x04]);
 			Trk->PanAni.Anim = Data[0x01];
 			Trk->PanAni.AniIdx = Data[0x02];
 			Trk->PanAni.AniLen = Data[0x03];

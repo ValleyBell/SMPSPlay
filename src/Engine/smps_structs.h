@@ -71,6 +71,7 @@ typedef struct _file_data
 #define DCHNMODE_CYMN	0x03	// Chou Yakyuu Miracle Nine
 #define DCHNMODE_VRDLX	0x04	// Virtua Racing Deluxe 32x
 #define DCHNMODE_S2R	0x05	// Sonic 2 Recreation
+#define DCHNMODE_SMGP2	0x06	// Ayrton Senna's Super Monaco GP II
 
 #define FADEMODE_Z80	0x00	// delay by (n-1) ticks
 #define FADEMODE_68K	0x01	// delay by n ticks

@@ -392,7 +392,9 @@ INLINE void UpdateTrack(TRK_RAM* Trk)
 	}
 	else if (Trk->ChannelMask & 0x10)
 	{
-		if (Trk->ChannelMask & 0x08)
+		if ((Trk->ChannelMask & 0x0F) == 0x0F)
+			;	// UpdatePicoPCMTrack(Trk)
+		else if (Trk->ChannelMask & 0x08)
 			UpdatePWMTrack(Trk);
 		else
 			UpdateDrumTrack(Trk);
@@ -593,6 +595,7 @@ static void UpdatePSGVolume(TRK_RAM* Trk, UINT8 WasNewNote)
 static void UpdateDrumTrack(TRK_RAM* Trk)
 {
 	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	UINT8 Note;
 	
 	Trk->RemTicks --;
 	if (! Trk->RemTicks)
@@ -615,15 +618,17 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 				return;
 		}
 		
+		Note = 0x00;
 		if (Data[Trk->Pos] >= SmpsCfg->NoteBase)
 		{
 			Extra_LoopStartCheck(Trk);
-			Trk->DAC.Snd = Data[Trk->Pos];
+			Note = Data[Trk->Pos];
 			Trk->Pos ++;
 			
 			if (Trk->SpcDacMode == DCHNMODE_GAXE3)
 			{
 				// Golden Axe III: Special 2-ch DAC mode (2 separate notes, one for each channel)
+				Trk->DAC.Snd = Note;
 				Trk->DAC.Unused = 0x00;
 				if (Trk->GA3_DacMode & 0x01)
 				{
@@ -635,11 +640,28 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 			}
 			else if (Trk->SpcDacMode == DCHNMODE_S2R)
 			{
-				Trk->DAC.Snd -= SmpsCfg->NoteBase;
+				Trk->DAC.Snd = Note - SmpsCfg->NoteBase;
 				if (! Trk->DAC.Snd)
 					Trk->PlaybkFlags |= PBKFLG_ATREST;
 				else
 					Trk->DAC.Snd += Trk->Transpose;
+			}
+			else if (Trk->SpcDacMode == DCHNMODE_SMGP2)
+			{
+				if ((Trk->ChannelMask & 0x01) && Note == SmpsCfg->NoteBase)
+				{
+					Trk->PlaybkFlags |= PBKFLG_ATREST;
+					if (SmpsCfg->DelayFreq == DLYFREQ_RESET)
+						Trk->DAC.Snd = Note;
+				}
+				else
+				{
+					Trk->DAC.Snd = Note;
+				}
+			}
+			else
+			{
+				Trk->DAC.Snd = Note;
 			}
 		}
 		
@@ -691,6 +713,23 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 						PlayDrumNote(Trk, SmpsCfg->NoteBase + Trk->DAC.Snd);
 					else
 						DAC_Play(0x00, Trk->DAC.Snd - 0x01);
+				}
+				break;
+			case DCHNMODE_SMGP2:
+				if (Trk->ChannelMask & 0x01)
+				{
+					// melodic DAC mode
+					if (Trk->DAC.Snd >= SmpsCfg->NoteBase)
+						PlaySMGP2DACNote(Trk, Trk->DAC.Snd);
+				}
+				else
+				{
+					if (Trk->DAC.Snd & 0x0F)
+						DAC_SetRate(0x00, 0x00, 0x00);
+					if (Trk->DAC.Snd & 0x70)
+						DAC_SetRate(0x01, 0x00, 0x00);
+					if (Trk->DAC.Snd >= SmpsCfg->NoteBase)
+						PlayDrumNote(Trk, Trk->DAC.Snd);
 				}
 				break;
 			}
@@ -1149,6 +1188,8 @@ static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 		if (SmpsCfg->FMFreqCnt == 12)
 		{
 			Note &= 0xFF;	// simulate SMPS Z80 behaviour
+			if (SmpsCfg->FMBaseNote == FMBASEN_B)
+				Note &= 0x7F;	// SMPS 68k strips the sign bit, too
 			Octave = SmpsCfg->FMBaseOct + Note / 12;
 			Note %= 12;
 			return SmpsCfg->FMFreqs[Note] | (Octave << 11);
@@ -1176,7 +1217,12 @@ static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue)
 	if (! Trk->PanAni.Type)
 		return;	// Pan Animation disabled
 	if (Trk->PanAni.Anim >= PAniLib->AniCount)
+	{
+		if (DebugMsgs & 0x02)
+			printf("Warning: invalid Pan Animation 0x%02X\n", Trk->PanAni.Anim);
+		Trk->PanAni.Type = 0x00;
 		return;
+	}
 	
 	// StartPanAnim:
 	//	1	(return if Hold-Bit set), DoPanAnim
@@ -1220,7 +1266,12 @@ static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue)
 		return;
 	DataPtr += Trk->PanAni.AniIdx;	// add Animation Index
 	if (DataPtr >= PAniLib->DataLen)
+	{
+		if (DebugMsgs & 0x02)
+			printf("Warning: invalid Envelope Index 0x%02X (Env. %02X)\n",
+			Trk->PanAni.AniIdx, Trk->PanAni.Anim);
 		DataPtr = PAniLib->DataLen - 1;	// prevent reading beyond EOF
+	}
 	PanData = PAniLib->Data[DataPtr];
 	
 	Trk->PanAni.AniIdx ++;
@@ -2113,7 +2164,7 @@ static UINT8 CheckTrkID(UINT8 TrkID, UINT8 ChnBits)
 		BestTrkID = (ChnBits & 0x60) >> 5;
 		return CheckTrkRange(TrkID, TRACK_MUS_PSG1 + BestTrkID, TRACK_MUS_PSG1, TRACK_MUS_PSG_END);
 	}
-	else if ((ChnBits & 0xF8) == 0x18)
+	else if ((ChnBits & 0xF8) == 0x18 && ChnBits != 0x1F)
 	{
 		return CheckTrkRange(TrkID, TrkID, TRACK_MUS_PWM1, TRACK_MUS_PWM_END);
 	}

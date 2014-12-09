@@ -74,6 +74,7 @@ History
 	fixed missing DAC sounds in VGM logs
 	added per-driver fading settings
 	added Fade In support used by Sonic games
+	added support for Super Monaco GP II's melody DAC channel
 2014-08-17 - 2.01
 	added proper support for Master System SMPS (incl. PSG drums, additional commands)
 	added preSMPS instrument format (register-data pairs)

@@ -110,6 +110,7 @@ void RefreshDACVolume(TRK_RAM* Trk, UINT8 DacMode, UINT8 DacChn, UINT8 Volume);
 // smps_drum.c
 void PlayDrumNote(TRK_RAM* Trk, UINT8 Note);
 void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note);
+void PlaySMGP2DACNote(TRK_RAM* Trk, UINT8 Note);
 void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note);
 
 

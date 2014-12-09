@@ -105,6 +105,7 @@ static const OPT_LIST OPT_DRMCHNMODE[] =
 	{"GAXE3", DCHNMODE_GAXE3},
 	{"VRDLX", DCHNMODE_VRDLX},
 	{"S2R", DCHNMODE_S2R},
+	{"SMGP2", DCHNMODE_SMGP2},
 	{NULL, 0}};
 static const OPT_LIST OPT_FREQVALS_FM[] =
 {	{"DEF_68K", 1},
@@ -527,10 +528,11 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 					{
 						if (ChnIDs[CurChn] & ~0xF0)
 							break;
-						SmpsCfg->PSGChnCnt = 0x00;
+						if (ChnIDs[CurChn] == 0x80)
+							SmpsCfg->PSGChnCnt = 0x00;
 						continue;
 					}
-					if (ChnIDs[CurChn] & ~0x97)
+					if (ChnIDs[CurChn] & ~0x9F)
 						break;
 				}
 				if (! ChnCount || ChnCount > 8 || CurChn < ChnCount)	// invalid channels used?

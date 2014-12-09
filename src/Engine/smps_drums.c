@@ -128,7 +128,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 			for (CurChn = 0; CurChn < 8; CurChn ++)
 			{
 				if (DrumData->ChnMask & (1 << CurChn))
- 					DAC_Play(CurChn, DrumData->DrumID);
+					DAC_Play(CurChn, DrumData->DrumID);
 			}
 		}
 		break;
@@ -331,6 +331,54 @@ void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note)
 				return;	// DAC disabled - return
 			DAC_Play(0x00, Note - 0x01);
 		}
+	}
+	
+	return;
+}
+
+static const UINT8 SMGP2_Rates[0x23] =
+{	0x25, 0x27, 0x29, 0x2C, 0x2E, 0x31, 0x34, 0x36, 0x3A, 0x3C, 0x40, 0x44,
+	0x48, 0x4C, 0x50, 0x54, 0x5A, 0x5F, 0x64, 0x6A, 0x70, 0x77, 0x7E, 0x86,
+	0x8D, 0x96, 0x9E, 0xA8, 0xB3, 0xBE, 0x6A, 0x70, 0x77, 0x7E, 0x86
+};
+
+void PlaySMGP2DACNote(TRK_RAM* Trk, UINT8 Note)
+{
+	// special Super Monaco GP II Melody DAC mode
+	if (Trk->PlaybkFlags & PBKFLG_HOLD)
+		return;
+	
+	Note -= Trk->SmpsSet->Cfg->NoteBase;
+	if (Trk->PlaybkFlags & PBKFLG_ATREST)
+	{
+		Trk->Instrument = 0x00;
+		Trk->ModEnv = 0x88;
+		DAC_Stop(Trk->ChannelMask & 0x01);
+		return;
+	}
+	else
+	{
+		Note += Trk->Transpose;
+		if (Note < 0xB0-0x80)
+		{
+			Trk->Instrument = Note - 0x01;
+			Trk->ModEnv = 0x86;
+		}
+		else
+		{
+			Trk->Instrument = Note - (0xA0-0x80);
+			Trk->ModEnv = 0x87;
+		}
+	}
+	if (Trk->Instrument < 0x23)
+	{
+		DAC_SetRate(Trk->ChannelMask & 0x01, SMGP2_Rates[Trk->Instrument], 0x00);
+		DAC_Play(Trk->ChannelMask & 0x01, Trk->ModEnv - 0x81);
+	}
+	else
+	{
+		DAC_Stop(Trk->ChannelMask & 0x01);
+		return;
 	}
 	
 	return;

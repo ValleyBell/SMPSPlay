@@ -25,6 +25,7 @@ struct _smps_extention_definition
 	char* VolEnvFile;
 	char* PanAniFile;
 	char* DACFile;
+	char* PWMFile;
 	char* FMDrmFile;
 	char* PSGDrmFile;
 	char* GlbInsLibFile;

@@ -76,6 +76,7 @@ static SMPS_EXT_DEF* GetNewExtentionData(EXT_LIST* ExtList, const char* ExtStr)
 	TempExt->VolEnvFile = NULL;
 	TempExt->PanAniFile = NULL;
 	TempExt->DACFile = NULL;
+	TempExt->PWMFile = NULL;
 	TempExt->FMDrmFile = NULL;
 	TempExt->PSGDrmFile = NULL;
 	TempExt->GlbInsLibFile = NULL;
@@ -239,6 +240,8 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 					strdup_free(&ExtData->PanAniFile, PathBuf);
 				else if (! _stricmp(LToken, "DAC"))
 					strdup_free(&ExtData->DACFile, PathBuf);
+				else if (! _stricmp(LToken, "PWM"))
+					strdup_free(&ExtData->PWMFile, PathBuf);
 				else if (! _stricmp(LToken, "FMDrums"))
 					strdup_free(&ExtData->FMDrmFile, PathBuf);
 				else if (! _stricmp(LToken, "PSGDrums"))
@@ -300,6 +303,8 @@ void FreeConfigurationFiles(CONFIG_DATA* CfgData)
 			free(ExtDef->PanAniFile);
 		if (ExtDef->DACFile != NULL)
 			free(ExtDef->DACFile);
+		if (ExtDef->PWMFile != NULL)
+			free(ExtDef->PWMFile);
 		if (ExtDef->FMDrmFile != NULL)
 			free(ExtDef->FMDrmFile);
 		if (ExtDef->PSGDrmFile != NULL)
@@ -327,6 +332,12 @@ static void LoadExtData_Single(SMPS_EXT_DEF* ExtDef)
 		// Note: Must be loaded at first, because the Driver Definition
 		//       can overwrite the DAC channel count.
 		LoadDACData(ExtDef->DACFile, &SmpsCfg->DACDrv);
+	}
+	if (ExtDef->PWMFile != NULL && ExtDef->DACFile == NULL)
+	{
+		// Note: Must be loaded at first, because the Driver Definition
+		//       can overwrite the DAC channel count.
+		LoadDACData(ExtDef->PWMFile, &SmpsCfg->DACDrv);
 	}
 	if (ExtDef->DriverFile != NULL)
 	{
