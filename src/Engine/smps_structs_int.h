@@ -247,6 +247,7 @@ typedef struct _sound_ram
 	// 1C11 - Music is paused via in-sequence commands
 	UINT8 SpcFM3Mode;		// 1C12 - Special FM3 Mode Bits (YM2612 Register 027)
 	UINT8 NoiseDrmVol;		// DD16 - Base Volume for Noise Drums [Master System SMPS only]
+	UINT8 NecPcmOverride;	// SMPS Pico only
 	UINT8 MusMultUpdate;	// Music Multi-Update (number of times the music will get processed)
 	UINT8 TempoCntr;		// 1C13 - Tempo Counter/Tempo Timeout
 	UINT8 TempoInit;		// 1C14 - Initial Tempo Value

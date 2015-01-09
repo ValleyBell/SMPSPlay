@@ -19,12 +19,14 @@
 #include "smps_int.h"
 #include "../Sound.h"
 #include "dac.h"
+#include "necpcm.h"
 
 UINT8 ym2612_r(UINT8 ChipID, offs_t offset);
 #define ReadFM()				ym2612_r(0x00, 0x00)
 #define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, 0x00, Reg, Data)
 #define WriteFMII(Reg, Data)	ym2612_fm_write(0x00, 0x01, Reg, Data)
 #define WritePSG(Data)			sn76496_psg_write(0x00, Data)
+int upd7759_busy_r(UINT8 ChipID);
 
 extern UINT8 DebugMsgs;
 
@@ -323,6 +325,12 @@ void UpdateMusic(void)
 	if (SmpsRAM.MusSet == NULL)
 		return;
 	
+	if (SmpsRAM.NecPcmOverride)
+	{
+		if (upd7759_busy_r(0x00))	// actually returns "ready"
+			SmpsRAM.NecPcmOverride = 0x00;	// PCM sound finished - remove PCM SFX lock
+	}
+	
 	SmpsRAM.MusMultUpdate = 1;
 	DoTempo();
 	if (! SmpsRAM.MusMultUpdate)
@@ -392,9 +400,7 @@ INLINE void UpdateTrack(TRK_RAM* Trk)
 	}
 	else if (Trk->ChannelMask & 0x10)
 	{
-		if ((Trk->ChannelMask & 0x0F) == 0x0F)
-			;	// UpdatePicoPCMTrack(Trk)
-		else if (Trk->ChannelMask & 0x08)
+		if (Trk->ChannelMask & 0x08)
 			UpdatePWMTrack(Trk);
 		else
 			UpdateDrumTrack(Trk);
@@ -2125,6 +2131,8 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 	else //if (SmpsRAM.TimingMode == 0x80)
 		ym2612_timer_mask(0x03);	// YM2612 Timer A and B
 	SetDACDriver((DAC_CFG*)&SmpsCfg->DACDrv);
+	SetNecPCMDriver((DAC_CFG*)&SmpsCfg->DACDrv);
+	
 	DAC_ResetOverride();
 	
 	return;
@@ -2978,6 +2986,7 @@ void StopAllSound(void)
 	
 	for (CurChn = 0; CurChn < 8; CurChn ++)
 		DAC_Stop(CurChn);
+	NECPCM_Stop();
 	for (CurChn = 0; CurChn < 7; CurChn ++)
 	{
 		if ((CurChn & 0x03) == 0x03)
@@ -3237,6 +3246,7 @@ void RestoreMusic(MUS_STATE* MusState)
 	if (SmpsRAM.MusSet != NULL)
 	{
 		SetDACDriver((DAC_CFG*)&SmpsRAM.MusSet->Cfg->DACDrv);
+		SetNecPCMDriver((DAC_CFG*)&SmpsRAM.MusSet->Cfg->DACDrv);
 		DAC_ResetOverride();
 	}
 	

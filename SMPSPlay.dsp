@@ -115,6 +115,10 @@ SOURCE=.\src\main.c
 # End Source File
 # Begin Source File
 
+SOURCE=.\src\Engine\necpcm.c
+# End Source File
+# Begin Source File
+
 SOURCE=.\src\Engine\smps.c
 # End Source File
 # Begin Source File
@@ -140,6 +144,10 @@ SOURCE=.\src\Engine\dac.h
 # Begin Source File
 
 SOURCE=.\src\loader.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\src\Engine\necpcm.h
 # End Source File
 # Begin Source File
 
@@ -248,6 +256,14 @@ SOURCE=.\src\Stream.c
 # Begin Source File
 
 SOURCE=.\src\Stream.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\src\chips\upd7759.c
+# End Source File
+# Begin Source File
+
+SOURCE=.\src\chips\upd7759.h
 # End Source File
 # Begin Source File
 

@@ -28,6 +28,7 @@ void RedrawStatusLine(void);	// from main.c
 
 #define CLOCK_NTSC	53693175
 #define CLOCK_PAL	53203424
+#define CLOCK_PICOPCM	(1280000 | 0x80000000)
  
 
 typedef struct _vgm_file_header VGM_HEADER;
@@ -51,6 +52,7 @@ struct _vgm_file_header
 	UINT32 lngDataOffset;
 	UINT32 lngHzSPCM;
 	UINT32 lngSPCMIntf;
+	// -> 0x40 Bytes
 /*	UINT32 lngHzRF5C68;
 	UINT32 lngHz2203;
 	UINT32 lngHz2608;
@@ -64,8 +66,29 @@ struct _vgm_file_header
 	UINT32 lngHz280B;
 	UINT32 lngHzRF5C164;
 	UINT32 lngHzPWM;
-	UINT8 bytReserved3[0x0C];*/
-};	// -> 0x40 Bytes
+	UINT32 lngHzAY8910;
+	UINT8 bytModifiers[0x08];*/
+	// -> 0x80 Bytes
+	/*UINT32 lngHzGBDMG;
+	UINT32 lngHzNESAPU;
+	UINT32 lngHzMultiPCM;
+	UINT32 lngHzUPD7759;
+	UINT32 lngHzOKIM6258;
+	UINT8 bytOKI6258Flags;
+	UINT8 bytK054539Flags;
+	UINT8 bytC140Type;
+	UINT8 bytReservedFlags;
+	UINT32 lngHzOKIM6295;
+	UINT32 lngHzK051649;
+	UINT32 lngHzK054539;
+	UINT32 lngHzHuC6280;
+	UINT32 lngHzC140;
+	UINT32 lngHzK053260;
+	UINT32 lngHzPokey;
+	UINT32 lngHzQSound;
+	UINT32 lngHzSCSP;
+	UINT32 lngExtraOfs;*/
+};	// -> 0xC0 Bytes
 typedef struct _vgm_gd3_tag GD3_TAG;
 struct _vgm_gd3_tag
 {
@@ -102,7 +125,7 @@ struct _vgm_chip
 };
 
 
-static const UINT8 CHIP_LIST[0x04] = {VGMC_YM2612, VGMC_SN76496, VGMC_RF5C164, VGMC_PWM};
+static const UINT8 CHIP_LIST[0x05] = {VGMC_YM2612, VGMC_SN76496, VGMC_RF5C164, VGMC_PWM, VGMC_UPD7759};
 
 UINT8 Enable_VGMDumping;
 static UINT8 VGM_Dumping;
@@ -312,6 +335,9 @@ int vgm_dump_stop(void)
 			case VGMC_PWM:
 				VgmFile.Header.lngHzPWM = 0x00;
 				break;*/
+			case VGMC_UPD7759:
+				//VgmFile.Header.lngHzUPD7759 = 0x00;
+				break;
 			}
 		}
 	}
@@ -381,6 +407,8 @@ static void vgm_header_clear(void)
 	VgmFile.Header.shtPSG_Feedback = 0x09;
 	VgmFile.Header.bytPSG_STWidth = 0x10;
 	VgmFile.Header.bytPSG_Flags = 0x06;
+	
+	//VgmFile.Header.lngHzUPD7759 = CLOCK_PICOPCM;
 	
 	//VgmFile.Header.lngHzRF5C164 = 0;	// disabled by default
 	//VgmFile.Header.lngHzPWM = 0;
@@ -597,6 +625,11 @@ void vgm_write(UINT8 chip_type, UINT8 port, UINT16 r, UINT8 v)
 		fputc(r & 0xFF, VgmFile.hFile);
 		VgmFile.BytesWrt += 0x03;
 		break;*/
+	case VGMC_UPD7759:
+		fputc(0xB6, VgmFile.hFile);
+		fputc(r, VgmFile.hFile);
+		fputc(v, VgmFile.hFile);
+		break;
 	default:
 		fputc(0x01, VgmFile.hFile);	// write invalid data - for debugging purposes
 		break;

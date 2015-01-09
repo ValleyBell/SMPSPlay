@@ -13,6 +13,7 @@
 #include "smps_int.h"
 #include "../Sound.h"
 #include "dac.h"
+#include "necpcm.h"
 
 #define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, 0x00, Reg, Data)
 #define WriteFMII(Reg, Data)	ym2612_fm_write(0x00, 0x01, Reg, Data)
@@ -131,6 +132,12 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 					DAC_Play(CurChn, DrumData->DrumID);
 			}
 		}
+		break;
+	case DRMTYPE_NECPCM:
+		if ((Trk->PlaybkFlags & PBKFLG_OVERRIDDEN) || SmpsRAM.NecPcmOverride)
+			return;
+		
+		NECPCM_Play(DrumData->DrumID);
 		break;
 	case DRMTYPE_FM:
 	case DRMTYPE_FMDAC:

@@ -2,7 +2,7 @@ SMPS Player
 ===========
 by Valley Bell
 
-Version 2.10 (2014-##-##)
+Version 2.10 (2015-01-##)
 
 
 This program plays SMPS music files, a format commonly used in games for the Sega MegaDrive/Genesis.
@@ -64,7 +64,7 @@ A huge thanks to the developers of IDA, The Interactive Disassembler. Disassembl
 
 History
 -------
-2014-##-## - 2.10
+2015-01-## - 2.10
 	added "Tempo1Tick" setting, allowing for more accurate jitter emulation
 	added full support for the SMPS variant used in Sonic 2 Recreation
 	added support for music save states used by the Sonic series 1-up tunes
@@ -75,6 +75,7 @@ History
 	added per-driver fading settings
 	added Fade In support used by Sonic games
 	added support for Super Monaco GP II's melody DAC channel
+	added NEC ADPCM support (for Sega Pico)
 2014-08-17 - 2.01
 	added proper support for Master System SMPS (incl. PSG drums, additional commands)
 	added preSMPS instrument format (register-data pairs)

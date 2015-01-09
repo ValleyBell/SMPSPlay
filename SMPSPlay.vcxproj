@@ -151,8 +151,10 @@
     <ClCompile Include="src\chips\fm2612.c" />
     <ClCompile Include="src\chips\sn76496.c" />
     <ClCompile Include="src\chips\sn764intf.c" />
+    <ClCompile Include="src\chips\upd7759.c" />
     <ClCompile Include="src\dirent.c" />
     <ClCompile Include="src\Engine\dac.c" />
+    <ClCompile Include="src\Engine\necpcm.c" />
     <ClCompile Include="src\Engine\smps.c" />
     <ClCompile Include="src\Engine\smps_commands.c" />
     <ClCompile Include="src\Engine\smps_drums.c" />
@@ -173,8 +175,10 @@
     <ClInclude Include="src\chips\mamedef.h" />
     <ClInclude Include="src\chips\sn76496.h" />
     <ClInclude Include="src\chips\sn764intf.h" />
+    <ClInclude Include="src\chips\upd7759.h" />
     <ClInclude Include="src\dirent.h" />
     <ClInclude Include="src\Engine\dac.h" />
+    <ClInclude Include="src\Engine\necpcm.h" />
     <ClInclude Include="src\Engine\smps.h" />
     <ClInclude Include="src\Engine\smps_commands.h" />
     <ClInclude Include="src\Engine\smps_int.h" />

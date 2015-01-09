@@ -81,6 +81,12 @@
     <ClCompile Include="src\loader_ini.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\chips\upd7759.c">
+      <Filter>Sound Emulation</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Engine\necpcm.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\stdtype.h">
@@ -138,6 +144,12 @@
       <Filter>Libraries</Filter>
     </ClInclude>
     <ClInclude Include="src\Engine\smps_commands.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\chips\upd7759.h">
+      <Filter>Sound Emulation</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Engine\necpcm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

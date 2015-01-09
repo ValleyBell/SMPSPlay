@@ -7,8 +7,10 @@
 #include "Stream.h"
 #include "chips/2612intf.h"
 #include "chips/sn764intf.h"
+#include "chips/upd7759.h"
 #include "Engine/smps.h"
 #include "Engine/dac.h"
+#include "Engine/necpcm.h"
 #include "vgmwrite.h"
 
 
@@ -44,6 +46,7 @@ typedef struct chip_audio_struct
 {
 	CAUD_ATTR SN76496;
 	CAUD_ATTR YM2612;
+	CAUD_ATTR uPD7759;
 } CHIP_AUDIO;
 
 
@@ -130,6 +133,13 @@ UINT8 StartAudioOutput(void)
 	device_reset_sn764xx(0x00);
 	SetupResampler(CAA);
 	
+	CAA = &ChipAudio.uPD7759;
+	CAA->SmpRate = device_start_upd7759(0x00, 0x80000000 | (UPD7759_STANDARD_CLOCK * 2));
+	CAA->StreamUpdate = &upd7759_update;
+	CAA->Volume = 0x2B;	// ~0.33 * PSG according to Kega Fusion 3.64
+	device_reset_upd7759(0x00);
+	SetupResampler(CAA);
+	
 	DeviceState = 0x01;
 	TimerExpired = 0xFF;
 	TimerMask = 0x03;
@@ -165,6 +175,7 @@ UINT8 StopAudioOutput(void)
 	
 	device_stop_ym2612(0x00);
 	device_stop_sn764xx(0x00);
+	device_stop_upd7759(0x00);
 	DeviceState = 0x00;
 	
 	return 0x00;
@@ -475,7 +486,7 @@ UINT32 FillBuffer(WAVE_16BS* Buffer, UINT32 BufferSize)
 		if (! SmplsTilFrame)
 		{
 			UpdateAll(UPDATEEVT_VINT);
-			UpdateAll(UPDATEEVT_TIMER);
+			UpdateAll(UPDATEEVT_TIMER);	// check for Timer-based update (in case we changed timing)
 			//SmplsTilFrame = SmplsPerFrame;
 			SmplsTilFrame = SampleRate / FrameDivider;
 		}
@@ -486,6 +497,7 @@ UINT32 FillBuffer(WAVE_16BS* Buffer, UINT32 BufferSize)
 			TimerExpired = ym2612_r(0x00, 0x00) & TimerMask;
 		}
 		UpdateDAC(1);
+		UpdateNECPCM();
 		
 		if (StoppedTimer != -1)
 		{
@@ -510,6 +522,8 @@ UINT32 FillBuffer(WAVE_16BS* Buffer, UINT32 BufferSize)
 		//	ResampleChipStream(CurChip, &TempBuf, 1);
 		ResampleChipStream(&ChipAudio.YM2612, &TempBuf, 1);
 		ResampleChipStream(&ChipAudio.SN76496, &TempBuf, 1);
+		if (! upd7759_busy_r(0x00))
+			ResampleChipStream(&ChipAudio.uPD7759, &TempBuf, 1);
 		
 		TempBuf.Left = TempBuf.Left >> 7;
 		TempBuf.Right = TempBuf.Right >> 7;

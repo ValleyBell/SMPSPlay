@@ -30,6 +30,7 @@
 #include "Engine/smps_structs.h"
 #include "Engine/smps.h"
 #include "Engine/dac.h"
+#include "Engine/necpcm.h"
 #include "vgmwrite.h"
 
 
@@ -149,6 +150,7 @@ int main(int argc, char* argv[])
 	}
 	
 	DAC_Reset();
+	NECPCM_Reset();
 	PALMode = false;
 	FrameDivider = PALMode ? 50 : 60;
 	

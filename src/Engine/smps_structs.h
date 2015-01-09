@@ -89,8 +89,9 @@ typedef struct _file_data
 #define DRMTYPE_FM		0x01
 #define DRMTYPE_PSG		0x02
 #define DRMTYPE_DAC		0x03
-#define DRMTYPE_FM2OP	0x04
-#define DRMTYPE_FMDAC	0x05
+#define DRMTYPE_FM2OP	0x04	// preSMPS 2op drums (using separate tracks)
+#define DRMTYPE_FMDAC	0x05	// load mini-track, similar to FM drums
+#define DRMTYPE_NECPCM	0x06	// Sega Pico NEC ADPCM drums
 #define DRMTYPE_NONE	0x00
 
 // Music:

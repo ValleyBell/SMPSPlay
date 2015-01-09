@@ -19,6 +19,7 @@ void vgm_set_loop(UINT8 SetLoop);
 #define VGMC_YM2612		0x02
 #define VGMC_RF5C164	0x11
 #define VGMC_PWM		0x12
+#define VGMC_UPD7759	0x16
 
 extern UINT8 Enable_VGMDumping;
 //extern UINT8 VGM_IgnoreWrt; only used by smps.c
