@@ -53,7 +53,7 @@ struct _vgm_file_header
 	UINT32 lngHzSPCM;
 	UINT32 lngSPCMIntf;
 	// -> 0x40 Bytes
-/*	UINT32 lngHzRF5C68;
+	UINT32 lngHzRF5C68;
 	UINT32 lngHz2203;
 	UINT32 lngHz2608;
 	UINT32 lngHz2610;
@@ -67,9 +67,9 @@ struct _vgm_file_header
 	UINT32 lngHzRF5C164;
 	UINT32 lngHzPWM;
 	UINT32 lngHzAY8910;
-	UINT8 bytModifiers[0x08];*/
+	UINT8 bytModifiers[0x08];
 	// -> 0x80 Bytes
-	/*UINT32 lngHzGBDMG;
+	UINT32 lngHzGBDMG;
 	UINT32 lngHzNESAPU;
 	UINT32 lngHzMultiPCM;
 	UINT32 lngHzUPD7759;
@@ -87,8 +87,28 @@ struct _vgm_file_header
 	UINT32 lngHzPokey;
 	UINT32 lngHzQSound;
 	UINT32 lngHzSCSP;
-	UINT32 lngExtraOfs;*/
+	UINT32 lngExtraOfs;
 };	// -> 0xC0 Bytes
+typedef struct _vgm_header_extra
+{
+	UINT32 DataSize;
+	UINT32 Chp2ClkOffset;
+	UINT32 ChpVolOffset;
+} VGM_HDR_EXTRA;
+#pragma pack(1)
+typedef struct _vgm_extra_chip_data16
+{
+	UINT8 Type;
+	UINT8 Flags;
+	UINT16 Data;
+} VGMX_CHIP_DATA16;
+typedef struct _vgm_extra_chip_extra16
+{
+	UINT8 ChipCnt;
+	VGMX_CHIP_DATA16 CCData[4];
+} VGMX_CHP_EXTRA16;
+#pragma pack()
+
 typedef struct _vgm_gd3_tag GD3_TAG;
 struct _vgm_gd3_tag
 {
@@ -112,6 +132,9 @@ struct _vgm_file_inf
 {
 	FILE* hFile;
 	VGM_HEADER Header;
+	VGM_HDR_EXTRA HdrExtra;
+	VGMX_CHP_EXTRA16 HdrXCVol;
+	UINT32 HeaderSize;
 	UINT32 BytesWrt;
 	UINT32 SmplsWrt;
 	UINT32 EvtDelay;
@@ -120,18 +143,19 @@ typedef struct _vgm_chip VGM_CHIP;
 struct _vgm_chip
 {
 	UINT8 ChipType;
-	UINT16 VgmID;
+	//UINT16 VgmID;
 	UINT8 HadWrite;
 };
 
 
-static const UINT8 CHIP_LIST[0x05] = {VGMC_YM2612, VGMC_SN76496, VGMC_RF5C164, VGMC_PWM, VGMC_UPD7759};
+#define CHIP_COUNT	0x05
+static const UINT8 CHIP_LIST[CHIP_COUNT] = {VGMC_YM2612, VGMC_SN76496, VGMC_RF5C164, VGMC_PWM, VGMC_UPD7759};
 
 UINT8 Enable_VGMDumping;
 static UINT8 VGM_Dumping;
 UINT8 VGM_IgnoreWrt;
 static VGM_INF VgmFile;
-static VGM_CHIP VgmChip[0x04];
+static VGM_CHIP VgmChip[CHIP_COUNT];
 static GD3_TAG VgmTag;
 
 // Function Prototypes
@@ -156,6 +180,7 @@ static UINT32 LastVGMSmpl;
 
 static const char* MusFileName;
 static char* VGMFileName;
+static UINT8 SpcChipEnable;
 
 // ASCII to Wide-Char String Copy
 INLINE size_t atwcpy(wchar_t* dststr, const char* srcstr)
@@ -169,7 +194,7 @@ static UINT8 ChipType2ID(UINT8 chip_type)
 	UINT8 chip_id;
 	
 	chip_id = 0xFF;
-	for (curchip = 0x00; curchip < 0x04; curchip ++)
+	for (curchip = 0x00; curchip < CHIP_COUNT; curchip ++)
 	{
 		if (CHIP_LIST[curchip] == chip_type)
 		{
@@ -189,6 +214,7 @@ void vgm_init(void)
 	MusFileName = NULL;
 	VGMFileName = NULL;
 	VGM_Dumping = 0x00;
+	SpcChipEnable = 0x00;
 	
 	return;
 }
@@ -203,6 +229,13 @@ void vgm_deinit(void)
 		free(VGMFileName);
 		VGMFileName = NULL;
 	}
+	
+	return;
+}
+
+void vgm_set_chip_enable(UINT8 Mask)
+{
+	SpcChipEnable = Mask;
 	
 	return;
 }
@@ -235,6 +268,8 @@ void MakeVgmFileName(const char* FileName)
 
 int vgm_dump_start(void)
 {
+	UINT8 curchip;
+	
 	if (! Enable_VGMDumping)
 		return 0;
 	
@@ -245,6 +280,12 @@ int vgm_dump_start(void)
 		printf("Can't open file for VGM dumping!\n");
 		RedrawStatusLine();
 		return -3;
+	}
+	
+	for (curchip = 0x00; curchip < CHIP_COUNT; curchip ++)
+	{
+		VgmChip[curchip].ChipType = 0xFF;
+		VgmChip[curchip].HadWrite = 0x00;
 	}
 	
 	//PCMC_Start = 0xFFFFFFFF;
@@ -313,9 +354,9 @@ int vgm_dump_stop(void)
 		return -1;
 	
 	chip_unused = 0x00;
-	for (curchip = 0x00; curchip < 0x04; curchip ++)
+	for (curchip = 0x00; curchip < CHIP_COUNT; curchip ++)
 	{
-		if (! VgmChip[curchip].HadWrite)
+		if (! VgmChip[curchip].HadWrite && VgmChip[curchip].ChipType != 0xFF)
 		{
 			chip_unused ++;
 			switch(CHIP_LIST[curchip])
@@ -329,14 +370,14 @@ int vgm_dump_stop(void)
 			case VGMC_YM2612:
 				VgmFile.Header.lngHz2612 = 0x00;
 				break;
-			/*case VGMC_RF5C164:
+			case VGMC_RF5C164:
 				VgmFile.Header.lngHzRF5C164 = 0x00;
 				break;
 			case VGMC_PWM:
 				VgmFile.Header.lngHzPWM = 0x00;
-				break;*/
+				break;
 			case VGMC_UPD7759:
-				//VgmFile.Header.lngHzUPD7759 = 0x00;
+				VgmFile.Header.lngHzUPD7759 = 0x00;
 				break;
 			}
 		}
@@ -383,11 +424,17 @@ static void vgm_header_clear(void)
 {
 	UINT32 CUR_CLOCK;
 	VGM_HEADER* Header;
+	VGM_HDR_EXTRA* HdrX;
+	VGMX_CHP_EXTRA16* HdrXVol;
+	UINT8 Padding[0x10];
+	UINT32 PaddBytes;
 	
 	if (! VgmFile.hFile)
 		return;
 	
 	Header = &VgmFile.Header;
+	HdrX = &VgmFile.HdrExtra;
+	HdrXVol = &VgmFile.HdrXCVol;
 	memset(Header, 0x00, sizeof(VGM_HEADER));
 	Header->fccVGM = 0x206D6756;	// 'Vgm '
 	Header->lngEOFOffset = 0x00;
@@ -397,28 +444,77 @@ static void vgm_header_clear(void)
 	//Header->lngLoopOffset = 0x00;
 	//Header->lngLoopSamples = 0;
 	Header->lngRate = 60;
-	Header->lngDataOffset = sizeof(VGM_HEADER);
+	Header->lngExtraOfs = 0x00;	// disabled by default
 	
-	Header->lngDataOffset -= 0x34;	// moved here from vgm_close
+	HdrX->DataSize = sizeof(VGM_HDR_EXTRA);
+	HdrX->ChpVolOffset = HdrX->DataSize - 0x08;
+	HdrXVol->ChipCnt = 0x00;
+	memset(Padding, 0x00, 0x10);
 	
 	CUR_CLOCK = CLOCK_NTSC;
+	VgmChip[0x00].ChipType = CHIP_LIST[0x00];
 	VgmFile.Header.lngHz2612 = (CUR_CLOCK + 3) / 7;
+	VgmChip[0x01].ChipType = CHIP_LIST[0x01];
 	VgmFile.Header.lngHzPSG = (CUR_CLOCK + 7) / 15;
 	VgmFile.Header.shtPSG_Feedback = 0x09;
 	VgmFile.Header.bytPSG_STWidth = 0x10;
 	VgmFile.Header.bytPSG_Flags = 0x06;
+	VgmFile.HeaderSize = 0x40;
 	
-	//VgmFile.Header.lngHzUPD7759 = CLOCK_PICOPCM;
-	
-	//VgmFile.Header.lngHzRF5C164 = 0;	// disabled by default
-	//VgmFile.Header.lngHzPWM = 0;
-	//if (Genesis_Started) ;
-	/*if (SegaCD_Started)
+	if (SpcChipEnable & VGM_CEN_SCD_PCM)
+	{
+		VgmChip[0x02].ChipType = CHIP_LIST[0x02];
 		VgmFile.Header.lngHzRF5C164 = 12500000;	// verfied from MESS/MAME
-	if (_32X_Started)
-		VgmFile.Header.lngHzPWM = (CUR_CLOCK * 3 + 3) / 7;*/
-	fwrite(Header, sizeof(VGM_HEADER), 0x01, VgmFile.hFile);
-	VgmFile.BytesWrt += sizeof(VGM_HEADER);
+		if (VgmFile.HeaderSize < 0x80)
+			VgmFile.HeaderSize = 0x80;
+	}
+	if (SpcChipEnable & VGM_CEN_32X_PWM)
+	{
+		VgmChip[0x03].ChipType = CHIP_LIST[0x03];
+		VgmFile.Header.lngHzPWM = (CUR_CLOCK * 3 + 3) / 7;
+		if (VgmFile.HeaderSize < 0x80)
+			VgmFile.HeaderSize = 0x80;
+	}
+	if (SpcChipEnable & VGM_CEN_PICOPCM)
+	{
+		VgmChip[0x04].ChipType = CHIP_LIST[0x04];
+		if (Header->lngVersion < 0x0161)
+			Header->lngVersion = 0x0161;
+		VgmFile.Header.lngHzUPD7759 = CLOCK_PICOPCM;
+		if (VgmFile.HeaderSize < 0xC0)
+			VgmFile.HeaderSize = 0xC0;
+		HdrXVol->ChipCnt = 0x01;
+		HdrXVol->CCData[0].Type = 0x16;	// uPD7759
+		HdrXVol->CCData[0].Flags = 0x00;
+		HdrXVol->CCData[0].Data = 0x2B;	// ~0.33 * PSG (PSG is 0x80)
+	}
+	
+	Header->lngDataOffset = VgmFile.HeaderSize;
+	if (! Header->lngExtraOfs && HdrXVol->ChipCnt)
+		Header->lngExtraOfs = 0x04;
+	if (Header->lngExtraOfs)
+	{
+		Header->lngDataOffset += HdrX->DataSize;
+		Header->lngDataOffset += 0x01 + sizeof(VGMX_CHIP_DATA16) * HdrXVol->ChipCnt;
+	}
+	PaddBytes = (0 - Header->lngDataOffset) & 0x0F;
+	Header->lngDataOffset += PaddBytes;
+	
+	Header->lngDataOffset -= 0x34;	// moved here from vgm_close
+	fwrite(Header, VgmFile.HeaderSize, 0x01, VgmFile.hFile);
+	VgmFile.BytesWrt += VgmFile.HeaderSize;
+	if (Header->lngExtraOfs)
+	{
+		fwrite(HdrX, 0x01, HdrX->DataSize, VgmFile.hFile);
+		VgmFile.BytesWrt += HdrX->DataSize;
+		
+		fputc(HdrXVol->ChipCnt, VgmFile.hFile);
+		fwrite(HdrXVol->CCData, sizeof(VGMX_CHIP_DATA16), HdrXVol->ChipCnt, VgmFile.hFile);
+		VgmFile.BytesWrt += 0x01 + sizeof(VGMX_CHIP_DATA16) * HdrXVol->ChipCnt;
+		
+		fwrite(Padding, 0x01, PaddBytes, VgmFile.hFile);
+		VgmFile.BytesWrt += PaddBytes;
+	}
 	
 	return;
 }
@@ -464,7 +560,7 @@ static void vgm_close(void)
 	}
 	Header->lngEOFOffset = VgmFile.BytesWrt - 0x04;
 	fseek(VgmFile.hFile, 0x00, SEEK_SET);
-	fwrite(Header, sizeof(VGM_HEADER), 0x01, VgmFile.hFile);
+	fwrite(Header, VgmFile.HeaderSize, 0x01, VgmFile.hFile);
 	
 	fclose(VgmFile.hFile);
 	VgmFile.hFile = NULL;
@@ -629,6 +725,7 @@ void vgm_write(UINT8 chip_type, UINT8 port, UINT16 r, UINT8 v)
 		fputc(0xB6, VgmFile.hFile);
 		fputc(r, VgmFile.hFile);
 		fputc(v, VgmFile.hFile);
+		VgmFile.BytesWrt += 0x03;
 		break;
 	default:
 		fputc(0x01, VgmFile.hFile);	// write invalid data - for debugging purposes

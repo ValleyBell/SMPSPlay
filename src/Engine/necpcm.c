@@ -137,8 +137,9 @@ void UpdateNECPCM(void)
 		return;
 	
 	RemFIFOBytes = upd7759_get_fifo_space(0x00);
-	if (! RemFIFOBytes)
+	if (RemFIFOBytes < 0x14)
 		return;
+	RemFIFOBytes -= 0x04;	// don't fill FIFO completely (safe for VGM logging)
 	if (RemFIFOBytes > NecState.SmplLen)
 		RemFIFOBytes = NecState.SmplLen;
 	NecState.SmplLen -= RemFIFOBytes;

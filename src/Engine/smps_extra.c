@@ -43,9 +43,30 @@ static struct loop_state
 
 void StartSignal(void)
 {
+	const DRUM_LIB* DrumLib;
+	UINT8 CurIdx;
+	UINT8 VgmChipMask;
+	
 	PlayingTimer = -1;
 	LoopCntr = 0;
 	StoppedTimer = -1;
+	
+	VgmChipMask = 0x00;
+	for (CurIdx = 0; CurIdx < MUS_TRKCNT; CurIdx ++)
+	{
+		if ((SmpsRAM.MusicTrks[CurIdx].ChannelMask & 0xF8) == 0x18)
+			VgmChipMask |= 0;	//VGM_CEN_32X_PWM;	// Right now I still don't have true PWM support.
+	}
+	if (SmpsRAM.MusSet != NULL && SmpsRAM.MusSet->Cfg != NULL)
+	{
+		DrumLib = &SmpsRAM.MusSet->Cfg->DrumLib;
+		for (CurIdx = 0; CurIdx < DrumLib->DrumCount; CurIdx ++)
+		{
+			if (DrumLib->DrumData[CurIdx].Type == DRMTYPE_NECPCM)
+				VgmChipMask |= VGM_CEN_PICOPCM;
+		}
+	}
+	vgm_set_chip_enable(VgmChipMask);
 	
 	vgm_dump_start();
 	if (SmpsRAM.MusSet != NULL)

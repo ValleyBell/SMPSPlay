@@ -2250,7 +2250,7 @@ static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UI
 		if ((TempTrk->ChannelMask & 0xF8) == 0x18)	// PWM channels
 			SmpsRAM.MusicTrks[TRACK_MUS_FM6].PlaybkFlags = 0x00;	// disable FM 6 for PWM simulation
 		
-		if (TrkID == TRACK_MUS_DRUM)
+		if (TrkID == TRACK_MUS_DRUM && ! (TempTrk->ChannelMask & 0x09))
 			WriteFMMain(TempTrk, 0xB4, TempTrk->PanAFMS);	// force Pan bits to LR
 		
 		if (TempTrk->Pos >= SmpsSet->Seq.Len)
