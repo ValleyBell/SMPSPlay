@@ -106,6 +106,8 @@ int main(int argc, char* argv[])
 	memset(&Config, 0x00, sizeof(CONFIG_DATA));
 	Config.FM6DACOff = 0xFF;
 	Config.ResmplForce = 0xFF;
+	Config.SamplePerSec = 44100;	// Default samples per second
+	Config.BitsPerSample = 16;		// Default bits per sample
 	
 	LoadConfigurationFiles(&Config, "config.ini");
 	DebugMsgs = Config.DebugMsgs;
@@ -157,7 +159,7 @@ int main(int argc, char* argv[])
 	SoundLogging(Config.LogWave);
 	
 	AUDIOBUFFERU = 10;
-	StartAudioOutput();
+	StartAudioOutput(Config.SamplePerSec, Config.BitsPerSample);
 	
 	InitDriver();
 	CondJumpVar = SmpsGetVariable(SMPSVAR_CONDIT_JUMP);

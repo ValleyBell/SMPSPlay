@@ -60,6 +60,7 @@ UINT16 AUDIOBUFFERU = AUDIOBUFFERS;		// used AudioBuffers
 
 WAVEFORMATEX WaveFmt;
 extern UINT32 SampleRate;
+extern UINT32 BitsPerSample;
 volatile bool PauseThread;
 volatile bool StreamPause;
 bool ThreadPauseEnable;
@@ -260,7 +261,7 @@ UINT8 StartStream(UINT8 DeviceID)
 	WaveFmt.wFormatTag = WAVE_FORMAT_PCM;
 	WaveFmt.nChannels = 2;
 	WaveFmt.nSamplesPerSec = SampleRate;
-	WaveFmt.wBitsPerSample = 16;
+	WaveFmt.wBitsPerSample = BitsPerSample;
 	WaveFmt.nBlockAlign = WaveFmt.wBitsPerSample * WaveFmt.nChannels / 8;
 	WaveFmt.nAvgBytesPerSec = WaveFmt.nSamplesPerSec * WaveFmt.nBlockAlign;
 	WaveFmt.cbSize = 0;

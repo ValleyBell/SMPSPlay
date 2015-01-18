@@ -1,6 +1,5 @@
 // Stream.h: Header File for constants and structures related to Sound Output
 //
-
 #ifdef WIN32
 #include <windows.h>
 #include <mmsystem.h>
@@ -11,7 +10,7 @@
 #include "stdtype.h"
 #include "stdbool.h"
 
-#define SAMPLESIZE		sizeof(WAVE_16BS)
+#define SAMPLESIZE		((BitsPerSample / 8) * 2)
 #define BUFSIZE_MAX		0x1000		// Maximum Buffer Size in Bytes
 #ifndef WIN32
 #define BUFSIZELD		11			// Buffer Size

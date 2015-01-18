@@ -9,13 +9,15 @@ typedef struct waveform_16bit_stereo
 	INT16 Right;
 } WAVE_16BS;
 
+typedef char* WAVE_BINARY;
+
 typedef struct waveform_32bit_stereo
 {
 	INT32 Left;
 	INT32 Right;
 } WAVE_32BS;
 
-UINT8 StartAudioOutput(void);
+UINT8 StartAudioOutput(UINT32 samplesPerSec, UINT8 bitsPerSample);
 UINT8 StopAudioOutput(void);
 UINT32 FillBuffer(WAVE_16BS* Buffer, UINT32 BufferSize);
 

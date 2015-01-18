@@ -66,6 +66,7 @@ static void YM2612_Callback(void *param, int irq);
 #define CHIP_COUNT		0x02
 
 UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
+UINT8 BitsPerSample;
 
 UINT8 ResampleMode;	// 00 - HQ both, 01 - LQ downsampling, 02 - LQ both
 UINT8 CHIP_SAMPLING_MODE;
@@ -87,7 +88,7 @@ static UINT8 TimerMask;
 UINT32 PlayingTimer;
 INT32 StoppedTimer;
 
-UINT8 StartAudioOutput(void)
+UINT8 StartAudioOutput(UINT32 samplesPerSec, UINT8 bitsPerSample)
 {
 	UINT8 CurChip;
 	UINT8 RetVal;
@@ -95,8 +96,9 @@ UINT8 StartAudioOutput(void)
 	
 	if (DeviceState)
 		return 0x80;	// already running
-	
-	SampleRate = 44100;
+
+	SampleRate = samplesPerSec;
+	BitsPerSample = bitsPerSample;
 	ResampleMode = 0x00;
 	CHIP_SAMPLING_MODE = 0x00;
 	CHIP_SAMPLE_RATE = 0x00000000;
@@ -212,17 +214,47 @@ static void SetupResampler(CAUD_ATTR* CAA)
 	return;
 }
 
+INLINE INT8 Limit2Byte(INT32 Value)
+{
+	INT32 NewValue;
+
+	NewValue = Value / 256;
+	if (NewValue < -0x80)
+		NewValue = -0x80;
+	if (NewValue > 0x7F)
+		NewValue = 0x7F;
+
+	return (INT8)NewValue;
+}
 INLINE INT16 Limit2Short(INT32 Value)
 {
 	INT32 NewValue;
-	
+
 	NewValue = Value;
 	if (NewValue < -0x8000)
 		NewValue = -0x8000;
 	if (NewValue > 0x7FFF)
 		NewValue = 0x7FFF;
-	
+
 	return (INT16)NewValue;
+}
+INLINE INT32 Limit2Bit24(INT32 Value)
+{
+	INT32 NewValue = (Value << 8) + (Value >> 8);
+	if (NewValue < -0x800000)
+		NewValue = -0x800000;
+	if (NewValue > +0x7FFFFF)
+		NewValue = +0x7FFFFF;
+	return NewValue;
+}
+INLINE INT32 Limit2Int(INT32 Value)
+{
+	signed long long NewValue = ((signed long long)Value << 16LL) + Value;
+	if (NewValue < -0x80000000LL)
+		NewValue = -0x80000000LL;
+	if (NewValue > +0x7FFFFFFFLL)
+		NewValue = +0x7FFFFFFFLL;
+	return NewValue;
 }
 
 static void null_update(UINT8 ChipID, stream_sample_t **outputs, int samples)
@@ -461,7 +493,7 @@ static void ResampleChipStream(CAUD_ATTR* CAA, WAVE_32BS* RetSample, UINT32 Leng
 	return;
 }
 
-UINT32 FillBuffer(WAVE_16BS* Buffer, UINT32 BufferSize)
+UINT32 FillBuffer(WAVE_BINARY Buffer, UINT32 BufferSize)
 {
 	UINT32 CurSmpl;
 	WAVE_32BS TempBuf;
@@ -513,8 +545,35 @@ UINT32 FillBuffer(WAVE_16BS* Buffer, UINT32 BufferSize)
 		
 		TempBuf.Left = TempBuf.Left >> 7;
 		TempBuf.Right = TempBuf.Right >> 7;
-		Buffer[CurSmpl].Left = Limit2Short(TempBuf.Left);
-		Buffer[CurSmpl].Right = Limit2Short(TempBuf.Right);
+		switch (BitsPerSample)
+		{
+		case 8:
+			*Buffer++ = Limit2Byte(TempBuf.Left);
+			*Buffer++ = Limit2Byte(TempBuf.Right);
+			break;
+		case 16:
+			((INT16*)Buffer)[0] = Limit2Short(TempBuf.Left);
+			((INT16*)Buffer)[1] = Limit2Short(TempBuf.Right);
+			Buffer += sizeof(INT16) * 2;
+			break;
+		case 24:
+			{
+				INT32 tmp = Limit2Bit24(TempBuf.Left);
+				*Buffer++ = (tmp >> 0) & 0xFF;
+				*Buffer++ = (tmp >> 8) & 0xFF;
+				*Buffer++ = (tmp >> 16) & 0xFF;
+				tmp = Limit2Bit24(TempBuf.Right);
+				*Buffer++ = (tmp >> 0) & 0xFF;
+				*Buffer++ = (tmp >> 8) & 0xFF;
+				*Buffer++ = (tmp >> 16) & 0xFF;
+			}
+			break;
+		case 32:
+			((INT32*)Buffer)[0] = Limit2Int(TempBuf.Left);
+			((INT32*)Buffer)[1] = Limit2Int(TempBuf.Right);
+			Buffer += sizeof(INT32) * 2;
+			break;
+		}
 	}
 	
 	return CurSmpl;
