@@ -84,6 +84,8 @@ UINT16 FrameDivider = 60;
 //static UINT32 SmplsPerFrame;
 static UINT32 SmplsTilFrame;
 static UINT8 TimerMask;
+static UINT32 MuteChannelMaskYm2612 = 0;
+static UINT32 MuteChannelMaskSn76496 = 0;
 
 UINT32 PlayingTimer;
 INT32 StoppedTimer;
@@ -172,6 +174,31 @@ UINT8 StopAudioOutput(void)
 	return 0x00;
 }
 
+UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel)
+{
+	UINT8 result;
+	UINT32 mask = 1 << nChannel;
+	UINT32* CurrentMuteMask;
+	void(*fMuteMask)(UINT8 ChipID, UINT32 MuteMask);
+	switch (chip)
+	{
+	case CHIP_YM2612:
+		CurrentMuteMask = &MuteChannelMaskYm2612;
+		fMuteMask = ym2612_set_mute_mask;
+		break;
+	case CHIP_SN76496:
+		CurrentMuteMask = &MuteChannelMaskSn76496;
+		fMuteMask = sn764xx_set_mute_mask;
+		break;
+	}
+	result = *CurrentMuteMask & mask;
+	if (result != 0)
+		*CurrentMuteMask &= ~mask;
+	else
+		*CurrentMuteMask |= mask;
+	fMuteMask(0, *CurrentMuteMask);
+	return result;
+}
 
 static void SetupResampler(CAUD_ATTR* CAA)
 {
@@ -254,7 +281,7 @@ INLINE INT32 Limit2Int(INT32 Value)
 		NewValue = -0x80000000LL;
 	if (NewValue > +0x7FFFFFFFLL)
 		NewValue = +0x7FFFFFFFLL;
-	return NewValue;
+	return (INT32)NewValue;
 }
 
 static void null_update(UINT8 ChipID, stream_sample_t **outputs, int samples)

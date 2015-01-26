@@ -60,7 +60,7 @@ UINT16 AUDIOBUFFERU = AUDIOBUFFERS;		// used AudioBuffers
 
 WAVEFORMATEX WaveFmt;
 extern UINT32 SampleRate;
-extern UINT32 BitsPerSample;
+extern UINT8 BitsPerSample;
 volatile bool PauseThread;
 volatile bool StreamPause;
 bool ThreadPauseEnable;
@@ -458,7 +458,7 @@ static DWORD WINAPI WaveOutThread(void* Arg)
 	UINT32 RetVal;
 #endif
 	UINT16 CurBuf;
-	WAVE_16BS* TempBuf;
+	WAVE_BINARY TempBuf;
 	UINT32 WrtSmpls;
 	//char TestStr[0x80];
 	bool DidBuffer;	// a buffer was processed
@@ -492,7 +492,7 @@ static DWORD WINAPI WaveOutThread(void* Arg)
 		{
 			if (WaveHdrOut[CurBuf].dwFlags & WHDR_DONE)
 			{
-				TempBuf = (WAVE_16BS*)WaveHdrOut[CurBuf].lpData;
+				TempBuf = (WAVE_BINARY)WaveHdrOut[CurBuf].lpData;
 				
 				if (WaveHdrOut[CurBuf].dwUser & 0x01)
 					BlocksPlayed ++;

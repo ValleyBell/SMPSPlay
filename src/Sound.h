@@ -17,9 +17,16 @@ typedef struct waveform_32bit_stereo
 	INT32 Right;
 } WAVE_32BS;
 
+typedef enum chip_type
+{
+	CHIP_YM2612,
+	CHIP_SN76496,
+} CHIP;
+
 UINT8 StartAudioOutput(UINT32 samplesPerSec, UINT8 bitsPerSample);
 UINT8 StopAudioOutput(void);
-UINT32 FillBuffer(WAVE_16BS* Buffer, UINT32 BufferSize);
+UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel);
+UINT32 FillBuffer(WAVE_BINARY Buffer, UINT32 BufferSize);
 
 void ym2612_timer_mask(UINT8 Mask);
 void ym2612_fm_write(UINT8 ChipID, UINT8 Port, UINT8 Register, UINT8 Data);
