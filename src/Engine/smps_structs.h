@@ -184,6 +184,7 @@ typedef struct _drum_track_library
 	//UINT16 DataLen;
 	//UINT8* Data;
 	FILE_DATA File;
+	UINT8 SmpsPtrFmt;
 	UINT8 DrumCount;
 	UINT16 DrumBase;
 	UINT16* DrumList;

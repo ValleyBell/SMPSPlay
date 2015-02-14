@@ -29,7 +29,7 @@ INLINE UINT16 ReadLE16(const UINT8* Data);
 INLINE void WriteLE16(UINT8* Data, UINT16 Value);
 INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
 INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet);
-INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet);
+INLINE UINT16 ReadDrumPtr(const UINT8* Data, const DRUM_TRK_LIB* DTrkLib);
 
 //void PlayDrumNote(TRK_RAM* Trk, UINT8 Note);
 static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData);
@@ -64,6 +64,14 @@ INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg)
 INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet)
 {
 	return ReadRawPtr(Data, SmpsSet->Cfg) - SmpsSet->SeqBase;
+}
+
+INLINE UINT16 ReadDrumPtr(const UINT8* Data, const DRUM_TRK_LIB* DTrkLib)
+{
+	if ((DTrkLib->SmpsPtrFmt & PTRFMT_EMASK) == PTRFMT_BE)
+		return ReadBE16(Data) - DTrkLib->DrumBase;
+	else
+		return ReadLE16(Data) - DTrkLib->DrumBase;
 }
 
 
@@ -161,13 +169,15 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DTrkSet->SeqBase = DTrkLib->DrumBase;
 		DTrkSet->Seq = DTrkLib->File;
 		DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
+		DTrkSet->InsLib = DTrkLib->InsLib;
+		DTrkSet->LoopPtrs = NULL;
 		
 		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
 		DrumTrk->SmpsSet = DTrkSet;
 		DrumTrk->PlaybkFlags = PBKFLG_ACTIVE;
 		DrumTrk->ChannelMask = Trk->ChannelMask & 0x0F;	// make it FM6 or FM3
 		DrumTrk->TickMult = 1;
-		DrumTrk->Pos = ReadPtr(&DTrkData[0x00], DTrkSet);
+		DrumTrk->Pos = ReadDrumPtr(&DTrkData[0x00], DTrkLib);
 		DrumTrk->Transpose = DTrkData[0x02] + Trk->Transpose;
 		DrumTrk->Volume = DTrkData[0x03] + Trk->Volume;
 		DrumTrk->ModEnv = DTrkData[0x04];
@@ -216,13 +226,15 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DTrkSet->SeqBase = DTrkLib->DrumBase;
 		DTrkSet->Seq = DTrkLib->File;
 		DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
+		DTrkSet->InsLib = DTrkLib->InsLib;
+		DTrkSet->LoopPtrs = NULL;
 		
 		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
 		DrumTrk->SmpsSet = DTrkSet;
 		DrumTrk->PlaybkFlags = PBKFLG_ACTIVE;
 		DrumTrk->ChannelMask = 0xC0;
 		DrumTrk->TickMult = 1;
-		DrumTrk->Pos = ReadPtr(&DTrkData[0x00], DTrkSet);;
+		DrumTrk->Pos = ReadDrumPtr(&DTrkData[0x00], DTrkLib);
 		DrumTrk->Transpose = DTrkData[0x02];
 		DrumTrk->Volume = DTrkData[0x03];
 		DrumTrk->ModEnv = DTrkData[0x04];
@@ -271,7 +283,8 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DrumTrk2Op->Freq2Inc = DTrkData[0x08];
 		DrumTrk2Op->RemTicks = DTrkData[0x09];
 		
-		DrumOfs = ReadLE16(&DTrkData[0x01]) - DTrkLib->DrumBase;
+		//DrumOfs = ReadLE16(&DTrkData[0x01]) - DTrkLib->DrumBase;
+		DrumOfs = ReadDrumPtr(&DTrkData[0x01], DTrkLib);
 		if (DrumOfs < DTrkLib->File.Len)
 			SendFMIns(Trk, &DTrkLib->File.Data[DrumOfs]);
 		Do2OpNote();

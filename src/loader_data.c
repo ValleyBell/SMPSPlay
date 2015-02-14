@@ -52,6 +52,7 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 //void FreeGlobalInstrumentLib(SMPS_CFG* SmpsCfg);
 INLINE UINT16 ReadLE16(const UINT8* Data);
 INLINE UINT16 ReadBE16(const UINT8* Data);
+INLINE UINT16 ReadPtr16(const UINT8* Data, const UINT8 Flags);
 
 
 // ---- DAC Files ---
@@ -487,6 +488,7 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 	UINT32 FileLen;
 	UINT8 FileHdr[0x10];
 	UINT32 ReadBytes;
+	UINT8 Flags;
 	UINT8 InsCount;
 	UINT16 DrumOfs;
 	UINT16 InsOfs;
@@ -511,7 +513,8 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		return 0x80;	// invalid file
 	}
 	
-	if (FileHdr[0x04] != DrumMode)
+	Flags = FileHdr[0x04];
+	if ((Flags & 0x0F) != DrumMode)
 	{
 		fclose(hFile);
 		return 0xC0;	// wrong drum mode
@@ -525,8 +528,8 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 			return 0x80;	// invalid file
 		}
 		DrumLib->DrumCount = FileHdr[0x05];
-		DrumOfs = ReadLE16(&FileHdr[0x06]);
-		DrumLib->DrumBase = ReadLE16(&FileHdr[0x08]);
+		DrumOfs = ReadPtr16(&FileHdr[0x06], Flags);
+		DrumLib->DrumBase = ReadPtr16(&FileHdr[0x08], Flags);
 		InsCount = 0x00;
 		InsOfs = 0x0000;
 		break;
@@ -537,11 +540,11 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 			return 0x80;	// invalid file
 		}
 		DrumLib->DrumCount = FileHdr[0x05];
-		DrumOfs = ReadLE16(&FileHdr[0x06]);
-		DrumLib->DrumBase = ReadLE16(&FileHdr[0x08]);
+		DrumOfs = ReadPtr16(&FileHdr[0x06], Flags);
+		DrumLib->DrumBase = ReadPtr16(&FileHdr[0x08], Flags);
 		InsCount = FileHdr[0x0B];
-		InsOfs = ReadLE16(&FileHdr[0x0C]);
-		InsBaseOfs = ReadLE16(&FileHdr[0x0E]);
+		InsOfs = ReadPtr16(&FileHdr[0x0C], Flags);
+		InsBaseOfs = ReadPtr16(&FileHdr[0x0E], Flags);
 		break;
 	}
 	if (! DrumOfs)
@@ -549,6 +552,13 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		fclose(hFile);
 		return 0xC1;	// invalid drum offset
 	}
+	
+	if (! (Flags & 0x10))
+		DrumLib->SmpsPtrFmt = PTRFMT_Z80;
+	else if (! (Flags & 0x20))
+		DrumLib->SmpsPtrFmt = PTRFMT_68K;
+	else
+		DrumLib->SmpsPtrFmt = PTRFMT_RST;
 	
 	BaseOfs = DrumOfs;
 	if (InsOfs && InsOfs < BaseOfs)
@@ -564,8 +574,16 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 	DrumLib->DrumList = (UINT16*)malloc(DrumLib->DrumCount * sizeof(UINT16));
 	CurPos = DrumOfs - BaseOfs;
 	DrumLib->DrumBase -= CurPos;
-	for (CurItm = 0x00; CurItm < DrumLib->DrumCount; CurItm ++, CurPos += 0x02)
-		DrumLib->DrumList[CurItm] = ReadLE16(&DrumLib->File.Data[CurPos]);
+	if (! (Flags & 0x10))
+	{
+		for (CurItm = 0x00; CurItm < DrumLib->DrumCount; CurItm ++, CurPos += 0x02)
+			DrumLib->DrumList[CurItm] = ReadLE16(&DrumLib->File.Data[CurPos]);
+	}
+	else
+	{
+		for (CurItm = 0x00; CurItm < DrumLib->DrumCount; CurItm ++, CurPos += 0x02)
+			DrumLib->DrumList[CurItm] = ReadBE16(&DrumLib->File.Data[CurPos]);
+	}
 	
 	DrumLib->InsLib.InsCount = InsCount;
 	DrumLib->InsLib.InsPtrs = NULL;
@@ -576,7 +594,7 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		InsBaseOfs -= CurPos;
 		for (CurItm = 0x00; CurItm < InsCount; CurItm ++, CurPos += 0x02)
 		{
-			TempOfs = ReadLE16(&DrumLib->File.Data[CurPos]) - InsBaseOfs;
+			TempOfs = ReadPtr16(&DrumLib->File.Data[CurPos], Flags) - InsBaseOfs;
 			if (TempOfs >= BaseOfs && TempOfs < DrumLib->File.Len - 0x10)
 				DrumLib->InsLib.InsPtrs[CurItm] = &DrumLib->File.Data[TempOfs];
 			else
@@ -646,10 +664,7 @@ UINT8 LoadPanAniData(const char* FileName, PAN_ANI_LIB* PAniLib)
 	PtrSize = (Flags & 0x20) ? 0x04 : 0x02;
 	PAniLib->AniCount = FileHdr[0x05];
 	AniOfs = ReadLE16(&FileHdr[0x06]);
-	if (! (Flags & 0x10))
-		PAniLib->AniBase = ReadLE16(&FileHdr[0x08]);
-	else
-		PAniLib->AniBase = ReadBE16(&FileHdr[0x08]);
+	PAniLib->AniBase = ReadPtr16(&FileHdr[0x08], Flags);
 	
 	if (! AniOfs)
 	{
@@ -778,10 +793,7 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 	
 	InsCount = FileData[0x05];
 	InsOfs = ReadLE16(&FileData[0x06]);
-	if (! (Flags & 0x10))
-		InsBase = ReadLE16(&FileData[0x08]);
-	else
-		InsBase = ReadBE16(&FileData[0x08]);
+	InsBase = ReadPtr16(&FileData[0x08], Flags);
 	// For now I'll ignore the Register array. It is specified in DefDrv.txt.
 	if (! InsOfs)
 		return 0xC1;	// invalid drum offset
@@ -796,10 +808,7 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 		CurPos = InsOfs;
 		for (CurIns = 0x00; CurIns < InsCount; CurIns ++, CurPos += 0x02)
 		{
-			if (! (Flags & 0x10))
-				InsPos = ReadLE16(&FileData[CurPos]);
-			else
-				InsPos = ReadBE16(&FileData[CurPos]);
+			InsPos = ReadPtr16(&FileData[CurPos], Flags);
 			InsPos = InsPos - InsBase + InsOfs;
 			if (InsPos >= InsOfs && InsPos < FileLen)
 				SmpsCfg->GblInsLib.InsPtrs[CurIns] = &FileData[InsPos];
@@ -850,4 +859,12 @@ INLINE UINT16 ReadLE16(const UINT8* Data)
 INLINE UINT16 ReadBE16(const UINT8* Data)
 {
 	return (Data[0x00] << 8) | (Data[0x01] << 0);
+}
+
+INLINE UINT16 ReadPtr16(const UINT8* Data, const UINT8 Flags)
+{
+	if (! (Flags & 0x10))
+		return ReadLE16(Data);
+	else
+		return ReadBE16(Data);
 }

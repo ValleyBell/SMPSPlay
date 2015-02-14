@@ -1544,8 +1544,15 @@ static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 		case ENVCMD_HOLD:	// 81 - hold at current level
 			return 0x8001;
 		case ENVCMD_STOP:	// 83 - stop
-			DoNoteOff(Trk);
-			return 0x80FF;
+			if (SmpsCfg->EnvMult == ENVMULT_Z80)
+			{
+				return 0x8001;	// in SMPS Z80, it has the same effect as 81
+			}
+			else
+			{
+				DoNoteOff(Trk);
+				return 0x80FF;
+			}
 		}
 	}
 	
@@ -3131,10 +3138,15 @@ void RestoreBGMChannel(TRK_RAM* Trk)
 		// restore Instrument
 		//if (Trk->Instrument & 0x80)	// That's what the actual driver does.
 		if (Trk->FMInsSong)	// But this is safer in our case, since we're supporting large instrument tables.
+		{
 			InsLib = GetSongInsLib(Trk, Trk->FMInsSong);
+			InsID = Trk->Instrument & 0x7F;
+		}
 		else
+		{
 			InsLib = &Trk->SmpsSet->InsLib;
-		InsID = Trk->Instrument & 0x7F;
+			InsID = Trk->Instrument;
+		}
 		if (InsLib != NULL && InsID < InsLib->InsCount)
 		{
 			InsPtr = InsLib->InsPtrs[InsID];

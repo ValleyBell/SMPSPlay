@@ -351,7 +351,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		}
 		break;
 	case CF_INSTRUMENT:	// EF/F5 Set Instrument
-		cfSetInstrument(Trk, CFlag, &Data[0x00]);
+		CmdLen = cfSetInstrument(Trk, CFlag, &Data[0x00]);
 		break;
 	case CF_PSG_NOISE:
 		if (CFlag->SubType == CFS_PNOIS_SRES)
