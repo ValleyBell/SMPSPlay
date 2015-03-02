@@ -51,9 +51,9 @@ typedef struct _config_data
 	UINT8 ResmplForce;
 	UINT8 DebugMsgs;
 	UINT8 LogWave;
-	UINT32 AudioBufs;
 	UINT32 SamplePerSec;
 	UINT8 BitsPerSample;
+	UINT32 AudioBufs;
 	
 	EXT_LIST ExtList;
 } CONFIG_DATA;

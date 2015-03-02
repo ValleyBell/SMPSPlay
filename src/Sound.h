@@ -9,13 +9,13 @@ typedef struct waveform_16bit_stereo
 	INT16 Right;
 } WAVE_16BS;
 
-typedef char* WAVE_BINARY;
-
 typedef struct waveform_32bit_stereo
 {
 	INT32 Left;
 	INT32 Right;
 } WAVE_32BS;
+
+typedef UINT8* WAVE_BINARY;
 
 typedef enum chip_type
 {
@@ -23,7 +23,7 @@ typedef enum chip_type
 	CHIP_SN76496,
 } CHIP;
 
-UINT8 StartAudioOutput(UINT32 samplesPerSec, UINT8 bitsPerSample);
+UINT8 StartAudioOutput(void);
 UINT8 StopAudioOutput(void);
 UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel);
 UINT32 FillBuffer(WAVE_BINARY Buffer, UINT32 BufferSize);

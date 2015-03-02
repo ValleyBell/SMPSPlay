@@ -69,6 +69,7 @@ extern volatile bool ThreadPauseConfrm;
 extern char SoundLogFile[MAX_PATH];
 
 extern UINT32 SampleRate;	// from Sound.c
+extern UINT8 BitsPerSample;
 extern UINT16 FrameDivider;
 extern UINT32 PlayingTimer;
 extern INT32 LoopCntr;
@@ -110,8 +111,9 @@ int main(int argc, char* argv[])
 	memset(&Config, 0x00, sizeof(CONFIG_DATA));
 	Config.FM6DACOff = 0xFF;
 	Config.ResmplForce = 0xFF;
-	Config.SamplePerSec = 44100;	// Default samples per second
-	Config.BitsPerSample = 16;		// Default bits per sample
+	SampleRate = 44100;
+	BitsPerSample = 16;
+	AUDIOBUFFERU = 10;
 	
 	LoadConfigurationFiles(&Config, "config.ini");
 	DebugMsgs = Config.DebugMsgs;
@@ -163,8 +165,13 @@ int main(int argc, char* argv[])
 	strcpy(SoundLogFile, "dumps/out.wav");
 	SoundLogging(Config.LogWave);
 	
-	AUDIOBUFFERU = 10;
-	StartAudioOutput(Config.SamplePerSec, Config.BitsPerSample);
+	if (Config.SamplePerSec)
+		SampleRate = Config.SamplePerSec;
+	if (Config.BitsPerSample)
+		BitsPerSample = Config.BitsPerSample;
+	if (Config.AudioBufs)
+		AUDIOBUFFERU = Config.AudioBufs;
+	StartAudioOutput();
 	
 	InitDriver();
 	CondJumpVar = SmpsGetVariable(SMPSVAR_CONDIT_JUMP);

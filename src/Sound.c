@@ -53,7 +53,10 @@ typedef struct chip_audio_struct
 //UINT8 StartAudioOutput(void);
 //UINT8 StopAudioOutput(void);
 static void SetupResampler(CAUD_ATTR* CAA);
-INLINE INT16 Limit2Short(INT32 Value);
+INLINE UINT8 Limit8Bit(INT32 Value);
+INLINE INT16 Limit16Bit(INT32 Value);
+INLINE INT32 Limit24Bit(INT32 Value);
+INLINE INT32 Limit32Bit(INT32 Value);
 static void null_update(UINT8 ChipID, stream_sample_t **outputs, int samples);
 static void ResampleChipStream(CAUD_ATTR* CAA, WAVE_32BS* RetSample, UINT32 Length);
 //UINT32 FillBuffer(WAVE_16BS* Buffer, UINT32 BufferSize);
@@ -67,6 +70,8 @@ static void YM2612_Callback(void *param, int irq);
 #define CLOCK_SN76496	3579545
 
 #define CHIP_COUNT		0x02
+
+#define VOL_SHIFT		7	// shift X bits to the right after mixing everything together
 
 UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
 UINT8 BitsPerSample;
@@ -93,7 +98,7 @@ static UINT32 MuteChannelMaskSn76496 = 0;
 UINT32 PlayingTimer;
 INT32 StoppedTimer;
 
-UINT8 StartAudioOutput(UINT32 samplesPerSec, UINT8 bitsPerSample)
+UINT8 StartAudioOutput(void)
 {
 	UINT8 CurChip;
 	UINT8 RetVal;
@@ -102,8 +107,6 @@ UINT8 StartAudioOutput(UINT32 samplesPerSec, UINT8 bitsPerSample)
 	if (DeviceState)
 		return 0x80;	// already running
 
-	SampleRate = samplesPerSec;
-	BitsPerSample = bitsPerSample;
 	ResampleMode = 0x00;
 	CHIP_SAMPLING_MODE = 0x00;
 	CHIP_SAMPLE_RATE = 0x00000000;
@@ -252,42 +255,51 @@ static void SetupResampler(CAUD_ATTR* CAA)
 	return;
 }
 
-INLINE INT8 Limit2Byte(INT32 Value)
+INLINE UINT8 Limit8Bit(INT32 Value)
 {
 	INT32 NewValue;
 
-	NewValue = Value / 256;
+	// divide by (8 + VOL_SHIFT) with proper rounding
+	Value += (0x80 << VOL_SHIFT);	// add rounding term (1 << (8 + VOL_SHIFT)) / 2
+	NewValue = Value >> (8 + VOL_SHIFT);
 	if (NewValue < -0x80)
 		NewValue = -0x80;
-	if (NewValue > 0x7F)
-		NewValue = 0x7F;
+	if (NewValue > +0x7F)
+		NewValue = +0x7F;
 
-	return (INT8)NewValue;
+	return (UINT8)(0x80 + NewValue);	// return unsigned 8-bit
 }
-INLINE INT16 Limit2Short(INT32 Value)
+
+INLINE INT16 Limit16Bit(INT32 Value)
 {
 	INT32 NewValue;
 
-	NewValue = Value;
+	NewValue = Value >> VOL_SHIFT;
 	if (NewValue < -0x8000)
 		NewValue = -0x8000;
-	if (NewValue > 0x7FFF)
-		NewValue = 0x7FFF;
+	if (NewValue > +0x7FFF)
+		NewValue = +0x7FFF;
 
 	return (INT16)NewValue;
 }
-INLINE INT32 Limit2Bit24(INT32 Value)
+
+INLINE INT32 Limit24Bit(INT32 Value)
 {
-	INT32 NewValue = (Value << 8) + (Value >> 8);
+	INT32 NewValue;
+	
+	NewValue = (Value << 8 >> VOL_SHIFT) + (Value >> (8 + VOL_SHIFT));
 	if (NewValue < -0x800000)
 		NewValue = -0x800000;
 	if (NewValue > +0x7FFFFF)
 		NewValue = +0x7FFFFF;
 	return NewValue;
 }
-INLINE INT32 Limit2Int(INT32 Value)
+
+INLINE INT32 Limit32Bit(INT32 Value)
 {
-	signed long long NewValue = ((signed long long)Value << 16LL) + Value;
+	INT64 NewValue;
+	
+	NewValue = ((INT64)Value << 16 >> VOL_SHIFT) + (Value >> VOL_SHIFT);
 	if (NewValue < -0x80000000LL)
 		NewValue = -0x80000000LL;
 	if (NewValue > +0x7FFFFFFFLL)
@@ -536,6 +548,7 @@ UINT32 FillBuffer(WAVE_BINARY Buffer, UINT32 BufferSize)
 	UINT32 CurSmpl;
 	WAVE_32BS TempBuf;
 	//UINT8 CurChip;
+	INT32 tempSmpl;
 	
 	if (Buffer == NULL)
 		return 0x00;
@@ -584,34 +597,33 @@ UINT32 FillBuffer(WAVE_BINARY Buffer, UINT32 BufferSize)
 		if (! upd7759_busy_r(0x00))
 			ResampleChipStream(&ChipAudio.uPD7759, &TempBuf, 1);
 		
-		TempBuf.Left = TempBuf.Left >> 7;
-		TempBuf.Right = TempBuf.Right >> 7;
+		// now done by the LimitXBit routines
+		//TempBuf.Left = TempBuf.Left >> VOL_SHIFT;
+		//TempBuf.Right = TempBuf.Right >> VOL_SHIFT;
 		switch (BitsPerSample)
 		{
-		case 8:
-			*Buffer++ = Limit2Byte(TempBuf.Left);
-			*Buffer++ = Limit2Byte(TempBuf.Right);
+		case 8:	// 8-bit is unsigned
+			*Buffer++ = Limit8Bit(TempBuf.Left);
+			*Buffer++ = Limit8Bit(TempBuf.Right);
 			break;
 		case 16:
-			((INT16*)Buffer)[0] = Limit2Short(TempBuf.Left);
-			((INT16*)Buffer)[1] = Limit2Short(TempBuf.Right);
+			((INT16*)Buffer)[0] = Limit16Bit(TempBuf.Left);
+			((INT16*)Buffer)[1] = Limit16Bit(TempBuf.Right);
 			Buffer += sizeof(INT16) * 2;
 			break;
 		case 24:
-			{
-				INT32 tmp = Limit2Bit24(TempBuf.Left);
-				*Buffer++ = (tmp >> 0) & 0xFF;
-				*Buffer++ = (tmp >> 8) & 0xFF;
-				*Buffer++ = (tmp >> 16) & 0xFF;
-				tmp = Limit2Bit24(TempBuf.Right);
-				*Buffer++ = (tmp >> 0) & 0xFF;
-				*Buffer++ = (tmp >> 8) & 0xFF;
-				*Buffer++ = (tmp >> 16) & 0xFF;
-			}
+			tempSmpl = Limit24Bit(TempBuf.Left);
+			*Buffer++ = (tempSmpl >>  0) & 0xFF;
+			*Buffer++ = (tempSmpl >>  8) & 0xFF;
+			*Buffer++ = (tempSmpl >> 16) & 0xFF;
+			tempSmpl = Limit24Bit(TempBuf.Right);
+			*Buffer++ = (tempSmpl >>  0) & 0xFF;
+			*Buffer++ = (tempSmpl >>  8) & 0xFF;
+			*Buffer++ = (tempSmpl >> 16) & 0xFF;
 			break;
 		case 32:
-			((INT32*)Buffer)[0] = Limit2Int(TempBuf.Left);
-			((INT32*)Buffer)[1] = Limit2Int(TempBuf.Right);
+			((INT32*)Buffer)[0] = Limit32Bit(TempBuf.Left);
+			((INT32*)Buffer)[1] = Limit32Bit(TempBuf.Right);
 			Buffer += sizeof(INT32) * 2;
 			break;
 		}

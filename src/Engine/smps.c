@@ -214,6 +214,17 @@ static void CleanSmpsFiles(void)
 	
 	CurSet = 0;
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
+	{
+		for (CurSet = 0x00; CurSet < 0x02; CurSet ++)
+		{
+			if ((SmpsRAM.MusicTrks[CurTrk].PlaybkFlags & PBKFLG_ACTIVE) &&
+				SmpsRAM.MusicTrks[CurTrk].SmpsSet == &SmpsRAM.DrumSet[CurSet])
+				return;	// delay the cleanup until the drums finished playing (else they might hang)
+		}
+	}
+	
+	CurSet = 0;
+	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 		CurSet += CleanSmpsTrack(&SmpsRAM.MusicTrks[CurTrk]);
 	for (CurTrk = 0; CurTrk < SFX_TRKCNT; CurTrk ++)
 		CurSet += CleanSmpsTrack(&SmpsRAM.SFXTrks[CurTrk]);
