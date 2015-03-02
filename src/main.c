@@ -94,6 +94,9 @@ int main(int argc, char* argv[])
 	UINT8* NewSeqData;
 	SMPS_SET LastSmpsCfg;
 	SMPS_EXT_DEF* NewSmpsEDef;
+	UINT8 NChannel;
+	UINT8 MuteToggleResult;
+	char* ChipName;
 	
 	printf("SMPS Music Player v" SMPSPLAY_VER "\n");
 	printf("-----------------\n");
@@ -107,6 +110,8 @@ int main(int argc, char* argv[])
 	memset(&Config, 0x00, sizeof(CONFIG_DATA));
 	Config.FM6DACOff = 0xFF;
 	Config.ResmplForce = 0xFF;
+	Config.SamplePerSec = 44100;	// Default samples per second
+	Config.BitsPerSample = 16;		// Default bits per sample
 	
 	LoadConfigurationFiles(&Config, "config.ini");
 	DebugMsgs = Config.DebugMsgs;
@@ -159,7 +164,7 @@ int main(int argc, char* argv[])
 	SoundLogging(Config.LogWave);
 	
 	AUDIOBUFFERU = 10;
-	StartAudioOutput();
+	StartAudioOutput(Config.SamplePerSec, Config.BitsPerSample);
 	
 	InitDriver();
 	CondJumpVar = SmpsGetVariable(SMPSVAR_CONDIT_JUMP);
@@ -176,6 +181,48 @@ int main(int argc, char* argv[])
 	{
 		switch(inkey)
 		{
+		case '1': case 0x61:
+		case '2': case 0x62:
+		case '3': case 0x63:
+		case '4': case 0x64:
+		case '5': case 0x65:
+		case '6': case 0x66:
+		case '7': case 0x67:
+		case '8': case 0x68:
+		case '9': case 0x69:
+		case '0': case 0x60:
+		case '*':
+			if (inkey == '*')
+				NChannel = 10;
+			else
+			{
+				NChannel = inkey - '1';
+				if (NChannel >= 0x30)
+					NChannel -= 0x30;
+				if (NChannel >= 0x80)
+					NChannel = 9;
+			}
+			if (NChannel < 6)
+			{
+				MuteToggleResult = ToggleMuteAudioChannel(CHIP_YM2612, NChannel);
+				ChipName = "YM2612";
+			}
+			else if (NChannel < 10)
+			{
+				NChannel -= 6;
+				MuteToggleResult = ToggleMuteAudioChannel(CHIP_SN76496, NChannel);
+				ChipName = "SN76496";
+			}
+			else
+			{
+				NChannel = 0;
+				MuteToggleResult = ToggleMuteAudioChannel(CHIP_YM2612, 6);
+				ChipName = "DAC";
+			}
+			ClearLine();
+			printf("Channel %i of %s %s\r", NChannel + 1, ChipName, MuteToggleResult ? "enabled" : "disabled");
+			WaitTimeForKey(1000);
+			break;
 		case 0xE0:
 			inkey = _getch();
 			switch(inkey)

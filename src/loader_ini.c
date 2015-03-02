@@ -211,6 +211,10 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 				CfgData->AudioBufs = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "LogWave"))
 				CfgData->LogWave = GetBoolValue(RToken1, "True", "False");
+			else if (! _stricmp(LToken, "SamplesPerSec"))
+				CfgData->SamplePerSec = (UINT32)strtoul(RToken1, NULL, 0);
+			else if (! _stricmp(LToken, "BitsPerSample"))
+				CfgData->BitsPerSample = (UINT8)strtoul(RToken1, NULL, 0);
 		}
 		else if (Group == 0x10)	// [.ext] group
 		{
