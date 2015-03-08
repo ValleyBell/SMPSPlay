@@ -188,25 +188,27 @@ int main(int argc, char* argv[])
 	{
 		switch(inkey)
 		{
-		case '1': case 0x61:
-		case '2': case 0x62:
-		case '3': case 0x63:
-		case '4': case 0x64:
-		case '5': case 0x65:
-		case '6': case 0x66:
-		case '7': case 0x67:
-		case '8': case 0x68:
-		case '9': case 0x69:
-		case '0': case 0x60:
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+		case '8':
+		case '9':
+		case '0':
 		case '*':
 			if (inkey == '*')
+			{
 				NChannel = 10;
+			}
 			else
 			{
-				NChannel = inkey - '1';
-				if (NChannel >= 0x30)
-					NChannel -= 0x30;
-				if (NChannel >= 0x80)
+				NChannel = inkey - '0';
+				if (NChannel > 0)
+					NChannel --;
+				else
 					NChannel = 9;
 			}
 			if (NChannel < 6)
@@ -229,6 +231,7 @@ int main(int argc, char* argv[])
 			ClearLine();
 			printf("Channel %i of %s %s\r", NChannel + 1, ChipName, MuteToggleResult ? "enabled" : "disabled");
 			WaitTimeForKey(1000);
+			DisplayFileID(cursor);
 			break;
 		case 0xE0:
 			inkey = _getch();
@@ -400,7 +403,11 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			inkey = toupper(_getch());
+			inkey = _getch();
+			if (inkey == 0x00 || inkey == 0xE0)
+				inkey = 0xE0;
+			else
+				inkey = toupper(inkey);
 		}
 	}
 	

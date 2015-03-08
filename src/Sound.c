@@ -52,6 +52,7 @@ typedef struct chip_audio_struct
 
 //UINT8 StartAudioOutput(void);
 //UINT8 StopAudioOutput(void);
+//UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel);
 static void SetupResampler(CAUD_ATTR* CAA);
 INLINE UINT8 Limit8Bit(INT32 Value);
 INLINE INT16 Limit16Bit(INT32 Value);
@@ -300,10 +301,17 @@ INLINE INT32 Limit32Bit(INT32 Value)
 	INT64 NewValue;
 	
 	NewValue = ((INT64)Value << 16 >> VOL_SHIFT) + (Value >> VOL_SHIFT);
+#ifndef _MSC_VER
 	if (NewValue < -0x80000000LL)
 		NewValue = -0x80000000LL;
 	if (NewValue > +0x7FFFFFFFLL)
 		NewValue = +0x7FFFFFFFLL;
+#else	// fallback for MS VC++ 6.0
+	if (NewValue < -0x80000000i64)
+		NewValue = -0x80000000i64;
+	if (NewValue > +0x7FFFFFFFi64)
+		NewValue = +0x7FFFFFFFi64;
+#endif
 	return (INT32)NewValue;
 }
 

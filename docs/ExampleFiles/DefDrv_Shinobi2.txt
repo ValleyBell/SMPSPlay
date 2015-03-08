@@ -9,6 +9,7 @@ PtrFmt = 68k
 InsMode = Default
 ;FMChnOrder = 16 0 1 2 4 5 6
 TempoMode = Timeout
+Tempo1Tick = DoTempo
 FMBaseNote = B
 FMBaseOctave = 0
 DetuneOctWrap = False
@@ -20,6 +21,11 @@ VolMode = Algo
 FMFreqs = Def_68k
 PSGFreqs = Def_68k
 FM3Freqs = $000 $180 $1F4 $260
+
+FadeMode = 68k
+
+FadeOutSteps = $28
+FadeOutDelay = 3
 
 [EnvelopeCmds]
 80 = RESET

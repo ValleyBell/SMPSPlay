@@ -1,0 +1,18 @@
+; --- Golden Axe III Drum Definition ---
+
+[Main]
+DrumMode = Normal
+DrumIDBase = 81	; Note: DrumID 80 will result in -1 and stop the DAC sound.
+
+; Note: "Chn" is a bitmask, so 01 = channel 1, 02 = channel 2, 03 = channel 1+2
+;       If the value is 00 or omitted, channel 1 is used.
+;       The Chn value is only used by DAC drums.
+[Drums]
+;Note	Type	DrumID	Pitch	Chn
+80..8F	DAC	80		01
+90..9F	DAC	80		02
+A0..AF	DAC	80		03
+; not used by any SMPS, but for completeness:
+B0..BF	DAC	80		03
+C0..CF	DAC	80		01
+D0..DF	DAC	80		02

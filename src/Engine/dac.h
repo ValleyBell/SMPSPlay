@@ -18,7 +18,7 @@ typedef struct _dac_table
 	UINT16 Sample;
 	UINT8 Pan;
 	UINT8 Flags;
-//	UINT8 reserved;
+	UINT8 Algo;
 	UINT32 Rate;
 	UINT32 OverriddenRate;
 } DAC_TABLE;
@@ -28,18 +28,29 @@ typedef struct _dac_table
 #define DACRM_NOVERFLOW	0x02
 #define DACSM_NORMAL	0x00
 #define DACSM_INTERPLT	0x01	// do linear interpolation between samples
-typedef struct _dac_settings
+typedef struct _dac_algorithm
 {
+	UINT8 DefCompr;		// default compression mode
+	UINT8 RateMode;
 	UINT32 BaseCycles;
 	UINT32 LoopCycles;
 	UINT32 LoopSamples;
-	UINT32 RateOverflow;
 	
 	UINT32 BaseRate;
-	UINT32 Divider;	// Note: .2 (decimal) Fixed Point, i.e. 123 means 1.23
-	UINT8 RateMode;
-	UINT8 SmplMode;	// Resample Mode
+	union
+	{
+		// RM_DELAY: use Divider, RM_[N]OVERFLOW: use RateOverflow
+		UINT32 Divider;	// Note: .2 (decimal) Fixed Point, i.e. 123 means 1.23
+		UINT32 RateOverflow;
+	};
+} DAC_ALGO;
+typedef struct _dac_settings
+{
+	UINT8 AlgoAlloc;
+	UINT8 AlgoCount;
+	DAC_ALGO* Algos;
 	
+	UINT8 SmplMode;	// Resample Mode
 	UINT8 Channels;
 	UINT8 VolDiv;
 } DAC_SETTINGS;

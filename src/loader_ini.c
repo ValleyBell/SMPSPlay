@@ -221,6 +221,8 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 			if (! _stricmp(LToken, "Equals"))
 			{
 				ExtData->EqualExt = GetExtentionData(&CfgData->ExtList, RToken1);
+				if (ExtData->EqualExt == NULL)
+					printf("Warning: Unable to find extention '%s'!\n", RToken1);
 			}
 			else
 			{

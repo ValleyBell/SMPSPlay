@@ -53,6 +53,11 @@ FMChnOrder = 12 0 1 4 5 6 2
 ;	OVERFLOW2 - used by Sonic 2
 TempoMode = Timeout
 
+; Order of the execution of PlaySoundID and DoTempo
+;	DOTEMPO - DoTempo is executed first, PlaySoundID then. So when a new song gets started, one DoTempo is missed.
+;	PLAYMUSIC - PlaySoundID is executed first.
+Tempo1Tick = DoTempo
+
 ; FM Base Note
 ;	B - frequency table begins with a B note, so the table entry is (note - 80h) [SMPS 68k]
 ;	C - frequency table begins with a C note, so the table entry is (note - 81h) [SMPS Z80]
@@ -98,6 +103,10 @@ VolMode = Bit7
 FMFreqs = Def_Z80
 PSGFreqs = Def_Z80_T1
 FM3Freqs = 000h 132h 18Ah 1E4h	; Flicky uses a slightly modified set of FM3 frequencies.
+
+
+FadeOutSteps = 28h
+FadeOutDelay = 6
 
 
 [EnvelopeCmds]

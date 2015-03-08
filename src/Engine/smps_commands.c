@@ -1734,7 +1734,7 @@ void RefreshDACVolume(TRK_RAM* Trk, UINT8 DacMode, UINT8 DacChn, UINT8 Volume)
 	case DCHNMODE_VRDLX:
 		CurVolume = (Volume & 0x0F) << 4;
 		CurVolume = 0x100 - CurVolume;
-		DAC_SetVolume(DacChn, Volume);
+		DAC_SetVolume(DacChn, CurVolume);
 		break;
 	case DCHNMODE_S2R:
 		if (Volume < 0x10)

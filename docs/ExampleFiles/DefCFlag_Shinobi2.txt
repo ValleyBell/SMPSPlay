@@ -1,4 +1,4 @@
-; --- SMPS 68k Command Definition ---
+; --- SMPS 68k Type 2 Command Definition ---
 ; based on a disassembly of The Super Shinobi II
 
 ;Flag	Type    	SubType 	Len	JmpOfs
@@ -40,5 +40,5 @@ FF	META_CF 	        	01
 00	SSG_EG  	SEG_FULLATK	05
 01	MUS_PAUSE	MUSP_68K	02
 02	TICK_MULT	TMULT_ALL	02
-03	FADE_IN 	FDIN_START	03
-04	FADE_IN 	FDIN_CANCEL	01
+03	FADE_SPC	FDSPC_FMPSG	83
+04	FADE_SPC	FDSPC_STOP	01

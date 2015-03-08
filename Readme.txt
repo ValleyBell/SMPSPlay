@@ -25,17 +25,24 @@ Features
 
 Keys
 ----
-- Cursor Up/Down - change song
-- Enter - play
-- Space - pause/resume
-- N - next song
-- A - automatic progessing (plays the next song when a song is finished or played 2 full loops)
-- P - PAL mode on/off (affects only games that use VInt for timing)
-- S - stop and mute music (calls the StopAllSound SMPS routine)
-- F - fade music out (calls FadeOutMusic SMPS routine)
-- V - enable/disable VGM logging
-- J - toggle Conditional Jump variable
-- ESC - quit
+Cursor Up/Down - change song
+Enter - play
+Space - pause/resume
+N - next song
+A - automatic progessing (plays the next song when a song is finished or played 2 full loops)
+P - PAL mode on/off (affects only games that use VInt for timing)
+S - stop and mute music (calls the StopAllSound SMPS routine)
+F - fade music out (calls FadeOutMusic SMPS routine)
+V - enable/disable VGM logging
+J - toggle Conditional Jump variable
+ESC - quit
+
+Channel Muting
+--------------
+1-6 - mute/unmute YM2612 channel 1-6
+ *  - mute/unmute YM2612 DAC channel
+7-9 - mute/unmute PSG channel 1-3
+ 0  - mute/unmute PSG channel 4/noise
 
 
 In order to play the SMPS files of a certain game, you need to load that game's config.ini.
@@ -59,6 +66,7 @@ The wave playback code was taken from VGMPlay.
 The SMPS engine code is based on disassemblies of various SMPS sound drivers.
 
 A huge thanks to the developers of IDA, The Interactive Disassembler. Disassembling the SMPS sound drivers would've been a lot harder without this great tool.
+Thanks to Xeeynamo for contributing.
 
 
 
@@ -76,6 +84,7 @@ History
 	added Fade In support used by Sonic games
 	added support for Super Monaco GP II's melody DAC channel
 	added NEC ADPCM support (for Sega Pico)
+	added configurable output settings and channel muting (thanks Xeeynamo)
 2014-08-17 - 2.01
 	added proper support for Master System SMPS (incl. PSG drums, additional commands)
 	added preSMPS instrument format (register-data pairs)

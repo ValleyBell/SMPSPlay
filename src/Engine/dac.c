@@ -19,6 +19,7 @@ typedef struct _dac_state
 	const DAC_TABLE* DACTblPtr;
 	const UINT8* DPCMData;
 	const UINT8* SmplData;
+	const DAC_ALGO* DACAlgo;
 	
 	// semi-constant variables
 	UINT32 FreqForce;	// FreqForce and RateForce force override the current playback speed.
@@ -44,9 +45,9 @@ typedef struct _dac_state
 
 // Function Prototypes
 //void SetDACDriver(DAC_CFG* DACSet);
-static UINT32 CalcDACFreq(UINT32 Rate);
+static UINT32 CalcDACFreq(const DAC_ALGO* DacAlgo, UINT32 Rate);
 static UINT32 CalcDACDelta_Hz(UINT32 FreqHz);
-static UINT32 CalcDACDelta_Rate(UINT32 Rate);
+static UINT32 CalcDACDelta_Rate(const DAC_ALGO* DacAlgo, UINT32 Rate);
 static UINT8 GetNextSample(DAC_STATE* ChnState, INT16* RetSmpl);
 static UINT8 HandleSampleEnd(DAC_STATE* ChnState);
 static INT16 UpdateChannels(UINT16* ProcSmpls, UINT8* StopSignal);
@@ -83,38 +84,38 @@ void SetDACDriver(DAC_CFG* DACSet)
 	return;
 }
 
-static UINT32 CalcDACFreq(UINT32 Rate)
+static UINT32 CalcDACFreq(const DAC_ALGO* DacAlgo, UINT32 Rate)
 {
 	UINT32 Numerator;
 	UINT32 Divisor;
 	
-	switch(DACDrv->Cfg.RateMode)
+	switch(DacAlgo->RateMode)
 	{
 	case DACRM_DELAY:
-		if (DACDrv->Cfg.BaseCycles)
+		if (DacAlgo->BaseCycles)
 		{
-			Numerator = CLOCK_Z80 * DACDrv->Cfg.LoopSamples;
-			Divisor = DACDrv->Cfg.BaseCycles + DACDrv->Cfg.LoopCycles * (Rate - 1);
+			Numerator = CLOCK_Z80 * DacAlgo->LoopSamples;
+			Divisor = DacAlgo->BaseCycles + DacAlgo->LoopCycles * (Rate - 1);
 		}
 		else
 		{
-			Numerator = DACDrv->Cfg.BaseRate * 100;
-			Divisor = DACDrv->Cfg.Divider + Rate * 100;
+			Numerator = DacAlgo->BaseRate * 100;
+			Divisor = DacAlgo->Divider + Rate * 100;
 		}
 		break;
 	case DACRM_OVERFLOW:
 	case DACRM_NOVERFLOW:
 		if (Rate == DACRM_NOVERFLOW)
 			Rate = 0x100 - Rate;
-		if (DACDrv->Cfg.BaseCycles)
+		if (DacAlgo->BaseCycles)
 		{
-			Numerator = CLOCK_Z80 * DACDrv->Cfg.LoopSamples * Rate;
-			Divisor = DACDrv->Cfg.BaseCycles * 0x100;
+			Numerator = CLOCK_Z80 * DacAlgo->LoopSamples * Rate;
+			Divisor = DacAlgo->BaseCycles * 0x100;
 		}
 		else
 		{
-			Numerator = DACDrv->Cfg.BaseRate * Rate;
-			Divisor = DACDrv->Cfg.Divider;
+			Numerator = DacAlgo->BaseRate * Rate;
+			Divisor = DacAlgo->RateOverflow;
 		}
 		break;
 	default:
@@ -134,38 +135,41 @@ static UINT32 CalcDACDelta_Hz(UINT32 FreqHz)	// returns 16.16 fixed point delta
 	return (Numerator + SampleRate / 2) / SampleRate;
 }
 
-static UINT32 CalcDACDelta_Rate(UINT32 Rate)	// returns 16.16 fixed point delta
+static UINT32 CalcDACDelta_Rate(const DAC_ALGO* DacAlgo, UINT32 Rate)	// returns 16.16 fixed point delta
 {
 	UINT64 Numerator;
 	UINT64 Divisor;
 	
-	switch(DACDrv->Cfg.RateMode)
+	switch(DacAlgo->RateMode)
 	{
 	case DACRM_DELAY:
-		if (DACDrv->Cfg.BaseCycles)
+		if (DacAlgo->BaseCycles)
 		{
-			Numerator = CLOCK_Z80 * DACDrv->Cfg.LoopSamples;
-			Divisor = DACDrv->Cfg.BaseCycles + DACDrv->Cfg.LoopCycles * (Rate - 1);
+			Numerator = CLOCK_Z80 * DacAlgo->LoopSamples;
+			Divisor = DacAlgo->BaseCycles + DacAlgo->LoopCycles * (Rate - 1);
 		}
 		else
 		{
-			Numerator = DACDrv->Cfg.BaseRate * 100;
-			Divisor = DACDrv->Cfg.Divider + Rate * 100;
+			Numerator = DacAlgo->BaseRate * 100;
+			Divisor = DacAlgo->Divider + Rate * 100;
 		}
 		break;
-	case DACRM_OVERFLOW:
 	case DACRM_NOVERFLOW:
-		if (Rate == DACRM_NOVERFLOW)
-			Rate = 0x100 - Rate;
-		if (DACDrv->Cfg.BaseCycles)
+		if (Rate < DacAlgo->RateOverflow)
+			Rate = DacAlgo->RateOverflow - Rate;
+		else
+			Rate = 0;
+		// fall through
+	case DACRM_OVERFLOW:
+		if (DacAlgo->BaseCycles)
 		{
-			Numerator = CLOCK_Z80 * DACDrv->Cfg.LoopSamples * Rate;
-			Divisor = DACDrv->Cfg.BaseCycles * 0x100;
+			Numerator = CLOCK_Z80 * DacAlgo->LoopSamples * Rate;
+			Divisor = DacAlgo->BaseCycles * DacAlgo->RateOverflow;
 		}
 		else
 		{
-			Numerator = DACDrv->Cfg.BaseRate * Rate;
-			Divisor = DACDrv->Cfg.Divider;
+			Numerator = DacAlgo->BaseRate * Rate;
+			Divisor = DacAlgo->RateOverflow;
 		}
 		break;
 	default:
@@ -433,6 +437,7 @@ void DAC_Reset(void)
 		//DACChn->PbBaseFlags = 0x00;
 		//DACChn->Volume = 0x100;
 		DACChn->SmplLast = DACChn->SmplNext = 0x0000;
+		DACChn->DACAlgo = NULL;
 	}
 	
 	DAC_ResetOverride();
@@ -571,6 +576,7 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 	DACChn->DACTblPtr = TempEntry;
 	DACChn->DPCMData = TempSmpl->DPCMArr;
 	DACChn->SmplData = TempSmpl->Data;
+	DACChn->DACAlgo = &DACDrv->Cfg.Algos[TempEntry->Algo];
 	DACChn->DPCMState = 0x80;
 	DACChn->DPCMNibble = 0x00;
 	DACChn->OutSmpl = 0x0000;
@@ -609,8 +615,8 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 			Rate = TempEntry->OverriddenRate;
 		else
 			Rate = TempEntry->Rate;
-		FreqHz = CalcDACFreq(Rate);	// for VGM logging
-		DACChn->DeltaFract = CalcDACDelta_Rate(Rate);
+		FreqHz = CalcDACFreq(DACChn->DACAlgo, Rate);	// for VGM logging
+		DACChn->DeltaFract = CalcDACDelta_Rate(DACChn->DACAlgo, Rate);
 	}
 	
 	SetDACState(0x80);	// also does WriteFMI(0x2B, 0x00);
@@ -648,7 +654,7 @@ void DAC_SetBank(UINT8 Chn, UINT8 BankID)
 void DAC_SetRate(UINT8 Chn, UINT32 Rate, UINT8 MidNote)
 {
 	// Note: MidNote is here for optimization.
-	//       setting it to 0 skips the rate recalculation, since that's done when playing the next sound anyway
+	//       Setting it to 0 skips the rate recalculation, since that's done when playing the next sound anyway.
 	DAC_STATE* DACChn;
 	UINT32 FreqHz;
 	
@@ -660,6 +666,8 @@ void DAC_SetRate(UINT8 Chn, UINT32 Rate, UINT8 MidNote)
 	DACChn->RateForce = Rate;
 	if (DACChn->FreqForce || DACChn->DACSmplPtr == NULL || ! MidNote)
 		return;
+	if (DACChn->DACAlgo == NULL)
+		return;
 	
 	if (! Rate && DACChn->DACTblPtr != NULL)
 	{
@@ -668,10 +676,10 @@ void DAC_SetRate(UINT8 Chn, UINT32 Rate, UINT8 MidNote)
 		else
 			Rate = DACChn->DACTblPtr->Rate;
 	}
-	FreqHz = CalcDACFreq(Rate);
+	FreqHz = CalcDACFreq(DACChn->DACAlgo, Rate);
 	if (DACChn->DACSmplPtr->UsageID < 0xFE)
 		vgm_write_stream_data_command(0x00, 0x02, FreqHz);
-	DACChn->DeltaFract = CalcDACDelta_Rate(Rate);
+	DACChn->DeltaFract = CalcDACDelta_Rate(DACChn->DACAlgo, Rate);
 	
 	return;
 }

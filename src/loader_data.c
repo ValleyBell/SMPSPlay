@@ -32,13 +32,15 @@ typedef struct _dac_new_smpl
 	UINT8 Compr;
 	UINT8 Pan;
 	UINT8 Flags;
+	UINT8 Algo;
 	UINT32 Rate;
 	UINT8* DPCMData;
 } DAC_NSMPL;
 
 // Function Prototypes
 //void LoadDACData(const char* FileName, DAC_CFG* DACDrv);
-static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, DAC_NSMPL* SmplData);
+static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, const DAC_NSMPL* SmplData);
+static UINT8 GetDACAlgoID(const DAC_SETTINGS* DACCfg, const DAC_NSMPL* SmplData);
 //void FreeDACData(DAC_CFG* DACDrv);
 //UINT8 LoadEnvelopeData(const char* FileName, ENV_LIB* EnvLib);
 //void FreeEnvelopeData(ENV_LIB* EnvLib);
@@ -70,9 +72,11 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 	UINT8* ArrPtr;
 	
 	char DACFile[0x100];
+	UINT8 CurAlgoID;
 	UINT8 DrumIDBase;
 	UINT16 CurDrumID;
 	DAC_NSMPL DSmpl;
+	DAC_ALGO* DAlgo;
 	
 	DACDrv->SmplAlloc = 0x100;
 	DACDrv->SmplCount = 0x00;
@@ -87,12 +91,20 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 	DACDrv->BankCount = 0x00;
 	DACDrv->BankTbl = NULL;
 	
-	DACDrv->Cfg.BaseRate = 272624;
-	DACDrv->Cfg.Divider = 796;
+	DACDrv->Cfg.AlgoAlloc = 0x10;
+	DACDrv->Cfg.AlgoCount = 0x01;
+	DACDrv->Cfg.Algos = (DAC_ALGO*)malloc(DACDrv->Cfg.AlgoAlloc * sizeof(DAC_ALGO));
+	memset(DACDrv->Cfg.Algos, 0x00, DACDrv->Cfg.AlgoAlloc * sizeof(DAC_ALGO));
+	
+	
+	DAlgo = &DACDrv->Cfg.Algos[0x00];
+	DAlgo->BaseRate = 272624;
+	DAlgo->Divider = 796;
+	DAlgo->RateMode = DACRM_DELAY;
+	DAlgo->DefCompr = 0xFF;
+	DACDrv->Cfg.SmplMode = DACSM_NORMAL;
 	DACDrv->Cfg.Channels = 1;
 	DACDrv->Cfg.VolDiv = 1;
-	DACDrv->Cfg.RateMode = DACRM_DELAY;
-	DACDrv->Cfg.SmplMode = DACSM_NORMAL;
 	DSmpl.DPCMData = NULL;
 	
 	strcpy(BasePath, FileName);
@@ -108,6 +120,10 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 	}
 	
 	IniSection = 0x01;
+	CurAlgoID = 0x00;
+	DAlgo = &DACDrv->Cfg.Algos[CurAlgoID];
+	DAlgo->DefCompr = 0xFF;	// by default, use this algorithm for all compression types
+	DSmpl.Algo = 0xFF;
 	DrumIDBase = 0x81;
 	
 	CurDrumID = 0x00;
@@ -125,25 +141,51 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 			if (IniSection & 0x80)
 				LoadDACSample(DACDrv, CurDrumID, DACFile, &DSmpl);
 			
-			CurDrumID = (UINT8)strtoul(RToken1, &RToken2, 0x10);
-			if (! _stricmp(LToken + 1, "Banks"))
+			if (RToken1[0] == '$')
+			{
+				CurAlgoID = (UINT8)strtoul(RToken1 + 1, &RToken2, 0x10);
+				if (CurAlgoID == DACDrv->Cfg.AlgoCount)
+				{
+					DACDrv->Cfg.AlgoCount = CurAlgoID + 1;
+				}
+				else if (CurAlgoID > DACDrv->Cfg.AlgoCount)
+				{
+					printf("Warning: Ignoring DAC algorithm %s! (must be defined consecutively)\n");
+					RToken2 = RToken1;
+				}
+				
+				if (RToken2 == RToken1 || CurAlgoID >= DACDrv->Cfg.AlgoAlloc)
+				{
+					IniSection = 0x00;	// invalid algorithm ID - ignore section
+				}
+				else
+				{
+					DAlgo = &DACDrv->Cfg.Algos[CurAlgoID];
+					IniSection = 0x01;
+				}
+			}
+			else if (! _stricmp(RToken1, "Banks"))
 			{
 				IniSection = 0x02;
 			}
-			else if (RToken2 == RToken1 || CurDrumID < DrumIDBase)
-			{
-				IniSection = 0x00;
-			}
 			else
 			{
-				CurDrumID -= DrumIDBase;
-				IniSection = 0x80;
-				
-				strcpy(DACFile, "");
-				DSmpl.Compr = 0x00;
-				DSmpl.Rate = 0x00;
-				DSmpl.Pan = 0x00;
-				DSmpl.Flags = 0x00;
+				CurDrumID = (UINT8)strtoul(RToken1, &RToken2, 0x10);
+				if (RToken2 == RToken1 || CurDrumID < DrumIDBase)
+				{
+					IniSection = 0x00;
+				}
+				else
+				{
+					CurDrumID -= DrumIDBase;
+					IniSection = 0x80;
+					
+					strcpy(DACFile, "");
+					DSmpl.Compr = 0x00;
+					DSmpl.Rate = 0x00;
+					DSmpl.Pan = 0x00;
+					DSmpl.Flags = 0x00;
+				}
 			}
 			continue;
 		}
@@ -151,40 +193,55 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 		if (! IniSection)	// ignore all invalid sections
 			continue;
 		
+		// "DPCMData" is valid in all sections
+		if (! _stricmp(LToken, "DPCMData"))
+		{
+			//RevertTokenTrim(RToken1, RToken2);
+			ArrSize = ReadHexData(RToken1, &ArrPtr);
+			// DPCM compression is nibble-based, so 10h values are necessary
+			if (ArrSize >= 0x10)
+			{
+				if (DSmpl.DPCMData != NULL)
+					free(DSmpl.DPCMData);
+				DSmpl.DPCMData = ArrPtr;
+			}
+			else
+			{
+				free(ArrPtr);
+			}
+			continue;
+		}
+		
 		RToken2 = TrimToken(RToken1);
 		if (IniSection == 0x01)
 		{
 			if (! _stricmp(LToken, "BaseRate"))
-				DACDrv->Cfg.BaseRate = (UINT32)strtoul(RToken1, NULL, 0);
+				DAlgo->BaseRate = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "RateDiv"))
-				DACDrv->Cfg.Divider = (UINT32)(strtod(RToken1, NULL) * 100 + 0.5);
+				DAlgo->Divider = (UINT32)(strtod(RToken1, NULL) * 100 + 0.5);
 			else if (! _stricmp(LToken, "BaseCycles"))
-				DACDrv->Cfg.BaseCycles = (UINT32)strtoul(RToken1, NULL, 0);
+				DAlgo->BaseCycles = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "LoopCycles"))
-				DACDrv->Cfg.LoopCycles = (UINT32)strtoul(RToken1, NULL, 0);
+				DAlgo->LoopCycles = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "LoopSamples"))
-				DACDrv->Cfg.LoopSamples = (UINT32)strtoul(RToken1, NULL, 0);
+				DAlgo->LoopSamples = (UINT32)strtoul(RToken1, NULL, 0);
+			else if (! _stricmp(LToken, "RateMode"))
+				DAlgo->RateMode = (UINT8)strtoul(RToken1, NULL, 0);
+			else if (! _stricmp(LToken, "RateOverflow"))
+				DAlgo->RateOverflow = (UINT32)(strtol(RToken1, NULL, 0));
+			else if (! _stricmp(LToken, "DefCompr"))
+			{
+				if (! _stricmp(RToken1, "All"))
+					DAlgo->DefCompr = 0xFF;
+				else if (! _stricmp(RToken1, "PCM"))
+					DAlgo->DefCompr = COMPR_PCM;
+				else if (! _stricmp(RToken1, "DPCM"))
+					DAlgo->DefCompr = COMPR_DPCM;
+				else
+					DAlgo->DefCompr = (UINT8)strtoul(RToken1, NULL, 0);
+			}
 			else if (! _stricmp(LToken, "ResampleMode"))
 				DACDrv->Cfg.SmplMode = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "RateMode"))
-				DACDrv->Cfg.RateMode = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "RateOverflow"))
-				DACDrv->Cfg.Divider = (UINT32)(strtol(RToken1, NULL, 0));
-			else if (! _stricmp(LToken, "DPCMData"))
-			{
-				RevertTokenTrim(RToken1, RToken2);
-				ArrSize = ReadHexData(RToken1, &ArrPtr);
-				if (ArrSize >= 0x10)
-				{
-					if (DSmpl.DPCMData != NULL)
-						free(DSmpl.DPCMData);
-					DSmpl.DPCMData = ArrPtr;
-				}
-				else
-				{
-					free(ArrPtr);
-				}
-			}
 			else if (! _stricmp(LToken, "DrumIDBase"))
 				DrumIDBase = (UINT8)strtoul(RToken1, NULL, 0x10);
 		}
@@ -219,6 +276,8 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 			}
 			else if (! _stricmp(LToken, "Compr"))
 			{
+				// "False" and "True" are for backwards compatibility with
+				// older DAC.ini files.
 				if (! _stricmp(RToken1, "PCM") || ! _stricmp(RToken1, "False"))
 					DSmpl.Compr = COMPR_PCM;
 				else if (! _stricmp(RToken1, "DPCM") || ! _stricmp(RToken1, "True"))
@@ -240,25 +299,16 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 				DSmpl.Flags &= ~DACFLAG_REVERSE;
 				DSmpl.Flags |= GetBoolValue(RToken1, "True", "False") << 1;
 			}
-			else if (! _stricmp(LToken, "DPCMData"))
-			{
-				RevertTokenTrim(RToken1, RToken2);
-				ArrSize = ReadHexData(RToken1, &ArrPtr);
-				if (ArrSize >= 0x10)
-				{
-					if (DSmpl.DPCMData != NULL)
-						free(DSmpl.DPCMData);
-					DSmpl.DPCMData = ArrPtr;
-				}
-				else
-				{
-					free(ArrPtr);
-				}
-			}
 		}
 	}
 	if (IniSection & 0x80)
 		LoadDACSample(DACDrv, CurDrumID, DACFile, &DSmpl);
+	for (CurAlgoID = 0x00; CurAlgoID < DACDrv->Cfg.AlgoCount; CurAlgoID ++)
+	{
+		DAlgo = &DACDrv->Cfg.Algos[CurAlgoID];
+		if (DAlgo->RateOverflow == 0x00 && DAlgo->RateMode != DACRM_DELAY)
+			DAlgo->RateOverflow = 0x100;
+	}
 	
 	if (DSmpl.DPCMData != NULL)
 		free(DSmpl.DPCMData);
@@ -268,7 +318,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 	return;
 }
 
-static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, DAC_NSMPL* SmplData)
+static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, const DAC_NSMPL* SmplData)
 {
 	UINT16 CurSmpl;
 	DAC_SAMPLE* TempSmpl;
@@ -291,6 +341,7 @@ static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, 
 	TempTbl->Rate = SmplData->Rate;
 	TempTbl->Pan = SmplData->Pan;
 	TempTbl->Flags = SmplData->Flags;
+	TempTbl->Algo = GetDACAlgoID(&DACDrv->Cfg, SmplData);
 	
 	if (TempTbl->Sample != 0xFFFF)
 	{
@@ -364,6 +415,23 @@ static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, 
 	return;
 }
 
+static UINT8 GetDACAlgoID(const DAC_SETTINGS* DACCfg, const DAC_NSMPL* SmplData)
+{
+	UINT8 CurAlgo;
+	
+	if (SmplData->Algo < 0xFF)
+		return SmplData->Algo;
+
+	for (CurAlgo = 0x00; CurAlgo < DACCfg->AlgoCount; CurAlgo ++)
+	{
+		if (DACCfg->Algos[CurAlgo].DefCompr == SmplData->Compr)
+			return CurAlgo;
+		else if (DACCfg->Algos[CurAlgo].DefCompr == 0xFF)	// "all" compression types
+			return CurAlgo;
+	}
+	return 0x00;
+}
+
 void FreeDACData(DAC_CFG* DACDrv)
 {
 	UINT8 CurSmpl;
@@ -386,13 +454,16 @@ void FreeDACData(DAC_CFG* DACDrv)
 	DACDrv->SmplCount = 0x00;
 	DACDrv->TblCount = 0x00;
 	DACDrv->BankCount = 0x00;
+	DACDrv->Cfg.AlgoCount = 0x00;
 	
 	DACDrv->SmplAlloc = 0x00;
-	free(DACDrv->Smpls);	DACDrv->Smpls = NULL;
+	free(DACDrv->Smpls);		DACDrv->Smpls = NULL;
 	DACDrv->TblAlloc = 0x00;
-	free(DACDrv->SmplTbl);	DACDrv->SmplTbl = NULL;
+	free(DACDrv->SmplTbl);		DACDrv->SmplTbl = NULL;
 	DACDrv->BankAlloc = 0x00;
-	free(DACDrv->BankTbl);	DACDrv->BankTbl = NULL;
+	free(DACDrv->BankTbl);		DACDrv->BankTbl = NULL;
+	DACDrv->Cfg.AlgoAlloc = 0x00;
+	free(DACDrv->Cfg.Algos);	DACDrv->Cfg.Algos = NULL;
 	
 	return;
 }
