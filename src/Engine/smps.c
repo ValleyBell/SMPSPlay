@@ -1254,7 +1254,15 @@ static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue)
 		//StartPanAnim:
 		if (Trk->PanAni.Type == 0x01)
 		{
-			if (Trk->PlaybkFlags & PBKFLG_HOLD)
+			UINT8 Flags;
+			
+			// Like in DoNoteOn, SMPS 68k and Z80 check the same bit,
+			// which does something different in both drivers.
+			if (Trk->SmpsSet->Cfg->NoteOnPrevent == NONPREV_HOLD)
+				Flags = PBKFLG_HOLD;	// SMPS Z80
+			else //if (Trk->SmpsSet->Cfg->NoteOnPrevent == NONPREV_REST)
+				Flags = PBKFLG_ATREST;	// SMPS 68k
+			if (Trk->PlaybkFlags & Flags)
 				return;
 		}
 		else //if (Trk->PanAni.Type >= 0x02)
@@ -1403,6 +1411,7 @@ static void PrepareModulat(TRK_RAM* Trk)
 	}
 	
 	ModData = &Data[Trk->CstMod.DataPtr];
+	SmpsRAM.ModData = ModData;	// save IY register value
 	Trk->CstMod.Delay = ModData[0x00];
 	Trk->CstMod.Rate = ModData[0x01];
 	Trk->CstMod.Delta = ModData[0x02];
@@ -1516,6 +1525,7 @@ static INT16 DoCustomModulation(TRK_RAM* Trk)
 		Trk->CstMod.Rate --;
 		if (! Trk->CstMod.Rate)
 		{
+			SmpsRAM.ModData = ModData;	// save IY register value
 			Trk->CstMod.Rate = ModData[0x01];
 			Trk->CstMod.Freq += Trk->CstMod.Delta;
 			NewFreq = Trk->CstMod.Freq;
@@ -1524,6 +1534,10 @@ static INT16 DoCustomModulation(TRK_RAM* Trk)
 		Trk->CstMod.RemSteps --;
 		if (! Trk->CstMod.RemSteps)
 		{
+			// emulate bug with uninitialized IY register, fixes Hyper Marbles: Round Clear
+			// (SMPS Z80 Type 1 and Type 2 FM, fixed in Type 2 DAC)
+			if (SmpsRAM.ModData != NULL && 1)
+				ModData = SmpsRAM.ModData;
 			Trk->CstMod.RemSteps = ModData[0x03];
 			Trk->CstMod.Delta = -Trk->CstMod.Delta;
 		}
@@ -1552,9 +1566,10 @@ static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 	{
 		switch(SmpsCfg->EnvCmds[EnvVal & 0x7F])
 		{
-		case ENVCMD_HOLD:	// 81 - hold at current level
+		case ENVCMD_HOLD:		// 81 - hold at current level
+		case ENVCMD_VST_MHLD:	// 83 - [SMPS Z80] like 81
 			return 0x8001;
-		case ENVCMD_STOP:	// 83 - stop
+		case ENVCMD_STOP:		// 83 - [SMPS 68k] stop
 			if (SmpsCfg->EnvMult == ENVMULT_Z80)
 			{
 				return 0x8001;	// in SMPS Z80, it has the same effect as 81
@@ -1618,9 +1633,10 @@ static UINT8 DoVolumeEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 	{
 		switch(SmpsCfg->EnvCmds[EnvVal & 0x7F])
 		{
-		case ENVCMD_HOLD:	// 81 - hold at current level
+		case ENVCMD_HOLD:		// 81 - hold at current level
 			return 0x80;
-		case ENVCMD_STOP:	// 83 - stop
+		case ENVCMD_STOP:		// 83 - stop
+		case ENVCMD_VST_MHLD:
 			DoNoteOff(Trk);
 			return 0x81;
 		}
@@ -2121,6 +2137,7 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 	ResetSpcFM3Mode();
 	SmpsRAM.FadeOut.Steps = 0x00;
 	SmpsRAM.FadeIn.Steps = 0x00;
+	SmpsRAM.ModData = NULL;
 	
 	InitCfg = &SmpsCfg->InitCfg;
 	if (SmpsRAM.LockTimingMode == 0xFF)
@@ -3015,6 +3032,8 @@ void StopAllSound(void)
 	}
 	
 	SmpsRAM.FadeOut.Steps = 0x00;
+	SmpsRAM.FadeIn.Steps = 0x00;
+	SmpsRAM.ModData = NULL;
 	SilencePSG();
 	ResetSpcFM3Mode();
 	DAC_ResetOverride();

@@ -1,2 +1,5 @@
+- switch do turn DoModulation bug on/off [ModAlgo value?]
+- Envelope Command VolStop_ModHold
 - way to define Song IDs (for Wonder Boy 3, command EF 81 84)
 - read Chaotix 32x DAC/PWM.ini correctly
+- disable automatic VGM looping (for loop detection bugs)

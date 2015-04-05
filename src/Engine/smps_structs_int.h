@@ -282,6 +282,7 @@ typedef struct _sound_ram
 	TRK_RAM MusicTrks[MUS_TRKCNT];		// 1C40 - Music Tracks
 	TRK_RAM SFXTrks[SFX_TRKCNT];		// 1DF0 - SFX Tracks
 	TRK_RAM SpcSFXTrks[SPCSFX_TRKCNT];	// 1F40 - Special SFX Tracks
+	const UINT8* ModData;				// [SMPS Z80 Type 1] last value of IY register
 } SND_RAM;
 
 typedef struct _music_save_state

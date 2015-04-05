@@ -62,7 +62,9 @@ static UINT32 FileAlloc;
 static FILE_NAME* FileList;
 static UINT32 cursor = 0;
 static UINT32 smps_playing = -1;
+static volatile bool ExitWait;
 static bool GoToNextSong;
+static bool CondVarChg;
 
 extern bool PauseThread;	// from Stream.c
 extern volatile bool ThreadPauseConfrm;
@@ -84,6 +86,7 @@ static UINT8 LastLineState;
 
 extern UINT16 AUDIOBUFFERU;
 static UINT8* CondJumpVar;
+static UINT8* CommunicationVar;
 
 CONFIG_DATA Config;
 
@@ -174,10 +177,14 @@ int main(int argc, char* argv[])
 	StartAudioOutput();
 	
 	InitDriver();
+	CommunicationVar = SmpsGetVariable(SMPSVAR_COMMUNICATION);
 	CondJumpVar = SmpsGetVariable(SMPSVAR_CONDIT_JUMP);
 	PlayingTimer = 0;
 	LoopCntr = -1;
 	StoppedTimer = -1;
+	CondVarChg = false;
+	GoToNextSong = false;
+	ExitWait = false;
 	
 	smps_playing = -1;
 	memset(&LastSmpsCfg, 0x00, sizeof(SMPS_SET));
@@ -388,18 +395,22 @@ int main(int argc, char* argv[])
 		}
 		
 		WaitForKey();
-		if (GoToNextSong)
+		inkey = 0x00;
+		if (CondVarChg)
+		{
+			CondVarChg = false;
+			ClearLine();
+			printf("Communication Variable changed: 0x%02X\r", *CommunicationVar);
+			WaitTimeForKey(1000);
+			DisplayFileID(cursor);
+		}
+		else if (GoToNextSong)
 		{
 			GoToNextSong = false;
 			if (smps_playing < FileCount - 1)
-			{
 				inkey = 'N';
-			}
 			else
-			{
 				FadeOutMusic();
-				inkey = 0x00;
-			}
 		}
 		else
 		{
@@ -579,125 +590,6 @@ static UINT32 GetFileData(const char* FileName, UINT8** RetBuffer)
 }
 
 
-/*
-void LoadINIFile(const char* INIFileName)
-{
-	FILE* hFile;
-	//char BasePath[0x100];
-	char TempStr[0x100];
-	size_t TempInt;
-	char* TempPnt;
-	
-	strcpy(WorkDir[0x00], "music");
-	strcpy(WorkDir[0x01], "data");
-	strcpy(IniPath[0x00], "");
-	strcpy(IniPath[0x01], "");
-	strcpy(IniPath[0x02], "");
-#ifndef _DEBUG
-	DebugMsgs = 0x00;
-#else
-	DebugMsgs = 0xFF;
-#endif
-	VGM_DataBlkCompress = 0x00;
-	
-	hFile = fopen(INIFileName, "rt");
-	if (hFile == NULL)
-	{
-		printf("Error opening %s\n", INIFileName);
-		return;
-	}
-	
-	while(! feof(hFile))
-	{
-		TempPnt = fgets(TempStr, 0x100, hFile);
-		if (TempPnt == NULL)
-			break;
-		if (TempStr[0x00] == '\n' || TempStr[0x00] == '\0')
-			continue;
-		if (TempStr[0x00] == ';')
-		{
-			// skip comment lines
-			// fgets has set a null-terminator at char 0x3F
-			while(TempStr[strlen(TempStr) - 1] != '\n')
-			{
-				fgets(TempStr, 0x40, hFile);
-				if (TempStr[0x00] == '\0')
-					break;
-			}
-			continue;
-		}
-		
-		TempPnt = strchr(TempStr, '=');
-		if (TempPnt == NULL || TempPnt == TempStr)
-			continue;	// invalid line
-		
-		TempInt = strlen(TempPnt) - 1;
-		if (TempPnt[TempInt] == '\n')
-			TempPnt[TempInt] = '\0';
-		
-		*TempPnt = '\0';
-		TempPnt ++;
-		while(*TempPnt == ' ')
-			TempPnt ++;
-		
-		TempInt = strlen(TempStr) - 1;
-		while(TempInt > 0 && TempStr[TempInt] == ' ')
-		{
-			TempStr[TempInt] = '\0';
-			TempInt --;
-		}
-		
-		if (! _stricmp(TempStr, "MusicDir"))
-		{
-			strcpy(WorkDir[0x00], TempPnt);
-			TempPnt = WorkDir[0x00] + strlen(WorkDir[0x00]) - 0x01;
-			while(TempPnt >= WorkDir[0x00] && (*TempPnt == '\\' || *TempPnt == '/'))
-			{
-				*TempPnt = '\0';
-				TempPnt --;
-			}
-		}
-		else if (! _stricmp(TempStr, "DataDir"))
-		{
-			strcpy(WorkDir[0x01], TempPnt);
-			TempPnt = WorkDir[0x01] + strlen(WorkDir[0x01]) - 0x01;
-			while(TempPnt >= WorkDir[0x01] && (*TempPnt == '\\' || *TempPnt == '/'))
-			{
-				*TempPnt = '\0';
-				TempPnt --;
-			}
-		}
-		else if (! _stricmp(TempStr, "PSGFlt"))
-		{
-			sprintf(IniPath[0x00], "%s\\%s", WorkDir[0x01], TempPnt);
-		}
-		else if (! _stricmp(TempStr, "DACSnd"))
-		{
-			sprintf(IniPath[0x01], "%s\\%s", WorkDir[0x01], TempPnt);
-		}
-		else if (! _stricmp(TempStr, "GblInsSet"))
-		{
-			sprintf(IniPath[0x02], "%s\\%s", WorkDir[0x01], TempPnt);
-		}
-		else if (! _stricmp(TempStr, "DebugMsgs"))
-		{
-			DebugMsgs = (UINT8)strtoul(TempPnt, NULL, 0);
-		}
-		else if (! _stricmp(TempStr, "CompressVGM"))
-		{
-			VGM_DataBlkCompress = (UINT8)strtoul(TempPnt, NULL, 0);
-		}
-		else if (! _stricmp(TempStr, "AudioBuffers"))
-		{
-			AudioBufs = (UINT8)strtoul(TempPnt, NULL, 0);
-		}
-	}
-	
-	fclose(hFile);
-	
-	return;
-}*/
-
 void ClearLine(void)
 {
 	printf("%79s", "\r");
@@ -726,7 +618,7 @@ void ReDisplayFileID(int FileID)
 	char TempBuf[0x20];	// maximum is 0x18 chars (for 2 loop digits) + '\0' (without Z80 offset)
 	char* TempPnt;
 	UINT8 NewLineState;
-	//LastLineState
+	
 	if (FileID >= (int)FileCount)
 		return;
 	
@@ -795,19 +687,20 @@ static void WaitTimeForKey(unsigned int MSec)
 	DWORD CurTime;
 	
 	CurTime = timeGetTime() + MSec;
-	while(timeGetTime() < CurTime)
+	while(! ExitWait && timeGetTime() < CurTime)
 	{
 		Sleep(20);
 		if (_kbhit())
 			break;
 	}
+	// don't reset ExitWait to enforce skipping WaitForKey()
 	
 	return;
 }
 
 static void WaitForKey(void)
 {
-	while(! GoToNextSong && ! PauseMode)
+	while(! ExitWait && ! PauseMode)
 	{
 		Sleep(20);
 		if (cursor == smps_playing)
@@ -815,6 +708,7 @@ static void WaitForKey(void)
 		if (_kbhit())
 			break;
 	}
+	ExitWait = false;
 	
 	return;
 }
@@ -822,7 +716,18 @@ static void WaitForKey(void)
 void FinishedSongSignal(void)
 {
 	if (AutoProgress)
+	{
 		GoToNextSong = true;
+		ExitWait = true;
+	}
+	
+	return;
+}
+
+void CommVarChangeCallback(void)
+{
+	CondVarChg = true;
+	ExitWait = true;
 	
 	return;
 }

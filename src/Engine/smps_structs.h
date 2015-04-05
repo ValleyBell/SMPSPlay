@@ -82,6 +82,7 @@ typedef struct _file_data
 #define ENVCMD_LOOP		0x03	// jump back to env. index xx
 #define ENVCMD_STOP		0x04	// stop the Envelope and Note
 #define ENVCMD_CHGMULT	0x05	// change Envelope Multiplier
+#define ENVCMD_VST_MHLD	0x06	// VolEnv: STOP, ModEnv: HOLD
 
 #define DRMMODE_NORMAL	0x00	// one note = one drum
 #define DRMMODE_DUAL	0x01	// one note = 2 drums (FM/PSG)

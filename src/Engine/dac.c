@@ -103,14 +103,17 @@ static UINT32 CalcDACFreq(const DAC_ALGO* DacAlgo, UINT32 Rate)
 			Divisor = DacAlgo->Divider + Rate * 100;
 		}
 		break;
-	case DACRM_OVERFLOW:
 	case DACRM_NOVERFLOW:
-		if (Rate == DACRM_NOVERFLOW)
-			Rate = 0x100 - Rate;
+		if (Rate < DacAlgo->RateOverflow)
+			Rate = DacAlgo->RateOverflow - Rate;
+		else
+			Rate = 0;
+		// fall through
+	case DACRM_OVERFLOW:
 		if (DacAlgo->BaseCycles)
 		{
 			Numerator = CLOCK_Z80 * DacAlgo->LoopSamples * Rate;
-			Divisor = DacAlgo->BaseCycles * 0x100;
+			Divisor = DacAlgo->BaseCycles * DacAlgo->RateOverflow;
 		}
 		else
 		{

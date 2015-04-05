@@ -18,7 +18,8 @@
 #define WriteFMII(Reg, Data)	ym2612_fm_write(0x00, 0x01, Reg, Data)
 #define WritePSG(Data)			sn76496_psg_write(0x00, Data)
 
-void ClearLine(void);			// from main.c
+void ClearLine(void);				// from main.c
+void CommVarChangeCallback(void);	// from main.c
 
 
 extern SND_RAM SmpsRAM;
@@ -238,6 +239,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		break;
 	case CF_SET_COMM:	// E2 Set Communication Byte
 		SmpsRAM.CommData = Data[0x00];
+		CommVarChangeCallback();
 		break;
 	case CF_VOL_QUICK:
 		Data --;
@@ -1066,7 +1068,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		}
 		
 		TempByt = 0;
-		switch(CFlag->SubType & 0x0F)
+		switch(CFlag->SubType & 0x7F)
 		{
 		case CFS_CJMP_NZ:
 			TempByt = (SmpsRAM.CondJmpVal != 0x00);
@@ -1075,7 +1077,12 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			TempByt = (SmpsRAM.CondJmpVal == 0x00);
 			break;
 		case CFS_CJMP_EQ:
-			TempByt = (SmpsRAM.CondJmpVal == Data[0x00]);
+			//TempByt = (SmpsRAM.CondJmpVal == Data[0x00]);
+			// Right now CondJmpVal can only be 00 or 01, so I limit the parameter to these values.
+			if (Data[0x00])
+				TempByt = (SmpsRAM.CondJmpVal != 0x00);
+			else
+				TempByt = (SmpsRAM.CondJmpVal == 0x00);
 			break;
 		}
 		if (CFlag->SubType & CFS_CJMP_RESET)
