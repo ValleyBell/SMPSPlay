@@ -1,6 +1,6 @@
 // SMPS Command Handler
 // --------------------
-// Written by Valley Bell, 2014
+// Written by Valley Bell, 2014-2015
 
 #include <stdio.h>
 #include <stdlib.h>	// for rand()
@@ -801,8 +801,8 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				Trk->PanAni.AniIdx = Data[0x02];
 				Trk->PanAni.AniLen = Data[0x03] + 1;	// SMPS 68k plays [0..n] instead of [0..n-1]
 				Trk->PanAni.ToutInit = Data[0x04];
-				// SMPS 68k actually sets this to Data[0x04], but 1 has the correct
-				// effect for the SMPS Z80-based PanAnimation routine.
+				// SMPS 68k actually sets PanAni.Timeout to Data[0x04], but 1 has the
+				// correct effect for the SMPS Z80-based PanAnimation routine.
 				Trk->PanAni.Timeout = 0x01;
 				CmdLen += 0x04;
 			}
@@ -1406,6 +1406,12 @@ static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* 
 				Trk->FMInsSong = Params[0x01];
 				InsID &= 0x7F;
 				InsLib = GetSongInsLib(Trk, Trk->FMInsSong);	// get new Instrument Library
+				if (InsLib->InsCount == 0)
+				{
+					printf("Error: FM instrument cross-reference %02X-%02X at %04X!\n",
+							Trk->Instrument, Trk->FMInsSong, Trk->Pos);
+					InsLib = NULL;
+				}
 			}
 		}
 		else

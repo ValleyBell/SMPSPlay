@@ -1,6 +1,6 @@
 // SMPS Engine
 // -----------
-// Written by Valley Bell, 2014
+// Written by Valley Bell, 2014-2015
 //
 // Originally based on a disassembly of Battletoads. (SMPS Z80 Type 1)
 // This should support pretty much all MegaDrive variants of SMPS Z80 and 68k.
@@ -1534,10 +1534,13 @@ static INT16 DoCustomModulation(TRK_RAM* Trk)
 		Trk->CstMod.RemSteps --;
 		if (! Trk->CstMod.RemSteps)
 		{
-			// emulate bug with uninitialized IY register, fixes Hyper Marbles: Round Clear
-			// (SMPS Z80 Type 1 and Type 2 FM, fixed in Type 2 DAC)
-			if (SmpsRAM.ModData != NULL && 1)
-				ModData = SmpsRAM.ModData;
+			if (Trk->SmpsSet->Cfg->ModAlgo & 0x02)
+			{
+				// emulate bug with uninitialized IY register, fixes Hyper Marbles: Round Clear
+				// (SMPS Z80 Type 1 and Type 2 FM, fixed in Type 2 DAC)
+				if (SmpsRAM.ModData != NULL)
+					ModData = SmpsRAM.ModData;
+			}
 			Trk->CstMod.RemSteps = ModData[0x03];
 			Trk->CstMod.Delta = -Trk->CstMod.Delta;
 		}
@@ -1567,18 +1570,11 @@ static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 		switch(SmpsCfg->EnvCmds[EnvVal & 0x7F])
 		{
 		case ENVCMD_HOLD:		// 81 - hold at current level
-		case ENVCMD_VST_MHLD:	// 83 - [SMPS Z80] like 81
+		case ENVCMD_VST_MHLD:	// 83 - hold [SMPS Z80]
 			return 0x8001;
-		case ENVCMD_STOP:		// 83 - [SMPS 68k] stop
-			if (SmpsCfg->EnvMult == ENVMULT_Z80)
-			{
-				return 0x8001;	// in SMPS Z80, it has the same effect as 81
-			}
-			else
-			{
-				DoNoteOff(Trk);
-				return 0x80FF;
-			}
+		case ENVCMD_STOP:		// 83 - stop [SMPS 68k]
+			DoNoteOff(Trk);
+			return 0x80FF;
 		}
 	}
 	
@@ -1635,8 +1631,8 @@ static UINT8 DoVolumeEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 		{
 		case ENVCMD_HOLD:		// 81 - hold at current level
 			return 0x80;
-		case ENVCMD_STOP:		// 83 - stop
-		case ENVCMD_VST_MHLD:
+		case ENVCMD_STOP:		// 83 - stop [SMPS 68k]
+		case ENVCMD_VST_MHLD:	// 83 - stop [SMPS Z80]
 			DoNoteOff(Trk);
 			return 0x81;
 		}
@@ -1671,19 +1667,17 @@ static UINT8 DoEnvelope(const ENV_DATA* EnvData, const UINT8* EnvCmds, UINT8* En
 		case ENVCMD_DATA:
 			Finished = 0x01;
 			break;
-		case ENVCMD_RESET:	// 80 - reset Envelope
+		case ENVCMD_RESET:		// 80 - reset Envelope
 			*EnvIdx = 0x00;
 			break;
-		case ENVCMD_HOLD:	// 81 - hold at current level
+		case ENVCMD_HOLD:		// 81 - hold at current level
+		case ENVCMD_STOP:		// 83 - stop
+		case ENVCMD_VST_MHLD:	// 83 - stop/hold
 			(*EnvIdx) --;
 			Finished = 0x01;
 			break;
-		case ENVCMD_LOOP:	// 82 xx - loop back to index xx
+		case ENVCMD_LOOP:		// 82 xx - loop back to index xx
 			*EnvIdx = EnvData->Data[*EnvIdx];
-			break;
-		case ENVCMD_STOP:	// 83 - stop
-			(*EnvIdx) --;
-			Finished = 0x01;
 			break;
 		case ENVCMD_CHGMULT:	// 84 xx - change Multiplier
 			if (EnvMult != NULL)
@@ -2165,6 +2159,9 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 		ym2612_timer_mask(0x02);	// YM2612 Timer B
 	else //if (SmpsRAM.TimingMode == 0x80)
 		ym2612_timer_mask(0x03);	// YM2612 Timer A and B
+	ResetYMTimerA();
+	ResetYMTimerB();
+	
 	SetDACDriver((DAC_CFG*)&SmpsCfg->DACDrv);
 	SetNecPCMDriver((DAC_CFG*)&SmpsCfg->DACDrv);
 	

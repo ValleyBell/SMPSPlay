@@ -1,6 +1,6 @@
 // Extra SMPS Routines
 // -------------------
-// Written by Valley Bell, 2014
+// Written by Valley Bell, 2014-2015
 // Additional functions not necessary for SMPS, but for VGM logging and loop detection.
 //
 // Note: Loop detection is still far from perfect and still fails quite often.
@@ -31,6 +31,7 @@ INT32 LoopCntr;
 extern INT32 StoppedTimer;
 
 extern UINT8 VGM_DataBlkCompress;
+extern UINT8 VGM_NoLooping;
 
 extern SND_RAM SmpsRAM;
 static struct loop_state
@@ -87,7 +88,9 @@ void StopSignal(void)
 
 void LoopStartSignal(void)
 {
-	vgm_set_loop(1);
+	if (! VGM_NoLooping)
+		vgm_set_loop(1);
+	
 	LoopCntr = 1;
 	
 	return;
@@ -95,7 +98,9 @@ void LoopStartSignal(void)
 
 void LoopEndSignal(void)
 {
-	vgm_dump_stop();
+	if (! VGM_NoLooping)
+		vgm_dump_stop();
+	
 	if (LoopCntr >= 2)
 		FinishedSongSignal();
 	LoopCntr ++;

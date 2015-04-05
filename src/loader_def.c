@@ -1,6 +1,6 @@
 // SMPS Definition File Loader
 // ---------------------------
-// Written by Valley Bell, 2014
+// Written by Valley Bell, 2014-2015
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,6 +83,7 @@ static const OPT_LIST OPT_MODALGO[] =
 {	{"68K", MODULAT_68K},
 	{"68K_a", MODULAT_68K_1},
 	{"Z80", MODULAT_Z80},
+	{"Z80_b", MODULAT_Z80_B},
 	{NULL, 0}};
 static const OPT_LIST OPT_ENVMULT[] =
 {	{"PRE", ENVMULT_PRE},
@@ -124,6 +125,7 @@ static const OPT_LIST OPT_ENVCMD[] =
 	{"LOOP", ENVCMD_LOOP},
 	{"STOP", ENVCMD_STOP},
 	{"CHG_MULT", ENVCMD_CHGMULT},
+	{"VOLSTOP_MODHOLD", ENVCMD_VST_MHLD},
 	{NULL, 0}};
 
 static const OPT_LIST OPT_DRUMMODE[] =

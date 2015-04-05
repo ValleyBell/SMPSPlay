@@ -77,8 +77,10 @@ NoteOnPrevent = Hold
 DelayFreq = Keep
 
 ; Modulation Algorithm
-;	can be 68K or Z80
-ModAlgo = Z80
+;	68K - SMPS 68k
+;	Z80 - SMPS Z80 Type 2 DAC (fixed IY register bug)
+;	Z80_B - SMPS Z80 Type 1/Type 2 FM (with IY register bug)
+ModAlgo = Z80_b
 
 ; Envelope Multiplier Mode
 ;	PRE - preSMPS 68k
@@ -87,12 +89,13 @@ ModAlgo = Z80
 EnvMult = Z80
 
 ; Volume Mode
-;	ALGO - the FM Algorithm/Connection setting defines the TL operators affected by the channel volume [SMPS 68k]
+;	ALGO - the FM Algorithm/Connection setting defines the TL operators affected by the channel volume [SMPS 68k, pre-SMPS]
 ;	BIT7 - TL operators with Bit 7 set (value 80-FF) are affected by the channel volume [SMPS Z80]
+;	ALGOSET - like ALGO, but ignores the values of the instrument's affected TL operators
 VolMode = Bit7
 
 ; Frequency values
-;	Values can be decimal or hexadecimal (0xABC, $ABC or ABCh) and separates by spaces.
+;	Values can be decimal or hexadecimal (0xABC, $ABC or ABCh) and are separated by spaces.
 ;	All numbers on the line are read until something invalid is found.
 ;	A multiline frequency list is possible by enclosing the block with curly brackets {}
 ;	Note: Due to how the parser works, there must be a space before the closing bracket.
@@ -116,8 +119,9 @@ FadeOutDelay = 6
 ;	LOOP - loop back to the Envelope Index set by the following byte
 ;	STOP - stop the envelope and note
 ;	CHG_MULT - change the Envelope Multiplier (Modulation Envelope only)
+;	VOLSTOP_MODHOLD - like STOP for volume envelopes and like HOLD for modulation envelopes
 80 = Reset
 81 = Hold
 82 = Loop
-83 = Stop
+83 = VolStop_ModHold
 84 = Chg_Mult

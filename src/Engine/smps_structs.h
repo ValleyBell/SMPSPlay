@@ -55,7 +55,8 @@ typedef struct _file_data
 #define MODALGO_Z80		0x10	// Z80 Modulation algorithm
 #define MODULAT_68K		(MODALGO_68K | 0x00)	// SMPS 68k
 #define MODULAT_68K_1	(MODALGO_68K | 0x01)	// Sonic 2 (SMPS 68k + DoModulation on DoNote)
-#define MODULAT_Z80		(MODALGO_Z80 | 0x01)	// SMPS Z80
+#define MODULAT_Z80		(MODALGO_Z80 | 0x01)	// SMPS Z80 Type 2 DAC (fixed)
+#define MODULAT_Z80_B	(MODALGO_Z80 | 0x01 | 0x02)	// SMPS Z80 (broken)
 
 #define ENVMULT_PRE		0x00	// unsigned multiplier, prevents multiplication by 0
 #define ENVMULT_68K		0x01	// signed multiplier

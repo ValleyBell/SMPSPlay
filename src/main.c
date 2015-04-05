@@ -1,6 +1,6 @@
 // SMPS Player
 // -----------
-// Written by Valley Bell, 2014
+// Written by Valley Bell, 2014-2015
 
 #define SMPSPLAY_VER	"2.10"
 //#define BETA
@@ -82,6 +82,7 @@ bool PALMode;
 static bool AutoProgress;
 UINT8 DebugMsgs;
 UINT8 VGM_DataBlkCompress = 1;
+UINT8 VGM_NoLooping = 0;
 static UINT8 LastLineState;
 
 extern UINT16 AUDIOBUFFERU;
@@ -130,6 +131,7 @@ int main(int argc, char* argv[])
 		goto FinishProgram;
 	}
 	
+	VGM_NoLooping = Config.DisableVGMLoop;
 	if (Config.FM6DACOff != 0xFF)
 	{
 		for (smps_playing = 0; smps_playing < Config.ExtList.ExtCount; smps_playing ++)

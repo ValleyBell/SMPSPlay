@@ -1,6 +1,6 @@
 // Configuration Loader
 // --------------------
-// Written by Valley Bell, 2014
+// Written by Valley Bell, 2014-2015
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
 #include <stdio.h>
 #include <stdlib.h>
@@ -201,6 +201,8 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 				CfgData->ExtFilter = GetBoolValue(RToken1, "True", "False");
 			else if (! _stricmp(LToken, "CompressVGM"))
 				CfgData->CompressVGMs = (UINT8)strtoul(RToken1, NULL, 0);
+			else if (! _stricmp(LToken, "DisableVGMLoop"))
+				CfgData->DisableVGMLoop = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "FM6DACOff"))
 				CfgData->FM6DACOff = GetBoolValue(RToken1, "True", "False");
 			else if (! _stricmp(LToken, "ResmplForce"))

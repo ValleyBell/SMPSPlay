@@ -1,6 +1,6 @@
 // DAC Engine
 // ----------
-// Written by Valley Bell, 2014
+// Written by Valley Bell, 2014-2015
 
 #include <stddef.h>	// for NULL
 #include "stdtype.h"

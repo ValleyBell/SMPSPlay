@@ -1,6 +1,6 @@
 // SMPS Drum Handler
 // -----------------
-// Written by Valley Bell, 2014
+// Written by Valley Bell, 2014-2015
 
 #include <memory.h>
 #include <stdio.h>
