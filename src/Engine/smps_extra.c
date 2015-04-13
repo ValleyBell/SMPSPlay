@@ -37,8 +37,10 @@ extern SND_RAM SmpsRAM;
 static struct loop_state
 {
 	UINT8 Activated;
-	UINT16 TrkMask;
-	UINT16 TrkPos[MUS_TRKCNT];
+	UINT8 LoopTrk;	// ID of track with longest loop
+	UINT16 TrkMaskI;	// Track Mask (inital value)
+	UINT16 TrkMaskE;	// Track Mask (loop end check)
+	SMPS_LOOPPTR TrkPos[MUS_TRKCNT];
 } LoopState;
 
 
@@ -137,13 +139,14 @@ void Extra_LoopInit(void)
 	LoopState.Activated = 0xFF;
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
-		if (SmpsRAM.MusicTrks[CurTrk].LoopOfs)
+		if (SmpsRAM.MusicTrks[CurTrk].LoopOfs.Ptr)
 		{
 			LoopState.Activated = 0x00;
 			break;
 		}
 	}
-	LoopState.TrkMask = 0x0000;
+	LoopState.LoopTrk = 0xFF;
+	LoopState.TrkMaskI = 0x0000;
 	
 	return;
 }
@@ -158,28 +161,30 @@ void Extra_LoopStartCheck(TRK_RAM* Trk)
 		return;
 	if (LoopState.Activated)
 		return;
-	if (! Trk->LoopOfs)
+	if (! Trk->LoopOfs.Ptr)
 		return;
 	
 	TrkID = (UINT8)(Trk - SmpsRAM.MusicTrks);
-	if (Trk->Pos != Trk->LoopOfs)
+	if (Trk->Pos != Trk->LoopOfs.Ptr)
 		return;
 	
-	LoopState.TrkMask |= (1 << TrkID);
+	LoopState.TrkMaskI |= (1 << TrkID);
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
-		if (! (TempTrk->PlaybkFlags & PBKFLG_ACTIVE) || ! TempTrk->LoopOfs)
+		if (! (TempTrk->PlaybkFlags & PBKFLG_ACTIVE) || ! TempTrk->LoopOfs.Ptr)
 			continue;
 		
-		if (! (LoopState.TrkMask & (1 << CurTrk)))
+		if (! (LoopState.TrkMaskI & (1 << CurTrk)))
 			return;	// One channel is still outside of a loop
 		
-		LoopState.TrkPos[CurTrk] = TempTrk->Pos;
+		LoopState.TrkPos[CurTrk].Ptr = TempTrk->Pos;
+		LoopState.TrkPos[CurTrk].SrcOfs = TempTrk->LoopOfs.SrcOfs;
 	}
 	
 	LoopState.Activated = 0x01;
-	LoopState.TrkMask = TrkID;
+	LoopState.LoopTrk = TrkID;
+	LoopState.TrkMaskE = LoopState.TrkMaskI;
 	LoopStartSignal();
 	
 	return;
@@ -197,20 +202,27 @@ void Extra_LoopEndCheck(TRK_RAM* Trk)
 		return;
 	
 	TrkID = (UINT8)(Trk - SmpsRAM.MusicTrks);
-	if (TrkID != LoopState.TrkMask)
+	if (Trk->LastJmpPos == LoopState.TrkPos[TrkID].SrcOfs)
+		LoopState.TrkMaskE &= ~(1 << TrkID);	// need to pass the "loop jump"
+	if (TrkID != LoopState.LoopTrk)
 		return;
 	
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
-		if (! (TempTrk->PlaybkFlags & PBKFLG_ACTIVE) || ! TempTrk->LoopOfs)
+		if (! (TempTrk->PlaybkFlags & PBKFLG_ACTIVE) || ! TempTrk->LoopOfs.Ptr)
 			continue;
 		
-		if (TempTrk->Pos != LoopState.TrkPos[CurTrk])
+		if (TempTrk->Pos != LoopState.TrkPos[CurTrk].Ptr)
 			return;
 	}
+	// If I omit this check, I get false positives due to "F7 Loops",
+	// which can jump back to the loop offset. (-> Chou Yakyuu Miracle Nine)
+	if (LoopState.TrkMaskE)
+		return;
 	
 	LoopState.Activated = 0x02;
+	LoopState.TrkMaskE = LoopState.TrkMaskI;
 	LoopEndSignal();
 	
 	return;

@@ -2275,7 +2275,7 @@ static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UI
 		if (SmpsSet->LoopPtrs != NULL)
 			TempTrk->LoopOfs = SmpsSet->LoopPtrs[TrkBase + CurTrk];
 		else
-			TempTrk->LoopOfs = 0x0000;
+			TempTrk->LoopOfs.Ptr = 0x0000;
 		
 		if ((TempTrk->ChannelMask & 0xF8) == 0x10)	// DAC drum channels
 			TempTrk->SpcDacMode = SmpsSet->Cfg->DrumChnMode;

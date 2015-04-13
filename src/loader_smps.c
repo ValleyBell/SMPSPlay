@@ -309,7 +309,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		SmpsSet->InsLib.InsPtrs = NULL;
 	}
 	SmpsSet->UsageCounter = 0x01;
-	SmpsSet->LoopPtrs = (UINT16*)malloc(TrkCount * sizeof(UINT16));
+	SmpsSet->LoopPtrs = (SMPS_LOOPPTR*)malloc(TrkCount * sizeof(SMPS_LOOPPTR));
 	
 	// reset DAC usage
 	for (TempOfs = 0x00; TempOfs < DACDrv->SmplCount; TempOfs ++)
@@ -321,7 +321,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++)
 	{
 		CurPos = TrkOfs[CurTrk];
-		SmpsSet->LoopPtrs[CurTrk] = 0x0000;
+		SmpsSet->LoopPtrs[CurTrk].Ptr = 0x0000;
 		if (CurPos >= FileLen)
 		{
 			if (DebugMsgs & 0x04)
@@ -452,7 +452,8 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				UsageMask = (1 << (9 - StackPos)) - 1;
 				if (FileMask[CurPos] & UsageMask)
 				{
-					SmpsSet->LoopPtrs[CurTrk] = CurPos;
+					SmpsSet->LoopPtrs[CurTrk].Ptr = CurPos;
+					SmpsSet->LoopPtrs[CurTrk].SrcOfs = OldPos;
 					TrkMode = 0x00;
 					if (StackPos < 0x08 && (DebugMsgs & 0x04))
 					{
@@ -488,7 +489,8 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 					UsageMask = (1 << (9 - StackPos)) - 1;
 					if (FileMask[CurPos] & UsageMask)
 					{
-						SmpsSet->LoopPtrs[CurTrk] = CurPos;
+						SmpsSet->LoopPtrs[CurTrk].Ptr = CurPos;
+						SmpsSet->LoopPtrs[CurTrk].SrcOfs = OldPos;
 						TrkMode = 0x00;
 					}
 				}

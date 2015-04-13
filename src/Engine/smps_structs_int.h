@@ -122,7 +122,9 @@ typedef struct _track_ram
 	UINT8 CoI_VolBase;	// Volume Base value (added to all volume changes)
 	
 	UINT8 LoopStack[TRK_STACK_SIZE];	// 28-2F - Loop Data and GoSub Stack
-	UINT16 LoopOfs;		// [not in driver] Loop Offset (for loop detection)
+	
+	SMPS_LOOPPTR LoopOfs;	// [not in driver] Loop Offset (for loop detection)
+	UINT16 LastJmpPos;		// for loop detection
 } TRK_RAM;
 typedef struct _drum_track_ram
 {

@@ -184,6 +184,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		{
 			switch(CFlag->SubType)
 			{
+			case CFS_PAFMS_PAN_PAOFF:	// E0 Disable Pan Anim + Set Pan
+				Trk->PanAni.Type = 0x00;
+				// fall through
 			case CFS_PAFMS_PAN:	// E0 Set Pan
 				TempByt = 0x3F;
 				break;
@@ -1095,6 +1098,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			break;
 		// fall through
 	case CF_GOTO:			// F6 GoTo
+		Trk->LastJmpPos = Trk->Pos;
 		Trk->Pos += CFlag->JumpOfs;
 		Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
 		Extra_LoopEndCheck(Trk);
@@ -1109,6 +1113,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		if (Trk->LoopStack[TempByt])
 		{
 			// jump back
+			Trk->LastJmpPos = Trk->Pos;
 			Trk->Pos += CFlag->JumpOfs;
 			Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
 			CmdLen = 0x00;
@@ -1121,6 +1126,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		WriteLE16(&Trk->LoopStack[Trk->StackPtr], Trk->Pos + CFlag->Len);
 		
 		// jump back
+		Trk->LastJmpPos = Trk->Pos;
 		Trk->Pos += CFlag->JumpOfs;
 		Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
 		CmdLen = 0x00;
@@ -1137,6 +1143,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		{
 			// jump
 			Trk->LoopStack[TempByt] --;
+			Trk->LastJmpPos = Trk->Pos;
 			Trk->Pos += CFlag->JumpOfs;
 			Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
 			Extra_LoopEndCheck(Trk);
@@ -1255,6 +1262,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			if (! SmpsRAM.ContSfxLoop)
 				SmpsRAM.ContSfxFlag = 0x00;
 			
+			Trk->LastJmpPos = Trk->Pos;
 			Trk->Pos += CFlag->JumpOfs;
 			Trk->Pos = ReadJumpPtr(&Trk->SmpsSet->Seq.Data[Trk->Pos], Trk->Pos, Trk->SmpsSet);
 			Extra_LoopEndCheck(Trk);

@@ -13,6 +13,7 @@
 	#define CFS_PAFMS_PAN			0x00	// E0
 	#define CFS_PAFMS_AMS			0x01	// EA (early SMPS Z80)
 	#define CFS_PAFMS_FMS			0x02	// EB (early SMPS Z80)
+	#define CFS_PAFMS_PAN_PAOFF		0x03	// E0 (some SMPS Z80)
 	#define CFS_PAFMS_PAN_C			0x10	// FD (preSMPS 68k)
 	#define CFS_PAFMS_PAN_L			0x11	// FF (preSMPS 68k)
 	#define CFS_PAFMS_PAN_R			0x12	// FE (preSMPS 68k)
