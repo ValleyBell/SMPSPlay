@@ -52,7 +52,7 @@ typedef struct _dac_settings
 	
 	UINT8 SmplMode;	// Resample Mode
 	UINT8 Channels;
-	UINT8 VolDiv;
+	INT8 VolDiv;
 } DAC_SETTINGS;
 
 typedef struct _dac_config

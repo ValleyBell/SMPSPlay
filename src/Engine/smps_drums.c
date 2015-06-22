@@ -176,7 +176,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DrumTrk->SmpsSet = DTrkSet;
 		DrumTrk->PlaybkFlags = PBKFLG_ACTIVE;
 		DrumTrk->ChannelMask = Trk->ChannelMask & 0x0F;	// make it FM6 or FM3
-		DrumTrk->TickMult = 1;
+		DrumTrk->TickMult = DTrkLib->TickMult ? DTrkLib->TickMult : 1;
 		DrumTrk->Pos = ReadDrumPtr(&DTrkData[0x00], DTrkLib);
 		DrumTrk->Transpose = DTrkData[0x02] + Trk->Transpose;
 		DrumTrk->Volume = DTrkData[0x03] + Trk->Volume;
@@ -233,7 +233,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DrumTrk->SmpsSet = DTrkSet;
 		DrumTrk->PlaybkFlags = PBKFLG_ACTIVE;
 		DrumTrk->ChannelMask = 0xC0;
-		DrumTrk->TickMult = 1;
+		DrumTrk->TickMult = DTrkLib->TickMult ? DTrkLib->TickMult : 1;
 		DrumTrk->Pos = ReadDrumPtr(&DTrkData[0x00], DTrkLib);
 		DrumTrk->Transpose = DTrkData[0x02];
 		DrumTrk->Volume = DTrkData[0x03];

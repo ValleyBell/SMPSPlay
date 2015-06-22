@@ -431,6 +431,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		break;
 	case CF_SND_CMD:
 		//SmpsRAM._1C09 = Data[0x00];
+		if (DebugMsgs & 0x01)
+			printf("Queued Sound ID %02X on Channel %02X at %04X\n",
+					Data[0x00], Trk->ChannelMask, Trk->Pos);
 		break;
 	case CF_MUS_PAUSE:
 		// Verified with SMPS Z80 and SMPS 68k.
@@ -651,7 +654,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		}
 		break;
 	case CF_DAC_BANK:
-		DAC_SetBank(0x00, Data[0x00]);
+		DAC_SetBank(CFlag->SubType & 0x0F, Data[0x00]);
 		break;
 	case CF_PLAY_DAC:
 		{
@@ -938,7 +941,8 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			break;
 		}
 		break;
-	case CF_TIMING:			// EA/BC Set YM2612 Timer
+	case CF_TIMING:			// EA/EB Set YM2612 Timer
+		TempByt = 0x00;
 		switch(CFlag->SubType)
 		{
 		case CFS_TIME_SET:
@@ -946,6 +950,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			if (CmdLen == 0x02)
 			{
 				SmpsRAM.TimerBVal = Data[0x00];
+				TempByt = 0x02;
 			}
 			else if (CmdLen == 0x03)
 			{
@@ -953,6 +958,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 					SmpsRAM.TimerAVal = ReadBE16(&Data[0x00]);
 				else
 					SmpsRAM.TimerAVal = ReadLE16(&Data[0x00]);
+				TempByt = 0x01;
 			}
 			else if (CmdLen == 0x04)
 			{
@@ -961,6 +967,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				else
 					SmpsRAM.TimerAVal = ReadLE16(&Data[0x00]);
 				SmpsRAM.TimerBVal = Data[0x02];
+				TempByt = 0x03;
 			}
 			break;
 		case CFS_TIME_ADD:
@@ -968,6 +975,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			if (CmdLen == 0x02)
 			{
 				SmpsRAM.TimerBVal += Data[0x00];
+				TempByt = 0x02;
 			}
 			else if (CmdLen == 0x03)
 			{
@@ -975,6 +983,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 					SmpsRAM.TimerAVal += ReadBE16(&Data[0x00]);
 				else
 					SmpsRAM.TimerAVal += ReadLE16(&Data[0x00]);
+				TempByt = 0x01;
 			}
 			else if (CmdLen == 0x04)
 			{
@@ -983,10 +992,12 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				else
 					SmpsRAM.TimerAVal += ReadLE16(&Data[0x00]);
 				SmpsRAM.TimerBVal += Data[0x02];
+				TempByt = 0x03;
 			}
 			break;
 		case CFS_TIME_ADD_0A:
 			SmpsRAM.TimerAVal += Data[0x00];
+			TempByt = 0x01;
 			break;
 		case CFS_TIME_SPC:
 			if (CmdLen == 0x02)
@@ -1003,6 +1014,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				else if (Mode == 0xC0)
 					SmpsRAM.TimerBVal = Tempo;
 				// Mode 00 does nothing
+				TempByt = 0x02;
 			}
 			else //if (CmdLen == 0x83)
 			{
@@ -1012,6 +1024,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				CmdLen &= 0x7F;
 				Tempo = ReadLE16(&Data[0x00]) & 0x0FFF;
 				Mode = Data[0x01] & 0xF0;
+				TempByt = 0x01;
 				if (Mode & 0x30)	// Bits 4/5 set - set Tempo + Timing Mode
 				{
 					Mode &= 0x30;
@@ -1024,6 +1037,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 					{
 						SmpsRAM.TimingMode = 0x40;
 						SmpsRAM.TimerBVal = Data[0x00];
+						TempByt = 0x02;
 					}
 					else if (Mode == 0x30)
 					{
@@ -1031,6 +1045,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 						SmpsRAM.TimerAVal = Tempo;
 						SmpsRAM.TimerBVal = Data[0x02];
 						CmdLen ++;
+						TempByt = 0x03;
 					}
 				}	// else - set or change Music Tempo
 				else if (Mode == 0x00)
@@ -1043,10 +1058,20 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			break;
 		}
 		
-		// [not in the driver] disable and reenable timers
-		// This improves the timing on tempo changes.
-		WriteFMI(0x27, SmpsRAM.SpcFM3Mode | 0x00);
-		WriteFMI(0x27, SmpsRAM.SpcFM3Mode | 0x0F);
+		if (1)
+		{
+			// [not in the driver] disable and reenable timers
+			// This improves the timing on tempo changes.
+			if (TempByt & 0x01)
+			{
+				WriteFMI(0x25, SmpsRAM.TimerAVal & 0x03);
+				WriteFMI(0x24, SmpsRAM.TimerAVal >> 2);
+			}
+			if (TempByt & 0x02)
+				WriteFMI(0x26, SmpsRAM.TimerBVal);
+			WriteFMI(0x27, SmpsRAM.SpcFM3Mode & ~TempByt);
+			WriteFMI(0x27, SmpsRAM.SpcFM3Mode);
+		}
 		break;
 	case CF_TIMING_MODE:	// FF 00 Set Timing Mode
 		if (SmpsRAM.LockTimingMode)
@@ -1071,7 +1096,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		}
 		
 		TempByt = 0;
-		switch(CFlag->SubType & 0x7F)
+		switch(CFlag->SubType & 0x0F)
 		{
 		case CFS_CJMP_NZ:
 			TempByt = (SmpsRAM.CondJmpVal != 0x00);
@@ -1091,11 +1116,24 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		if (CFlag->SubType & CFS_CJMP_RESET)
 			SmpsRAM.CondJmpVal = 0x00;
 		
-		if (DebugMsgs & 0x01)
-			printf("Conditional Jump on Channel %02X at %04X: %s\n", Trk->ChannelMask, Trk->Pos,
-					TempByt ? "taken" : "not taken");
-		if (! TempByt)	// if condition NOT true, continue normally
-			break;
+		if (! (CFlag->SubType & CFS_CJMP_2PTRS))
+		{
+			if (DebugMsgs & 0x01)
+				printf("Conditional Jump on Channel %02X at %04X: %s\n", Trk->ChannelMask, Trk->Pos,
+						TempByt ? "taken" : "not taken");
+			if (! TempByt)	// if condition NOT true, continue normally
+				break;
+		}
+		else
+		{
+			if (DebugMsgs & 0x01)
+				printf("Conditional Jump on Channel %02X at %04X: %s pointer taken\n", Trk->ChannelMask, Trk->Pos,
+						TempByt ? "2nd" : "1st");
+			if (TempByt)	// if the condition is true, use 2nd pointer
+				Trk->Pos += 0x02;	// This works unless I am able to read 2 jump parameters.
+			else			// if the condition is false, use 1st pointer
+				Trk->Pos += 0x00;
+		}
 		// fall through
 	case CF_GOTO:			// F6 GoTo
 		Trk->LastJmpPos = Trk->Pos;
@@ -1161,6 +1199,8 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		
 		// Note: SMPS Z80 keeps the PBKFLG_HOLD. This can cause notes to hang. (Example: 9A 04 E7 F2)
 		Trk->PlaybkFlags &= ~(PBKFLG_ACTIVE | PBKFLG_HOLD);
+		if (Trk->ChannelMask & 0x10)
+			Trk->ChannelMask &= ~0x10;	// make drum channels stop FM notes (fixed DJ Boy: Game Over)
 		DoNoteOff(Trk);
 		Extra_StopCheck();
 		
@@ -1185,18 +1225,20 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			DoCoordinationFlag(Trk, &EndFlag);
 			
 			SmpsRAM.LoadSaveRequest = 0x01;
-			SmpsRAM.FadeIn.Steps = SmpsCfg->FadeOut.Steps | 0x80;
-			SmpsRAM.FadeIn.DlyInit = 2;
-			SmpsRAM.FadeIn.DlyCntr = 2;
+			SmpsRAM.FadeIn.Steps = SmpsCfg->FadeIn.Steps | 0x80;
+			SmpsRAM.FadeIn.DlyInit = SmpsCfg->FadeIn.Delay;
 		}
 		else
 		{
 			// Sonic 3K: sets the Communication Byte to FF to tell the driver that the previous
 			// song has to be restored.
 			if (Data[0x00] == 0xFF)
+			{
 				SmpsRAM.LoadSaveRequest = 0x01;
+				SmpsRAM.FadeIn.Steps = SmpsCfg->FadeIn.Steps | 0x80;
+				SmpsRAM.FadeIn.DlyInit = SmpsCfg->FadeIn.Delay;
+			}
 		}
-		// TODO: start Fade In
 		break;
 	case CF_SND_OFF:
 		WriteFMMain(Trk, 0x88, 0x0F);
@@ -1414,7 +1456,7 @@ static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* 
 				Trk->FMInsSong = Params[0x01];
 				InsID &= 0x7F;
 				InsLib = GetSongInsLib(Trk, Trk->FMInsSong);	// get new Instrument Library
-				if (InsLib->InsCount == 0)
+				if (InsLib->InsCount == 0 || Trk->FMInsSong > 0x81)
 				{
 					printf("Error: FM instrument cross-reference %02X-%02X at %04X!\n",
 							Trk->Instrument, Trk->FMInsSong, Trk->Pos);

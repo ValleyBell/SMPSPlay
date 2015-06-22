@@ -167,8 +167,11 @@
 #define CF_COND_JUMP			0x75	// FF 07 [Ristar]
 	#define CFS_CJMP_NZ				0x00
 	#define CFS_CJMP_Z				0x01
-	#define CFS_CJMP_EQ				0x10
-	#define CFS_CJMP_RESET			0x80
+	#define CFS_CJMP_EQ				0x08
+	#define CFS_CJMP_2PTRS			0x40	// false - take 1st pointer, true - take 2nd pointer
+	#define CFS_CJMP_2P_NZ			(CFS_CJMP_2PTRS | CFS_CJMP_NZ)
+	#define CFS_CJMP_2P_Z			(CFS_CJMP_2PTRS | CFS_CJMP_Z)
+	#define CFS_CJMP_RESET			0x80	// reset value to 0 after jumping
 	#define CFS_CJMP_NZ_RESET		(CFS_CJMP_RESET | CFS_CJMP_NZ)
 	#define CFS_CJMP_Z_RESET		(CFS_CJMP_RESET | CFS_CJMP_Z)
 	#define CFS_CJMP_RESET_VAR		0xFF

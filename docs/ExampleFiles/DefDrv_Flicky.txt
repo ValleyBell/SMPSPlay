@@ -51,6 +51,7 @@ FMChnOrder = 12 0 1 4 5 6 2
 ;	TIMEOUT - used by preSMPS, SMPS Z80 Type 1 and most SMPS 68k
 ;	OVERFLOW - used by SMPS Z80 Type 2 and some late SMPS 68k
 ;	OVERFLOW2 - used by Sonic 2
+;	NONE - never delay the music
 TempoMode = Timeout
 
 ; Order of the execution of PlaySoundID and DoTempo

@@ -1,3 +1,2 @@
 - way to define Song IDs (for Wonder Boy 3, command EF 81 84)
 - read Chaotix 32x DAC/PWM.ini correctly
-- Hybrid Front: 14b Moon, Mars ~ Sakurabe Fight BGM 2.smz plays incorrectly (did I break something?, bass is late by 1 measure in 2nd loop)

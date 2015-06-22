@@ -356,7 +356,10 @@ void UpdateDAC(UINT32 Samples)
 		
 		if (ProcessedSmpls)
 		{
-			OutSmpl /= DACDrv->Cfg.VolDiv;
+			if (DACDrv->Cfg.VolDiv > 0)
+				OutSmpl /= DACDrv->Cfg.VolDiv;
+			else
+				OutSmpl *= -(INT16)DACDrv->Cfg.VolDiv;
 			if (OutSmpl < -0x80)
 				OutSmpl = -0x80;
 			else if (OutSmpl > 0x7F)

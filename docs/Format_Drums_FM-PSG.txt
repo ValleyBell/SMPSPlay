@@ -5,11 +5,11 @@
 1 byte  - Drum Count
 2 bytes - Data Pointer List File Offset
 2 bytes - Data Pointer Base
-1 byte  - reserved
+1 byte  - Track Tick Multiplier (ignored if 0)
 1 byte  - Instrument Count
 2 bytes - Instrument Pointer List File Offset
 2 bytes - Instrument Pointer Base
 
-Note: The pointer lists can not reference to any data with a lower offsets than themselves.
+Note: The pointer lists can not reference any data with a lower offset than themselves.
 
 All pointers are Little Endian.

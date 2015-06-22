@@ -14,6 +14,8 @@ PANAFMS - set Pan, AMS or FMS bits (YM2612 register B4)
 	command EA, size 02, early SMPS Z80
   PAFMS_FMS - set vibrato (FMS) strength
 	command EB, size 02, early SMPS Z80
+  PAFMS_PAN_PAOFF - like PAFMS_PAN, but also disables the Pan Animation effect
+	command E0, size 02, Super Monaco GP, Columns
   PAFMS_PAN_C - set to both speakers (center), no AMS/FMS
 	command FD, size 01, preSMPS
   PAFMS_PAN_L - set to left speaker, no AMS/FMS
@@ -179,7 +181,7 @@ MOD_ENV - set Modulation Envelope
   MENV_FMP - set PSG or FM modulation envelope (depending on the curren channel mode)
 	command F1, size 03, parameters are PSG (first) and FM (second)
   MENV_GEN2 - set envelope to second parameter (all channel types)
-	command F1, size 03
+	command F1, size 03, Tempo 32x
 
 FM_VOLENV - set FM volume envelope (second parameter is the Total Level operator mask)
 	command FF 07/06, size 03, SMPS Z80
@@ -222,7 +224,8 @@ RAW_FREQ - enable/disable Raw Frequency mode (01 = enable, disable else)
 	command FD, size 02, SMPS Z80
 
 SPC_FM3 - enable Special FM3 Mode
-	command FE, size 05/09
+	command FE, size 05, SMPS Z80, SMPS 68k Type 2
+	command FE, size 09, SMPS 68k Type 1
 	Note: size 05 causes the FM3 frequencies to be read from a global FM3Freq table
 	      size 09 means that the raw frequencies are part of the command (4 frequencies x 2-byte)
 
@@ -245,16 +248,16 @@ TICK_MULT - set Tick Multiplier (the length of all notes will be multiplied with
   TMULT_CUR - set it for the current track only
 	command FA, size 02
   TMULT_ALL - set it for all music tracks
-	command FC (SMPS 68k) / FF 05/04 (SMPS Z80), size 02
+	command FC (SMPS 68k), FF 05/04 (SMPS Z80), size 02
 
 TIMING - set YM2612 Timers
 	size 02 - set/change Timer B
 	size 03 - set/change Timer A, SMPS Z80 Type 1/DAC
 	size 04 - set/change Timer A and B, SMPS Z80 Type 1/FM
   TIME_SET - set Timer value
-	command EA, size 02/03/04
+	command EA, size 02/03/04, SMPS Z80 Type 1
   TIME_ADD - change to Timer value by adding the parameter values to it
-	command EB, size 02/03/04
+	command EB, size 02/03/04, SMPS Z80 Type 1
   TIME_SET_BE - same as TIME_SET, but the values are Big Endian
 	command EA, size 03/04, Castle of Illusion
   TIME_ADD_BE - same as TIME_ADD, but the values are Big Endian
@@ -295,11 +298,22 @@ COPY_MEM - copy Memory bytes
 	This command copies data from a specified location into the sequence.
 	The first parameter (16-bit Little Endian) is the Z80 address, the second parameter is an 8-bit byte count.
 
-FADE_IN - Fades the music in
-  FDIN_START - starts the Fade In, 2 parameters (FM volume increment, PSG volume increment)
-	FF 03 (SMPS 68k), size 03
-  FDIN_CANCEL - cancels the Fade In
-	FF 04 (SMPS 68k), size 01
+FADE_SPC - Special Fade that temporarily reduces the volume of the music
+  FDSPC_FMPSG - starts the Fade, 2 parameters (volume increment for FM, PSG)
+	command FF 03 (SMPS 68k), size 03
+  FDSPC_DFP - starts the Fade, 3 parameters (volume increment for DAC, FM, PSG)
+	size 04
+  FDSPC_DFPPWM - starts the Fade, 4 parameters (volume increment for DAC, FM, PSG, PWM)
+	command FF 03 (SMPS 68k), size 05, Metal Head
+  FDSPC_PSG - starts the Fade, 1 parameter (volume increment for PSG)
+	command FF 03 (SMPS 68k), size 02, Sega Pico SMPS
+  FDSPC_FP_TRS - SMPS/Treasure variant of FDSPC_FMPSG
+	command FF 03 (SMPS 68k), size 83, Dynamite Headdy
+	Note: Effective size is 01 if the Special Fade is still running and 03 if it is stopped. (and gets started by this command)
+  FDSPC_STOP - cancels the Fade
+	command FF 04 (SMPS 68k), size 01
+  FDSPC_STOP_TRS - SMPS/Treasure variant of FDSPC_STOP
+	command FF 04 (SMPS 68k), size 01, Dynamite Headdy
 
 
 Jump and Control Flags
@@ -319,6 +333,10 @@ COND_JUMP - Conditional Jump
   CJMP_Z - jump when global value is == 0
   CJMP_EQ - jump when global value is == parameter
 	command EE, size 04, Golden Axe III
+  CJMP_2P_NZ - jump to 2nd pointer when global value is != 0, 1st pointer when == 0
+	command FD/E2, size 05, Columns
+  CJMP_2P_Z - jump to 2nd pointer when global value is == 0, 1st pointer when != 0
+	size 05
   CJMP_NZ_RESET - jump when global value is != 0 and reset it to 0
   CJMP_Z_RESET - jump when global value is == 0 and reset it to 0
 	command E3, size 03, Tempo 32x
@@ -373,10 +391,12 @@ VOL_QUICK - use bits of the command ID to set the channel volume
 	commands D8..DF, size 01, Master System SMPS
   VQ_SET_4B - 4-bit volume: (Command ID & 0F)
 	size 01
-  VQ_SET_4B_WOI - 4-bit volume: PSG: set to (Command ID & 0F), FM: set to 10 + (Command ID & 0F)
+  VQ_SET_4B_WOI - 4-bit volume: PSG: set to (Command ID & 0F), FM: set to 10 + (Command ID & 0F) * 4
 	commands D0..DF, size 01, World of Illusion (Beta)
   VQ_SET_4B_WOI2 - 4-bit volume: like VQ_SET_4B_WOI, but also adds the Volume Base value.
 	commands D0..DF, size 01, World of Illusion (Final)
+  VQ_SET_4B_QS - 4-bit volume: PSG: set to (Command ID & 0F), FM: set to Volume Base + (Command ID & 0F)
+	commands D0..DF, size 01, Quack Shot
 
 DAC_PS4 - special DAC flags for Phantasy Star IV
 	Note: DAC_VOLCTRL is present in every song and is used to trigger PS4's special mode for the DAC channel.

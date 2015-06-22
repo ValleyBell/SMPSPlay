@@ -58,6 +58,7 @@ static const OPT_LIST OPT_TEMPOMODE[] =
 	{"TOUT+OFLW", TEMPO_TOUT_OFLW},
 	{"OFLW_MULTI", TEMPO_OFLW_MULT},
 	{"TOUT_REV", TEMPO_TOUT_REV},
+	{"NONE", TEMPO_NONE},
 	{NULL, 0}};
 static const OPT_LIST OPT_TEMP1TICK[] =
 {	{"DoTempo", T1TICK_NOTEMPO},
@@ -383,6 +384,8 @@ static const OPT_LIST OPT_CFLAGS_SUB[] =
 	{"CJMP_NZ", CFS_CJMP_NZ},
 	{"CJMP_Z", CFS_CJMP_Z},
 	{"CJMP_EQ", CFS_CJMP_EQ},
+	{"CJMP_2P_NZ", CFS_CJMP_2P_NZ},
+	{"CJMP_2P_Z", CFS_CJMP_2P_Z},
 	{"CJMP_NZ_RESET", CFS_CJMP_NZ_RESET},
 	{"CJMP_Z_RESET", CFS_CJMP_Z_RESET},
 	{"CJMP_RESET_VAR", CFS_CJMP_RESET_VAR},
@@ -681,7 +684,7 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 			else if (! _stricmp(LToken, "DACChns"))
 				SmpsCfg->DACDrv.Cfg.Channels = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "DACVolDiv"))
-				SmpsCfg->DACDrv.Cfg.VolDiv = (UINT8)strtoul(RToken1, NULL, 0);
+				SmpsCfg->DACDrv.Cfg.VolDiv = (INT8)strtol(RToken1, NULL, 0);
 		}
 		else if (Group == 0x10)	// [EnvelopeCmds] group
 		{

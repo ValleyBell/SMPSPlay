@@ -601,6 +601,7 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		DrumLib->DrumCount = FileHdr[0x05];
 		DrumOfs = ReadPtr16(&FileHdr[0x06], Flags);
 		DrumLib->DrumBase = ReadPtr16(&FileHdr[0x08], Flags);
+		DrumLib->TickMult = (DrumOfs <= 0x0A) ? 0 : FileHdr[0x0A];
 		InsCount = 0x00;
 		InsOfs = 0x0000;
 		break;
@@ -613,6 +614,7 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		DrumLib->DrumCount = FileHdr[0x05];
 		DrumOfs = ReadPtr16(&FileHdr[0x06], Flags);
 		DrumLib->DrumBase = ReadPtr16(&FileHdr[0x08], Flags);
+		DrumLib->TickMult = FileHdr[0x0A];
 		InsCount = FileHdr[0x0B];
 		InsOfs = ReadPtr16(&FileHdr[0x0C], Flags);
 		InsBaseOfs = ReadPtr16(&FileHdr[0x0E], Flags);

@@ -433,6 +433,10 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 			case CF_TRK_END:
 				TrkMode = 0x00;
 				break;
+			case CF_COND_JUMP:
+				if (! (CmdList->CmdData[CurCmd].SubType & CFS_CJMP_2PTRS))
+					break;
+				// fall through
 			case CF_GOTO:
 				OldPos = CurPos;
 				TempOfs = CurPos + CmdList->CmdData[CurCmd].JumpOfs;
@@ -693,6 +697,10 @@ static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DA
 		
 		DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
 		DrumID = DTrkLib->File.Data[DrumOfs + 0x05] - 0x01;
+		break;
+	case DRMTYPE_FM:
+		// TODO: handle drums played on this track
+		DrumID = 0xFFFF;
 		break;
 	default:
 		return;

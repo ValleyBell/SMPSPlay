@@ -1145,8 +1145,12 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 		Trk->ModEnvIdx = 0x00;
 		Trk->ModEnvMult = 0x00;
 		Trk->ModEnvCache = 0;
+		if (1)	// if (! BuggySmpsZ80)
+			Trk->PlaybkFlags &= ~PBKFLG_LOCKFREQ;
 		Trk->VolEnvIdx = 0x00;
 		Trk->VolEnvCache = 0x00;
+		if (0)	// if (BuggySmpsZ80)
+			Trk->VolEnvIdx = Trk->NStopTout;
 	}
 	
 	return;
@@ -1442,8 +1446,9 @@ static UINT8 DoModulation(TRK_RAM* Trk, UINT16* Freq)
 	
 	// Note: SMPS 68k can do Modulation Envelope and Custom Modulation simultaneously.
 	//       SMPS Z80 can only do one of them at the same time, since they share some memory.
+	//       Additionally, the SegaNet Z80 driver has a second ModEnv set for IDs 81-FF.
 	
-	EnvFreq = DoModulatEnvelope(Trk, Trk->ModEnv & 0x7F);
+	EnvFreq = DoModulatEnvelope(Trk, Trk->ModEnv);
 	CstFreq = DoCustomModulation(Trk);
 	
 	Executed = 0x00;
@@ -1557,6 +1562,11 @@ static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 	INT8 EnvVal;
 	INT16 Multiplier;
 	
+	if (EnvID & 0x80)
+	{
+		//ModEnvLib = &SmpsCfg->ModEnvs2;
+		EnvID &= 0x7F;
+	}
 	if (! EnvID)
 		return 0x8000;
 	EnvID --;
@@ -1571,6 +1581,7 @@ static INT16 DoModulatEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 		{
 		case ENVCMD_HOLD:		// 81 - hold at current level
 		case ENVCMD_VST_MHLD:	// 83 - hold [SMPS Z80]
+			Trk->PlaybkFlags |= PBKFLG_LOCKFREQ;
 			return 0x8001;
 		case ENVCMD_STOP:		// 83 - stop [SMPS 68k]
 			DoNoteOff(Trk);
@@ -1618,6 +1629,11 @@ static UINT8 DoVolumeEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 	const ENV_LIB* VolEnvLib = &SmpsCfg->VolEnvs;
 	UINT8 EnvVal;
 	
+	if (EnvID & 0x80)
+	{
+		//VolEnvLib = &SmpsCfg->VolEnvs2;
+		EnvID &= 0x7F;
+	}
 	if (! EnvID)
 		return 0x80;
 	EnvID --;
@@ -1831,7 +1847,7 @@ static void DoPSGNoteOff(TRK_RAM* Trk, UINT8 OffByTimeout)
 		EnforceOff = OffByTimeout;
 	else	// Master System SMPS
 		EnforceOff = 0x00;
-	if ((Trk->Instrument & 0x80) && ! EnforceOff)
+	if ((Trk->ChannelMask & 0x80) && (Trk->Instrument & 0x80) && ! EnforceOff)
 	{
 		Trk->ADSR.State &= 0x0F;
 		Trk->ADSR.State |= 0x80;	// set Release Phase
@@ -2613,6 +2629,8 @@ static void DoTempo(void)
 	
 	switch(SmpsRAM.MusSet->Cfg->TempoMode)
 	{
+	case TEMPO_NONE:
+		return;
 	case TEMPO_TIMEOUT:
 		// Note: (pre-)SMPS 68k checks TempoInit, SMPS Z80 checks TempoCntr
 		if (! SmpsRAM.TempoInit)
