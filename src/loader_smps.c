@@ -36,11 +36,13 @@ INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET
 //UINT8 GuessSMPSOffset(SMPS_CFG* SmpsCfg);
 //UINT8 SmpsOffsetFromFilename(const char* FileName, UINT16* RetOffset);
 static void DuplicateInsTable(const INS_LIB* InsLibSrc, INS_LIB* InsLibDst);
-static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, UINT8* FileData, UINT32 StartOfs);
+static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, const UINT8* FileData, UINT32 StartOfs);
 //UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg);
 static void MarkDrumNote(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note);
 static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData);
 static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Bank, UINT8 Note);
+static void MarkDrumTrack(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData, UINT8 Mode);
+
 //void FreeSMPSFile(SMPS_CFG* SmpsCfg);
 
 
@@ -189,7 +191,7 @@ static void DuplicateInsTable(const INS_LIB* InsLibSrc, INS_LIB* InsLibDst)
 	return;
 }
 
-static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, UINT8* FileData, UINT32 StartOfs)
+static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, const UINT8* FileData, UINT32 StartOfs)
 {
 	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
 	INS_LIB* InsLib;
@@ -204,7 +206,7 @@ static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, UINT8* File
 	
 	CurPos = StartOfs;
 	for (TempOfs = 0; TempOfs < InsLib->InsCount; TempOfs ++, CurPos += SmpsCfg->InsRegCnt)
-		InsLib->InsPtrs[TempOfs] = &FileData[CurPos];
+		InsLib->InsPtrs[TempOfs] = (UINT8*)&FileData[CurPos];
 	
 	return;
 }
@@ -213,10 +215,11 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 {
 	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
 	UINT32 FileLen;
-	UINT8* FileData;
+	const UINT8* FileData;
 	UINT8* FileMask;
 	const CMD_LIB* CmdList;
 	const CMD_LIB* CmdMetaList;
+	const CMD_LIB* CmdLstCur;
 	DAC_CFG* DACDrv;	// can't be const, because I set the Usage counters
 	UINT16 InsPtr;
 	UINT8 FMTrkCnt;
@@ -346,29 +349,17 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		while(CurPos < FileLen && (TrkMode & PBKFLG_ACTIVE))
 		{
 			FileMask[CurPos] |= 1 << (8 - StackPos);
-			while(FileData[CurPos] >= CmdList->FlagBase)
-			{
-				CurCmd = FileData[CurPos] - CmdList->FlagBase;
-				if (CurCmd >= CmdList->FlagCount)
-					break;
-				if (CmdList->CmdData[CurCmd].Type != CF_META_CF)
-					break;
-				CurPos += CmdList->CmdData[CurCmd].Len;
-				if (CurPos >= FileLen)
-				{
-					CurPos --;
-					break;
-				}
-				CurCmd = FileData[CurPos];
-				FileMask[CurPos] |= 0x01;
-			}
 			if (FileData[CurPos] < CmdList->FlagBase)
 			{
 				if (TrkMode & PBKFLG_RAWFREQ)
 				{
 					CurPos += 0x02 + 0x01;	// frequency + delay
 				}
-				else if (FileData[CurPos] & 0x80)
+				else if (FileData[CurPos] < SmpsSet->Cfg->NoteBase)
+				{
+					CurPos ++;	// delay
+				}
+				else
 				{
 					if (IsDrmTrk)
 					{
@@ -396,27 +387,41 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 					else if (! (FileData[CurPos] & 0x80))
 						CurPos ++;	// delay
 				}
-				else
-				{
-					CurPos ++;	// delay
-				}
 				continue;
 			}
-			CurCmd = FileData[CurPos] - CmdList->FlagBase;
-			if (CurCmd >= CmdList->FlagCount)
+			
+			CmdLstCur = CmdList;
+			while(FileData[CurPos] >= CmdLstCur->FlagBase)
+			{
+				CurCmd = FileData[CurPos] - CmdLstCur->FlagBase;
+				if (CurCmd >= CmdLstCur->FlagCount)
+					break;
+				if (CmdLstCur->CmdData[CurCmd].Type != CF_META_CF)
+					break;
+				CurPos += CmdLstCur->CmdData[CurCmd].Len;
+				if (CurPos >= FileLen)
+				{
+					CurPos --;
+					break;
+				}
+				CmdLstCur = CmdMetaList;
+				FileMask[CurPos] |= 0x01;
+			}
+			CurCmd = FileData[CurPos] - CmdLstCur->FlagBase;
+			if (CurCmd >= CmdLstCur->FlagCount)
 			{
 				if (DebugMsgs & 0x04)
 					printf("Unknown Coordination Flag 0x%02X in Track %u at 0x%04X\n",
-							CmdList->FlagBase + CurCmd, CurTrk, CurPos);
+							CmdLstCur->FlagBase + CurCmd, CurTrk, CurPos);
 				CurPos ++;
 				continue;
 			}
 			
-			CmdLen = CmdList->CmdData[CurCmd].Len;
+			CmdLen = CmdLstCur->CmdData[CurCmd].Len;
 			if (CmdLen & 0x80)
 			{
 				CmdLen &= 0x7F;
-				switch(CmdList->CmdData[CurCmd].Type)
+				switch(CmdLstCur->CmdData[CurCmd].Type)
 				{
 				case CF_INSTRUMENT:
 					if (FileData[CurPos + 0x01] & 0x80)
@@ -428,18 +433,18 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 					break;
 				}
 			}
-			switch(CmdList->CmdData[CurCmd].Type)
+			switch(CmdLstCur->CmdData[CurCmd].Type)
 			{
 			case CF_TRK_END:
 				TrkMode = 0x00;
 				break;
 			case CF_COND_JUMP:
-				if (! (CmdList->CmdData[CurCmd].SubType & CFS_CJMP_2PTRS))
+				if (! (CmdLstCur->CmdData[CurCmd].SubType & CFS_CJMP_2PTRS))
 					break;
 				// fall through
 			case CF_GOTO:
 				OldPos = CurPos;
-				TempOfs = CurPos + CmdList->CmdData[CurCmd].JumpOfs;
+				TempOfs = CurPos + CmdLstCur->CmdData[CurCmd].JumpOfs;
 				CurPos = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
 				if (CurPos >= FileLen)
 				{
@@ -501,7 +506,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				break;
 			case CF_LOOP_EXIT:
 				LoopID = FileData[CurPos + 0x01] & 0x07;
-				TempOfs = CurPos + CmdList->CmdData[CurCmd].JumpOfs;
+				TempOfs = CurPos + CmdLstCur->CmdData[CurCmd].JumpOfs;
 				LoopPtrs[LoopID] = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
 				break;
 			case CF_GOSUB:
@@ -520,7 +525,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				StackPtrs[StackPos] = CurPos + CmdLen;
 				
 				OldPos = CurPos;
-				TempOfs = CurPos + CmdList->CmdData[CurCmd].JumpOfs;
+				TempOfs = CurPos + CmdLstCur->CmdData[CurCmd].JumpOfs;
 				CurPos = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
 				StackPtrsE[StackPos] = CurPos;
 				CmdLen = 0x00;
@@ -579,7 +584,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 					TrkMode &= ~PBKFLG_RAWFREQ;
 				break;
 			case CF_DAC_PS4:
-				switch(CmdList->CmdData[CurCmd].SubType)
+				switch(CmdLstCur->CmdData[CurCmd].SubType)
 				{
 				case CFS_PS4_VOLCTRL:
 					TrkMode |= PBKFLG_SPCMODE;
@@ -626,16 +631,16 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 					printf("Special DAC command (Pos 0x%04X)\n", CurPos);
 				break;
 			case CF_IGNORE:
-				if (CmdList->CmdData[CurCmd].JumpOfs && (DebugMsgs & 0x04))
+				if (CmdLstCur->CmdData[CurCmd].JumpOfs && (DebugMsgs & 0x04))
 					printf("Unknown Conditional Jump (Pos 0x%04X)\n", CurPos);
 				break;
 			case CF_INVALID:
 				if (DebugMsgs & 0x04)
 					printf("Unknown Coordination Flag 0x%02X (Pos 0x%04X)\n",
-							CmdList->FlagBase + CurCmd, CurPos);
+							CmdLstCur->FlagBase + CurCmd, CurPos);
 				break;
 			case CF_FADE_IN_SONG:
-				if (CmdList->CmdData[CurCmd].Len == 0x01)
+				if (CmdLstCur->CmdData[CurCmd].Len == 0x01)
 					TrkMode = 0x00;	// Sonic 1's Fade In command also terminates the song.
 				SmpsSet->SeqFlags |= SEQFLG_NEED_SAVE;
 				break;
@@ -699,9 +704,9 @@ static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DA
 		DrumID = DTrkLib->File.Data[DrumOfs + 0x05] - 0x01;
 		break;
 	case DRMTYPE_FM:
-		// TODO: handle drums played on this track
-		DrumID = 0xFFFF;
-		break;
+		// handle drums played on this track
+		MarkDrumTrack(SmpsCfg, DACDrv, DrumData, 0x00);
+		return;
 	default:
 		return;
 	}
@@ -735,6 +740,172 @@ static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Bank, UINT8 Note)
 		return;
 	
 	DACDrv->Smpls[SmplID].UsageID = 0xFE;
+	
+	return;
+}
+
+static void MarkDrumTrack(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData, UINT8 Mode)
+{
+	const UINT8* FileData;
+	const DRUM_TRK_LIB* DTrkLib;
+	const UINT8* DTrkData;
+	SMPS_SET DTrkSet;
+	UINT16 DrumOfs;
+	UINT16 CurPos;
+	UINT16 TempOfs;
+	const CMD_LIB* CmdList;
+	const CMD_LIB* CmdMetaList;
+	const CMD_LIB* CmdLstCur;
+	UINT8 TrkMode;
+	UINT8 CurCmd;
+	UINT8 CmdLen;
+	UINT8 DACBank;
+	
+	DTrkLib = Mode ? &SmpsCfg->PSGDrums : &SmpsCfg->FMDrums;
+	if (DrumData->DrumID >= DTrkLib->DrumCount)
+		return;
+	
+	CmdList = &SmpsCfg->CmdList;
+	CmdMetaList = &SmpsCfg->CmdMetaList;
+	DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
+	DTrkData = &DTrkLib->File.Data[DrumOfs];
+	DTrkSet.Cfg = SmpsCfg;
+	DTrkSet.SeqBase = DTrkLib->DrumBase;
+	DTrkSet.Seq = DTrkLib->File;
+	FileData = DTrkLib->File.Data;
+	CurPos = ReadPtr(&DTrkData[0x00], &DTrkSet);
+	
+	DACBank = 0xFF;
+	TrkMode = PBKFLG_ACTIVE;
+	while(CurPos < DTrkLib->File.Len && (TrkMode & PBKFLG_ACTIVE))
+	{
+		if (FileData[CurPos] < CmdList->FlagBase)
+		{
+			if (TrkMode & PBKFLG_RAWFREQ)
+			{
+				CurPos += 0x02 + 0x01;	// frequency + delay
+			}
+			else if (FileData[CurPos] & 0x80)
+			{
+				CurPos ++;	// note
+				if (TrkMode & PBKFLG_PITCHSLIDE)
+					CurPos += 0x01 + 0x01;	// slide speed + delay
+				else if (! (FileData[CurPos] & 0x80))
+					CurPos ++;	// delay
+			}
+			else
+			{
+				CurPos ++;	// delay
+			}
+			continue;
+		}
+		
+		CmdLstCur = CmdList;
+		while(FileData[CurPos] >= CmdLstCur->FlagBase)
+		{
+			CurCmd = FileData[CurPos] - CmdLstCur->FlagBase;
+			if (CurCmd >= CmdLstCur->FlagCount)
+				break;
+			if (CmdLstCur->CmdData[CurCmd].Type != CF_META_CF)
+				break;
+			CurPos += CmdLstCur->CmdData[CurCmd].Len;
+			if (CurPos >= DTrkLib->File.Len)
+			{
+				CurPos --;
+				break;
+			}
+			CmdLstCur = CmdMetaList;
+		}
+		CurCmd = FileData[CurPos] - CmdLstCur->FlagBase;
+		if (CurCmd >= CmdLstCur->FlagCount)
+		{
+			CurPos ++;
+			continue;
+		}
+		
+		CmdLen = CmdLstCur->CmdData[CurCmd].Len;
+		if (CmdLen & 0x80)
+		{
+			CmdLen &= 0x7F;
+			switch(CmdLstCur->CmdData[CurCmd].Type)
+			{
+			case CF_INSTRUMENT:
+				if (FileData[CurPos + 0x01] & 0x80)
+					CmdLen ++;
+				break;
+			case CF_PAN_ANIM:
+				if (FileData[CurPos + 0x01])
+					CmdLen += 0x04;
+				break;
+			}
+		}
+		switch(CmdLstCur->CmdData[CurCmd].Type)
+		{
+		case CF_TRK_END:
+		case CF_RETURN:
+			TrkMode = 0x00;
+			break;
+		case CF_COND_JUMP:
+			if (! (CmdLstCur->CmdData[CurCmd].SubType & CFS_CJMP_2PTRS))
+				break;
+			// fall through
+		case CF_GOTO:
+			TempOfs = CurPos + CmdLstCur->CmdData[CurCmd].JumpOfs;
+			CurPos = ReadJumpPtr(&FileData[TempOfs], TempOfs, &DTrkSet);
+			if (CurPos >= DTrkLib->File.Len)
+				return;
+			CmdLen = 0x00;
+			break;
+		case CF_LOOP:
+			break;
+		case CF_LOOP_EXIT:
+			//TempOfs = CurPos + CmdLstCur->CmdData[CurCmd].JumpOfs;
+			//CurPos = ReadJumpPtr(&FileData[TempOfs], TempOfs, &DTrkSet);
+			//CmdLen = 0x00;
+			break;
+		case CF_PITCH_SLIDE:
+			if (FileData[CurPos + 0x01] == 0x01)
+				TrkMode |= PBKFLG_PITCHSLIDE;
+			else
+				TrkMode &= ~PBKFLG_PITCHSLIDE;
+			break;
+		case CF_RAW_FREQ:		// FC Raw Frequency Mode
+			if (FileData[CurPos + 0x01] == 0x01)
+				TrkMode |= PBKFLG_RAWFREQ;
+			else
+				TrkMode &= ~PBKFLG_RAWFREQ;
+			break;
+		case CF_DAC_BANK:
+			DACBank = FileData[CurPos + 0x01];
+			break;
+		case CF_PLAY_DAC:
+			switch(CmdLen)
+			{
+			case 0x02:
+				MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos + 0x01] & 0x7F);
+				break;
+			case 0x03:	// Zaxxon Motherbase 2000 32X
+				DACBank = FileData[CurPos + 0x01];
+				MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos + 0x02] & 0x7F);
+				break;
+			case 0x04:	// Mercs
+				MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos + 0x01] & 0x7F);
+				break;
+			default:
+				if (DebugMsgs & 0x04)
+					printf("Unknown DAC command (Pos 0x%04X)\n", CurPos);
+				break;
+			}
+			break;
+		case CF_PLAY_PWM:
+		case CF_DAC_CYMN:
+			if (DebugMsgs & 0x04)
+				printf("Special DAC command (Pos 0x%04X)\n", CurPos);
+			break;
+		}
+		
+		CurPos += CmdLen;
+	}
 	
 	return;
 }
