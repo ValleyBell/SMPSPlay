@@ -756,8 +756,8 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		}
 		break;
 	case CF_FM_VOLENV:
-		if (DebugMsgs & 0x02)
-			print_msg(Trk, CmdLen, "FM Volume Envelope");
+		//if (DebugMsgs & 0x02)
+		//	print_msg(Trk, CmdLen, "FM Volume Envelope");
 		Trk->FMVolEnv.VolEnv = Data[0x00];
 		Trk->FMVolEnv.OpMask = Data[0x01];
 		break;
@@ -1458,7 +1458,7 @@ static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* 
 				InsLib = GetSongInsLib(Trk, Trk->FMInsSong);	// get new Instrument Library
 				if (InsLib->InsCount == 0 || Trk->FMInsSong > 0x81)
 				{
-					printf("Error: FM instrument cross-reference %02X-%02X at %04X!\n",
+					printf("Error: FM instrument cross-reference (ins %02X, song %02X) at %04X!\n",
 							Trk->Instrument, Trk->FMInsSong, Trk->Pos);
 					InsLib = NULL;
 				}

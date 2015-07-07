@@ -1297,8 +1297,8 @@ static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue)
 	if (DataPtr >= PAniLib->DataLen)
 	{
 		if (DebugMsgs & 0x02)
-			printf("Warning: invalid Envelope Index 0x%02X (Env. %02X)\n",
-			Trk->PanAni.AniIdx, Trk->PanAni.Anim);
+			printf("Warning: invalid Pan Animation Index 0x%02X (Env. %02X)\n",
+					Trk->PanAni.AniIdx, Trk->PanAni.Anim);
 		DataPtr = PAniLib->DataLen - 1;	// prevent reading beyond EOF
 	}
 	PanData = PAniLib->Data[DataPtr];
@@ -1647,8 +1647,14 @@ static UINT8 DoVolumeEnvelope(TRK_RAM* Trk, UINT8 EnvID)
 		{
 		case ENVCMD_HOLD:		// 81 - hold at current level
 			return 0x80;
-		case ENVCMD_STOP:		// 83 - stop [SMPS 68k]
 		case ENVCMD_VST_MHLD:	// 83 - stop [SMPS Z80]
+			if (! (Trk->ChannelMask & 0x80))	// handle FM Volume Envelopes
+			{
+				Trk->PlaybkFlags |= PBKFLG_ATREST;
+				return 0x80;
+			}
+			// fall through
+		case ENVCMD_STOP:		// 83 - stop [SMPS 68k]
 			DoNoteOff(Trk);
 			return 0x81;
 		}

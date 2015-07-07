@@ -2,7 +2,7 @@ SMPS Player
 ===========
 by Valley Bell
 
-Version 2.10 (2015-04-05)
+Version 2.11 (2015-07-07)
 
 
 This program plays SMPS music files, a format commonly used in games for the Sega MegaDrive/Genesis.
@@ -72,6 +72,14 @@ Thanks to Xeeynamo for contributing.
 
 History
 -------
+2015-07-07 - 2.11
+	improved loop detection
+	fixed delay during first tick of SMPS Z80 Type 1 songs
+	fixed bug with cross-referenced instruments
+	added conditional jumps used by Columns
+	fixed FadeIn to use parameters defined in DefDrv.txt
+	fixed missing DAC drums in VGM logs of some SMPS Z80 Type 2 songs
+	fixed FM Volume Envelopes
 2015-04-05 - 2.10
 	added "Tempo1Tick" setting, allowing for more accurate jitter emulation
 	added full support for the SMPS variant used in Sonic 2 Recreation
