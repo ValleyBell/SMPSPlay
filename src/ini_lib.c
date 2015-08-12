@@ -336,11 +336,11 @@ UINT8 IsAbsolutePath(const char* Path)
 //  - You mustn't call it with DstBufSize != NULL and DstBuf == NULL.
 UINT32 ConcatPath(UINT32* DstBufSize, char** DstBuf, const char* Path1, const char* Path2)
 {
-	UINT32 Path1Len;
-	UINT32 Path2Len;
-	UINT32 Path2Start;
+	size_t Path1Len;
+	size_t Path2Len;
+	size_t Path2Start;
 	UINT8 Path2Abs;
-	UINT32 FnlPathAlloc;
+	size_t FnlPathAlloc;
 	
 	Path1Len = strlen(Path1);
 	Path2Len = strlen(Path2);
@@ -368,7 +368,7 @@ UINT32 ConcatPath(UINT32* DstBufSize, char** DstBuf, const char* Path1, const ch
 		if (*DstBuf == NULL || *DstBufSize < FnlPathAlloc)
 		{
 			*DstBuf = (char*)realloc(*DstBuf, FnlPathAlloc);
-			*DstBufSize = FnlPathAlloc;
+			*DstBufSize = (UINT32)FnlPathAlloc;
 		}
 	}
 	if (DstBuf != NULL)
@@ -379,7 +379,7 @@ UINT32 ConcatPath(UINT32* DstBufSize, char** DstBuf, const char* Path1, const ch
 		strcpy(*DstBuf + Path2Start, Path2);
 	}
 	
-	return Path2Start + Path2Len;
+	return (UINT32)(Path2Start + Path2Len);
 }
 
 // create path from folder name, returning the final path length
@@ -395,7 +395,7 @@ UINT32 CreatePath(UINT32* DstBufSize, char** DstBuf, const char* SrcPath)
 	//	                     (up to strlen(SrcPath)+1 characters)
 	char* PathStr;
 	char* CurChr;
-	UINT32 MinBufSize;
+	size_t MinBufSize;
 	
 	if (SrcPath == NULL)
 		SrcPath = "";
@@ -405,7 +405,7 @@ UINT32 CreatePath(UINT32* DstBufSize, char** DstBuf, const char* SrcPath)
 	{
 		*DstBuf = (char*)realloc(*DstBuf, MinBufSize * sizeof(char));
 		if (DstBufSize != NULL)
-			*DstBufSize = MinBufSize;
+			*DstBufSize = (UINT32)MinBufSize;
 	}
 	PathStr = *DstBuf;
 	

@@ -676,10 +676,10 @@ static void WaitTimeForKey(unsigned int MSec)
 
 static void WaitForKey(void)
 {
-	while(! ExitWait && ! PauseMode)
+	while(! ExitWait)
 	{
 		Sleep(20);
-		if (cursor == smps_playing)
+		if (! PauseMode && cursor == smps_playing)
 			ReDisplayFileID(cursor);
 		if (_kbhit())
 			break;
