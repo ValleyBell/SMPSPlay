@@ -1,7 +1,7 @@
 #ifndef __SMPS_STRUCTS_INT_H__
 #define __SMPS_STRUCTS_INT_H__
 
-#include "stdtype.h"
+#include <stdtype.h>
 #include "smps_structs.h"
 
 // --- Internal SMPS structures ---

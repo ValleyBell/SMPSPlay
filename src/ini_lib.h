@@ -2,7 +2,7 @@
 #define __LOADER_INI_H__
 
 #include <stdio.h>	// for FILE
-#include "stdtype.h"	// for UINT32
+#include <stdtype.h>	// for UINT32
 
 // Functions used to parse the actual lines in .ini files
 UINT8 GetTextLine(UINT32 BufSize, char* Buffer, FILE* hFile);

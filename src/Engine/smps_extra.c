@@ -7,9 +7,10 @@
 
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
 #include <stddef.h>	// for NULL
-#include <malloc.h>
-#include <memory.h>
-#include "stdtype.h"
+#include <stdlib.h>
+#include <string.h>
+
+#include <stdtype.h>
 #include "smps_structs_int.h"
 #include "dac.h"
 #include "../vgmwrite.h"

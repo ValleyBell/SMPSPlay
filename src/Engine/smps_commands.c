@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>	// for rand()
 #include <stddef.h>
-#include "stdtype.h"
+
+#include <common_def.h>
 #include "smps_structs.h"
 #include "smps_structs_int.h"
 #include "smps_commands.h"

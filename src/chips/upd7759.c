@@ -102,12 +102,11 @@
 #ifdef _DEBUG
 #include <stdio.h>
 #endif
-#include <memory.h>
-#include <malloc.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
 #include "mamedef.h"
 #include "upd7759.h"
-
-#define NULL	((void *)0)
 
 
 #define DEBUG_STATES	(0)

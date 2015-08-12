@@ -8,11 +8,10 @@
 #define _CRTDBG_MAP_ALLOC
 #include <stddef.h>	// for NULL
 #include <stdio.h>
-#include <memory.h>
-#include <malloc.h>	// for SMPS_SET memory management
+#include <string.h>
+#include <stdlib.h>	// for SMPS_SET memory management
 
-#include "stdtype.h"
-#include "../chips/mamedef.h"	// for offs_t
+#include <common_def.h>
 #include "smps_structs.h"
 #include "smps_structs_int.h"
 #include "smps.h"
@@ -21,7 +20,7 @@
 #include "dac.h"
 #include "necpcm.h"
 
-UINT8 ym2612_r(UINT8 ChipID, offs_t offset);
+UINT8 ym2612_r(UINT8 ChipID, UINT32 offset);
 #define ReadFM()				ym2612_r(0x00, 0x00)
 #define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, 0x00, Reg, Data)
 #define WriteFMII(Reg, Data)	ym2612_fm_write(0x00, 0x01, Reg, Data)
@@ -1861,7 +1860,8 @@ static void DoPSGNoteOff(TRK_RAM* Trk, UINT8 OffByTimeout)
 	else
 	{
 		Trk->PlaybkFlags |= PBKFLG_ATREST;
-		DoNoteOff(Trk);
+		if (Trk->ChannelMask & 0x80)
+			DoNoteOff(Trk);
 	}
 	
 	return;

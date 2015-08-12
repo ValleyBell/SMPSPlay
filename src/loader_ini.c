@@ -4,17 +4,27 @@
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
-#include <memory.h>
 #include <string.h>
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
 
-#include "stdtype.h"
+#include <common_def.h>
 #include "ini_lib.h"
 #include "loader.h"
 #include "Engine/smps_structs.h"
+
+
+#ifdef _MSC_VER
+
+#ifndef strdup	// crtdbg.h redefines strdup, usually it throws a warning
+#define strdup		_strdup
+#endif
+#define stricmp		_stricmp
+
+#else
+#define stricmp		strcasecmp
+#endif
 
 
 static UINT8 AddIniFileToList(FILE_LIST* FLst, const char* FileName)
@@ -23,7 +33,7 @@ static UINT8 AddIniFileToList(FILE_LIST* FLst, const char* FileName)
 	
 	for (CurFile = 0; CurFile < FLst->FileCount; CurFile ++)
 	{
-		if (! _stricmp(FLst->Files[CurFile], FileName))
+		if (! stricmp(FLst->Files[CurFile], FileName))
 			return 1;	// already in the list
 	}
 	
@@ -32,7 +42,7 @@ static UINT8 AddIniFileToList(FILE_LIST* FLst, const char* FileName)
 		FLst->FileAlloc += 0x10;
 		FLst->Files = (char**)realloc(FLst->Files, FLst->FileAlloc * sizeof(char*));
 	}
-	FLst->Files[FLst->FileCount] = _strdup(FileName);
+	FLst->Files[FLst->FileCount] = strdup(FileName);
 	FLst->FileCount ++;
 	
 	return 0;
@@ -44,7 +54,7 @@ SMPS_EXT_DEF* GetExtentionData(EXT_LIST* ExtList, const char* ExtStr)
 	
 	for (CurExt = 0; CurExt < ExtList->ExtCount; CurExt ++)
 	{
-		if (! _stricmp(ExtList->ExtData[CurExt].Extention, ExtStr))
+		if (! stricmp(ExtList->ExtData[CurExt].Extention, ExtStr))
 			return &ExtList->ExtData[CurExt];
 	}
 	
@@ -66,7 +76,7 @@ static SMPS_EXT_DEF* GetNewExtentionData(EXT_LIST* ExtList, const char* ExtStr)
 	}
 	
 	TempExt = &ExtList->ExtData[ExtList->ExtCount];
-	TempExt->Extention = _strdup(ExtStr);
+	TempExt->Extention = strdup(ExtStr);
 	TempExt->EqualExt = NULL;
 	TempExt->DriverFile = NULL;
 	TempExt->CmdFile = NULL;
@@ -91,7 +101,7 @@ INLINE void strdup_free(char** DestStr, const char* SrcStr)
 	// free DestStr before using strdup()
 	if (*DestStr != NULL)
 		free(*DestStr);
-	*DestStr = _strdup(SrcStr);
+	*DestStr = strdup(SrcStr);
 	
 	return;
 }
@@ -125,12 +135,12 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 		return 0xFF;
 	}
 	
-	IniPath = _strdup(FileName);
+	IniPath = strdup(FileName);
 	LToken = GetFileTitle(IniPath);	// can't return NULL
 	*LToken = '\0';
 	
-	BasePath = _strdup(IniPath);
-	DataPath = _strdup(IniPath);
+	BasePath = strdup(IniPath);
+	DataPath = strdup(IniPath);
 	BasePathAlloc = (UINT32)strlen(BasePath) + 1;
 	DataPathAlloc = BasePathAlloc;
 	
@@ -150,7 +160,7 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 		if (*LToken == '[')
 		{
 			// [Section]
-			if (! _stricmp(RToken1, "Main"))
+			if (! stricmp(RToken1, "Main"))
 				Group = 0x00;
 			else if (RToken1[0] == '.')
 			{
@@ -165,14 +175,14 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 		RToken2 = TrimToken(RToken1);
 		if (Group == 0x00)	// [Main] group
 		{
-			if (! _stricmp(LToken, "BasePath"))
+			if (! stricmp(LToken, "BasePath"))
 			{
 				RevertTokenTrim(RToken1, RToken2);
 				CreatePath(&PathBufAlloc, &PathBuf, RToken1);
 				ConcatPath(&BasePathAlloc, &BasePath, IniPath, PathBuf);
 				ConcatPath(&DataPathAlloc, &DataPath, BasePath, "");
 			}
-			else if (! _stricmp(LToken, "MusicDir"))
+			else if (! stricmp(LToken, "MusicDir"))
 			{
 				RevertTokenTrim(RToken1, RToken2);
 				CreatePath(&PathBufAlloc, &PathBuf, RToken1);
@@ -184,43 +194,49 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 				}
 				ConcatPath(NULL, &CfgData->MusPath, BasePath, PathBuf);
 			}
-			else if (! _stricmp(LToken, "DataDir"))
+			else if (! stricmp(LToken, "DataDir"))
 			{
 				RevertTokenTrim(RToken1, RToken2);
 				CreatePath(&PathBufAlloc, &PathBuf, RToken1);
 				ConcatPath(&DataPathAlloc, &DataPath, BasePath, PathBuf);
 			}
-			else if (! _stricmp(LToken, "LoadConfig"))
+			else if (! stricmp(LToken, "LoadConfig"))
 			{
 				RevertTokenTrim(RToken1, RToken2);
 				StandardizePath(RToken1);
 				ConcatPath(&PathBufAlloc, &PathBuf, DataPath, RToken1);
 				LoadConfigurationFiles(CfgData, PathBuf);
 			}
-			else if (! _stricmp(LToken, "ExtFilter"))
+			else if (! stricmp(LToken, "ExtFilter"))
 				CfgData->ExtFilter = GetBoolValue(RToken1, "True", "False");
-			else if (! _stricmp(LToken, "CompressVGM"))
+			else if (! stricmp(LToken, "CompressVGM"))
 				CfgData->CompressVGMs = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "DisableVGMLoop"))
+			else if (! stricmp(LToken, "DisableVGMLoop"))
 				CfgData->DisableVGMLoop = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "FM6DACOff"))
+			else if (! stricmp(LToken, "FM6DACOff"))
 				CfgData->FM6DACOff = GetBoolValue(RToken1, "True", "False");
-			else if (! _stricmp(LToken, "ResmplForce"))
+			else if (! stricmp(LToken, "ResmplForce"))
 				CfgData->ResmplForce = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "DebugMsgs"))
+			else if (! stricmp(LToken, "DebugMsgs"))
 				CfgData->DebugMsgs = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "SamplesPerSec"))
+			else if (! stricmp(LToken, "SamplesPerSec"))
 				CfgData->SamplePerSec = (UINT32)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "BitsPerSample"))
+			else if (! stricmp(LToken, "BitsPerSample"))
 				CfgData->BitsPerSample = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "AudioBuffers"))
-				CfgData->AudioBufs = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "LogWave"))
+			else if (! stricmp(LToken, "AudioAPI"))
+				strdup_free(&CfgData->AudAPIName, RToken1);
+			else if (! stricmp(LToken, "AudioDevice"))
+				CfgData->AudAPIDev = (UINT32)strtoul(RToken1, NULL, 0);
+			else if (! stricmp(LToken, "AudioBuffers"))
+				CfgData->AudioBufs = (UINT32)strtoul(RToken1, NULL, 0);
+			else if (! stricmp(LToken, "AudioBufSize"))
+				CfgData->AudioBufSize = (UINT32)strtoul(RToken1, NULL, 0);
+			else if (! stricmp(LToken, "LogWave"))
 				CfgData->LogWave = GetBoolValue(RToken1, "True", "False");
 		}
 		else if (Group == 0x10)	// [.ext] group
 		{
-			if (! _stricmp(LToken, "Equals"))
+			if (! stricmp(LToken, "Equals"))
 			{
 				ExtData->EqualExt = GetExtentionData(&CfgData->ExtList, RToken1);
 				if (ExtData->EqualExt == NULL)
@@ -232,29 +248,29 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 				StandardizePath(RToken1);
 				ConcatPath(&PathBufAlloc, &PathBuf, DataPath, RToken1);
 				
-				if (! _stricmp(LToken, "Driver"))
+				if (! stricmp(LToken, "Driver"))
 					strdup_free(&ExtData->DriverFile, PathBuf);
-				else if (! _stricmp(LToken, "Commands"))
+				else if (! stricmp(LToken, "Commands"))
 					strdup_free(&ExtData->CmdFile, PathBuf);
-				else if (! _stricmp(LToken, "Drums"))
+				else if (! stricmp(LToken, "Drums"))
 					strdup_free(&ExtData->DrumDefFile, PathBuf);
-				else if (! _stricmp(LToken, "PSGDrumDef"))
+				else if (! stricmp(LToken, "PSGDrumDef"))
 					strdup_free(&ExtData->PSGDrumDefFile, PathBuf);
-				else if (! _stricmp(LToken, "ModEnv"))
+				else if (! stricmp(LToken, "ModEnv"))
 					strdup_free(&ExtData->ModEnvFile, PathBuf);
-				else if (! _stricmp(LToken, "VolEnv"))
+				else if (! stricmp(LToken, "VolEnv"))
 					strdup_free(&ExtData->VolEnvFile, PathBuf);
-				else if (! _stricmp(LToken, "PanAni"))
+				else if (! stricmp(LToken, "PanAni"))
 					strdup_free(&ExtData->PanAniFile, PathBuf);
-				else if (! _stricmp(LToken, "DAC"))
+				else if (! stricmp(LToken, "DAC"))
 					strdup_free(&ExtData->DACFile, PathBuf);
-				else if (! _stricmp(LToken, "PWM"))
+				else if (! stricmp(LToken, "PWM"))
 					strdup_free(&ExtData->PWMFile, PathBuf);
-				else if (! _stricmp(LToken, "FMDrums"))
+				else if (! stricmp(LToken, "FMDrums"))
 					strdup_free(&ExtData->FMDrmFile, PathBuf);
-				else if (! _stricmp(LToken, "PSGDrums"))
+				else if (! stricmp(LToken, "PSGDrums"))
 					strdup_free(&ExtData->PSGDrmFile, PathBuf);
-				else if (! _stricmp(LToken, "GlobalInsLib"))
+				else if (! stricmp(LToken, "GlobalInsLib"))
 					strdup_free(&ExtData->GlbInsLibFile, PathBuf);
 			}
 		}
@@ -277,8 +293,8 @@ void FreeConfigurationFiles(CONFIG_DATA* CfgData)
 	SMPS_EXT_DEF* ExtDef;
 	UINT32 CurItem;
 	
-	free(CfgData->MusPath);
-	CfgData->MusPath = NULL;
+	free(CfgData->MusPath);		CfgData->MusPath = NULL;
+	free(CfgData->AudAPIName);	CfgData->AudAPIName = NULL;
 	
 	FLst = &CfgData->CfgFiles;
 	for (CurItem = 0; CurItem < FLst->FileCount; CurItem ++)

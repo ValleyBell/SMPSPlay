@@ -4,15 +4,13 @@
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
-#include <memory.h>
 #include <string.h>
 #include <ctype.h>	// for isspace()
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
 
-#include "stdtype.h"
+#include <common_def.h>
 #include "ini_lib.h"
 #include "Engine/dac.h"
 #include "Engine/smps_structs.h"

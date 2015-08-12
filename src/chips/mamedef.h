@@ -1,7 +1,7 @@
 #ifndef __MAMEDEF_H__
 #define __MAMEDEF_H__
 
-#include "../stdtype.h"
+#include <common_def.h>
 
 /* offsets and addresses are 32-bit (for now...) */
 typedef UINT32	offs_t;

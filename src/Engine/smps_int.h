@@ -5,7 +5,7 @@
 // Note: I know that "static" functions are out of place here,
 //       but this way I have a nice list of all functions.
 
-#include "stdtype.h"
+#include <common_def.h>
 #include "smps_structs.h"
 #include "smps_structs_int.h"
 

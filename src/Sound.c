@@ -1,10 +1,16 @@
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
-#include <memory.h>
-#include <malloc.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
+
+#include <stdtype.h>
+#include "Sound.h"
+#include "loader.h"	// for CONFIG_DATA
+#include <audio/AudioStream.h>
+#include <audio/AudioStream_SpcDrvFuns.h>
 
 #include "chips/mamedef.h"
-#include "Sound.h"
-#include "Stream.h"
 #include "chips/2612intf.h"
 #include "chips/sn764intf.h"
 #include "chips/upd7759.h"
@@ -12,6 +18,13 @@
 #include "Engine/dac.h"
 #include "Engine/necpcm.h"
 #include "vgmwrite.h"
+
+
+#ifdef _MSC_VER
+#define stricmp		_stricmp
+#else
+#define stricmp		strcasecmp
+#endif
 
 
 // from main.c
@@ -50,8 +63,10 @@ typedef struct chip_audio_struct
 } CHIP_AUDIO;
 
 
+static UINT32 GetAudioDriver(UINT8 Type, const char* PreferredDrv);
 //UINT8 StartAudioOutput(void);
 //UINT8 StopAudioOutput(void);
+//void PauseStream(UINT8 PauseOn);
 //UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel);
 static void SetupResampler(CAUD_ATTR* CAA);
 INLINE UINT8 Limit8Bit(INT32 Value);
@@ -60,7 +75,7 @@ INLINE INT32 Limit24Bit(INT32 Value);
 INLINE INT32 Limit32Bit(INT32 Value);
 static void null_update(UINT8 ChipID, stream_sample_t **outputs, int samples);
 static void ResampleChipStream(CAUD_ATTR* CAA, WAVE_32BS* RetSample, UINT32 Length);
-//UINT32 FillBuffer(WAVE_16BS* Buffer, UINT32 BufferSize);
+static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data);
 static void YM2612_Callback(void *param, int irq);
 
 //void ym2612_fm_write(UINT8 ChipID, UINT8 Port, UINT8 Register, UINT8 Data);
@@ -74,8 +89,9 @@ static void YM2612_Callback(void *param, int irq);
 
 #define VOL_SHIFT		7	// shift X bits to the right after mixing everything together
 
+extern CONFIG_DATA Config;
+static AUDIO_OPTS* audOpts;
 UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
-UINT8 BitsPerSample;
 
 UINT8 ResampleMode;	// 00 - HQ both, 01 - LQ downsampling, 02 - LQ both
 UINT8 CHIP_SAMPLING_MODE;
@@ -88,7 +104,11 @@ static INT32* StreamBufs[0x02];
 stream_sample_t* DUMMYBUF[0x02] = {NULL, NULL};
 
 static UINT8 DeviceState = 0x00;	// 00 - not running, 01 - running
+static void* audDrv;
+static void* audDrvLog;
+
 static UINT8 TimerExpired;
+static UINT8 SndLogEnable = 0x00;
 UINT16 FrameDivider = 60;
 //static UINT32 SmplsPerFrame;
 static UINT32 SmplsTilFrame;
@@ -99,18 +119,56 @@ static UINT32 MuteChannelMaskSn76496 = 0;
 UINT32 PlayingTimer;
 INT32 StoppedTimer;
 
+static UINT32 GetAudioDriver(UINT8 Type, const char* PreferredDrv)
+{
+	UINT32 idDrv;
+	AUDDRV_INFO* drvInfo;
+	UINT32 drvCount;
+	UINT32 curDrv;
+	
+	drvCount = Audio_GetDriverCount();
+	idDrv = (UINT32)-1;
+	for (curDrv = 0; curDrv < drvCount; curDrv ++)
+	{
+		Audio_GetDriverInfo(curDrv, &drvInfo);
+		if (drvInfo->drvType != Type)
+			continue;
+		
+		if (PreferredDrv != NULL && ! stricmp(drvInfo->drvName, PreferredDrv))
+			return curDrv;
+		
+		if (drvInfo->drvSig == ADRVSIG_WASAPI)
+			continue;	// WASAPI is crap due to limited sample rates
+		
+		// uncomment to use the first possible device
+		//if (idDrv == (UINT32)-1)
+		// We use the last device ID here, because the more "advanced" devices
+		// have later IDs.
+		idDrv = curDrv;
+	}
+	return idDrv;
+}
+
 UINT8 StartAudioOutput(void)
 {
 	UINT8 CurChip;
 	UINT8 RetVal;
 	CAUD_ATTR* CAA;
+	UINT32 idWaveOut;
+	UINT32 idWaveWrt;
+	AUDDRV_INFO* drvInfo;
+	AUDIO_OPTS* optsLog;
+	void* aDrv;
 	
 	if (DeviceState)
 		return 0x80;	// already running
-
+	
 	ResampleMode = 0x00;
 	CHIP_SAMPLING_MODE = 0x00;
 	CHIP_SAMPLE_RATE = 0x00000000;
+	SampleRate = 44100;	// used by some chips as output sample rate
+	if (Config.SamplePerSec)
+		SampleRate = Config.SamplePerSec;
 	
 	for (CurChip = 0x00; CurChip < CHIP_COUNT; CurChip ++)
 	{
@@ -157,11 +215,77 @@ UINT8 StartAudioOutput(void)
 	//SmplsPerFrame = SampleRate / 60;
 	SmplsTilFrame = 0;
 	
-	//SoundLogging(false);
-	RetVal = StartStream(0x00);
+	
+	Audio_Init();
+	
+	audDrv = audDrvLog = NULL;
+	idWaveOut = GetAudioDriver(ADRVTYPE_OUT, Config.AudAPIName);
+	idWaveWrt = GetAudioDriver(ADRVTYPE_DISK, "WaveWrite");
+	
+	RetVal = AudioDrv_Init(idWaveOut, &audDrv);
 	if (RetVal)
 	{
-		//printf("Error openning Sound Device!\n");
+		audDrv = NULL;
+		printf("Error loading Audio Driver!\n");
+		StopAudioOutput();
+		return 0xC0;
+	}
+	Audio_GetDriverInfo(idWaveOut, &drvInfo);
+	if (drvInfo->drvSig == ADRVSIG_DSOUND)
+	{
+#ifdef _WIN32
+		HWND hWnd;
+		
+		aDrv = AudioDrv_GetDrvData(audDrv);
+#if _WIN32_WINNT >= 0x500
+		hWnd = GetConsoleWindow();
+#else
+		hWnd = GetDesktopWindow();	// not as nice, but works
+#endif
+		DSound_SetHWnd(aDrv, hWnd);
+#endif	// _WIN32
+	}
+	if (Config.LogWave && idWaveWrt != (UINT32)-1 && Config.WaveLogPath != NULL)
+	{
+		RetVal = AudioDrv_Init(idWaveWrt, &audDrvLog);
+		if (! RetVal)
+		{
+			Audio_GetDriverInfo(idWaveWrt, &drvInfo);
+			if (drvInfo->drvSig == ADRVSIG_WAVEWRT)
+			{
+				aDrv = AudioDrv_GetDrvData(audDrvLog);
+				WavWrt_SetFileName(aDrv, Config.WaveLogPath);
+			}
+		}
+	}
+	
+	audOpts = AudioDrv_GetOptions(audDrv);
+	audOpts->sampleRate = SampleRate;
+	audOpts->numChannels = 2;
+	if (Config.BitsPerSample)
+		audOpts->numBitsPerSmpl = Config.BitsPerSample;
+	if (Config.AudioBufs)
+		audOpts->numBuffers = Config.AudioBufs;
+	if (Config.AudioBufSize)
+		audOpts->usecPerBuf = Config.AudioBufSize * 1000;
+	if (audDrvLog != NULL)
+	{
+		optsLog = AudioDrv_GetOptions(audDrvLog);
+		*optsLog = *audOpts;
+	}
+	
+	AudioDrv_SetCallback(audDrv, FillBuffer);
+	if (audDrvLog != NULL)
+	{
+		AudioDrv_DataForward_Add(audDrv, audDrvLog);
+		RetVal = AudioDrv_Start(audDrvLog, 0);
+		if (RetVal)
+			AudioDrv_Deinit(&audDrvLog);
+	}
+	RetVal = AudioDrv_Start(audDrv, Config.AudAPIDev);
+	if (RetVal)
+	{
+		printf("Error openning Sound Device! (Error Code %02X)\n", RetVal);
 		StopAudioOutput();
 		return 0xC0;
 	}
@@ -176,7 +300,17 @@ UINT8 StopAudioOutput(void)
 	if (! DeviceState)
 		return 0x00;	// not running
 	
-	RetVal = StopStream();
+	if (audDrv != NULL)
+	{
+		RetVal = AudioDrv_Stop(audDrv);
+		RetVal = AudioDrv_Deinit(&audDrv);
+	}
+	if (audDrvLog != NULL)
+	{
+		RetVal = AudioDrv_Stop(audDrvLog);
+		RetVal = AudioDrv_Deinit(&audDrvLog);
+	}
+	RetVal = Audio_Deinit();
 	
 	free(StreamBufs[0x00]);	StreamBufs[0x00] = NULL;
 	free(StreamBufs[0x01]);	StreamBufs[0x01] = NULL;
@@ -189,12 +323,33 @@ UINT8 StopAudioOutput(void)
 	return 0x00;
 }
 
+void PauseStream(UINT8 PauseOn)
+{
+	if (audDrv == NULL)
+		return;
+	
+	if (PauseOn)
+		AudioDrv_Pause(audDrv);
+	else
+		AudioDrv_Resume(audDrv);
+	
+	return;
+}
+
+void ThreadSync(UINT8 PauseAndWait)
+{
+	return;
+}
+
+
+
 UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel)
 {
 	UINT8 result;
 	UINT32 mask = 1 << nChannel;
 	UINT32* CurrentMuteMask;
 	void(*fMuteMask)(UINT8 ChipID, UINT32 MuteMask);
+	
 	switch (chip)
 	{
 	case CHIP_YM2612:
@@ -212,6 +367,7 @@ UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel)
 	else
 		*CurrentMuteMask |= mask;
 	fMuteMask(0, *CurrentMuteMask);
+	
 	return result;
 }
 
@@ -551,17 +707,21 @@ static void ResampleChipStream(CAUD_ATTR* CAA, WAVE_32BS* RetSample, UINT32 Leng
 	return;
 }
 
-UINT32 FillBuffer(WAVE_BINARY Buffer, UINT32 BufferSize)
+static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 {
+	UINT32 BufferSmpls;
+	UINT8* Buffer;
 	UINT32 CurSmpl;
 	WAVE_32BS TempBuf;
 	//UINT8 CurChip;
 	INT32 tempSmpl;
 	
-	if (Buffer == NULL)
+	if (data == NULL)
 		return 0x00;
 	
-	for (CurSmpl = 0x00; CurSmpl < BufferSize; CurSmpl ++)
+	Buffer = (UINT8*)data;
+	BufferSmpls = bufSize * 8 / audOpts->numBitsPerSmpl / 2;
+	for (CurSmpl = 0x00; CurSmpl < BufferSmpls; CurSmpl ++)
 	{
 		if (! SmplsTilFrame)
 		{
@@ -608,7 +768,7 @@ UINT32 FillBuffer(WAVE_BINARY Buffer, UINT32 BufferSize)
 		// now done by the LimitXBit routines
 		//TempBuf.Left = TempBuf.Left >> VOL_SHIFT;
 		//TempBuf.Right = TempBuf.Right >> VOL_SHIFT;
-		switch (BitsPerSample)
+		switch(audOpts->numBitsPerSmpl)
 		{
 		case 8:	// 8-bit is unsigned
 			*Buffer++ = Limit8Bit(TempBuf.Left);
@@ -637,7 +797,7 @@ UINT32 FillBuffer(WAVE_BINARY Buffer, UINT32 BufferSize)
 		}
 	}
 	
-	return CurSmpl;
+	return CurSmpl * audOpts->numBitsPerSmpl * 2 / 8;
 }
 
 static void YM2612_Callback(void* param, int irq)

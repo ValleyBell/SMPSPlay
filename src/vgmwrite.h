@@ -1,7 +1,7 @@
 #ifndef __VGMWRITE_H__
 #define __VGMWRITE_H__
 
-#include "stdtype.h"
+#include <stdtype.h>
 
 void vgm_init(void);
 void vgm_deinit(void);

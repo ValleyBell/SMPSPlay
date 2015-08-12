@@ -5,14 +5,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>	// for isalpha()
-#include <malloc.h>
-#include <memory.h>
 #include <string.h>
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
 
-#include "stdtype.h"
+#include <common_def.h>
 #include "ini_lib.h"
 #include "Engine/smps_structs.h"
 #include "Engine/smps_commands.h"

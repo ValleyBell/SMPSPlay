@@ -1,0 +1,5 @@
+Required Libraries:
+- Audio Output from https://github.com/ValleyBell/libvgm
+  Required files:
+    libs/include/audio/Audio*.h
+    libs/libs/libAudio*.lib [MS Visual Studio]

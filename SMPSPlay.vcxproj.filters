@@ -30,9 +30,6 @@
     <ClCompile Include="src\dirent.c">
       <Filter>Libraries</Filter>
     </ClCompile>
-    <ClCompile Include="src\Stream.c">
-      <Filter>Sound Emulation</Filter>
-    </ClCompile>
     <ClCompile Include="src\Sound.c">
       <Filter>Sound Emulation</Filter>
     </ClCompile>
@@ -97,9 +94,6 @@
     </ClInclude>
     <ClInclude Include="src\dirent.h">
       <Filter>Libraries</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Stream.h">
-      <Filter>Sound Emulation</Filter>
     </ClInclude>
     <ClInclude Include="src\Sound.h">
       <Filter>Sound Emulation</Filter>

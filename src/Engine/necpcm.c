@@ -3,7 +3,7 @@
 // Written by Valley Bell, 2015
 
 #include <stddef.h>	// for NULL
-#include "stdtype.h"
+#include <stdtype.h>
 #include "necpcm.h"
 #include "dac.h"	// for DAC_SAMPLE
 #include "../chips/mamedef.h"

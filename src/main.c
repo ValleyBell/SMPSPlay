@@ -2,13 +2,12 @@
 // -----------
 // Written by Valley Bell, 2014-2015
 
-#define SMPSPLAY_VER	"2.10"
+#define SMPSPLAY_VER	"2.11"
 //#define BETA
 
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
 #include <stdio.h>
 #include <stdlib.h>
-#include <malloc.h>
 #include <string.h>
 #ifdef _DEBUG
 #include <crtdbg.h>
@@ -20,13 +19,12 @@
 #include <sys/stat.h>	// for stat()
 #include "dirent.h"
 
-#include "stdtype.h"
-#include "stdbool.h"
+#include <common_def.h>
 
 #include "loader.h"
 #include "ini_lib.h"
 #include "Sound.h"
-#include "Stream.h"
+//#include "Stream.h"
 #include "Engine/smps_structs.h"
 #include "Engine/smps.h"
 #include "Engine/dac.h"
@@ -62,16 +60,11 @@ static UINT32 FileAlloc;
 static FILE_NAME* FileList;
 static UINT32 cursor = 0;
 static UINT32 smps_playing = -1;
-static volatile bool ExitWait;
+static volatile UINT8 ExitWait;
 static bool GoToNextSong;
 static bool CondVarChg;
 
-extern bool PauseThread;	// from Stream.c
-extern volatile bool ThreadPauseConfrm;
-extern char SoundLogFile[MAX_PATH];
-
 extern UINT32 SampleRate;	// from Sound.c
-extern UINT8 BitsPerSample;
 extern UINT16 FrameDivider;
 extern UINT32 PlayingTimer;
 extern INT32 LoopCntr;
@@ -85,7 +78,6 @@ UINT8 VGM_DataBlkCompress = 1;
 UINT8 VGM_NoLooping = 0;
 static UINT8 LastLineState;
 
-extern UINT16 AUDIOBUFFERU;
 static UINT8* CondJumpVar;
 static UINT8* CommunicationVar;
 
@@ -115,9 +107,6 @@ int main(int argc, char* argv[])
 	memset(&Config, 0x00, sizeof(CONFIG_DATA));
 	Config.FM6DACOff = 0xFF;
 	Config.ResmplForce = 0xFF;
-	SampleRate = 44100;
-	BitsPerSample = 16;
-	AUDIOBUFFERU = 10;
 	
 	LoadConfigurationFiles(&Config, "config.ini");
 	DebugMsgs = Config.DebugMsgs;
@@ -167,16 +156,11 @@ int main(int argc, char* argv[])
 	FrameDivider = PALMode ? 50 : 60;
 	
 	_mkdir("dumps");
-	strcpy(SoundLogFile, "dumps/out.wav");
-	SoundLogging(Config.LogWave);
+	Config.WaveLogPath = "dumps/out.wav";
 	
-	if (Config.SamplePerSec)
-		SampleRate = Config.SamplePerSec;
-	if (Config.BitsPerSample)
-		BitsPerSample = Config.BitsPerSample;
-	if (Config.AudioBufs)
-		AUDIOBUFFERU = Config.AudioBufs;
-	StartAudioOutput();
+	RetVal = StartAudioOutput();
+	if (RetVal)
+		goto FinishProgram;
 	
 	InitDriver();
 	CommunicationVar = SmpsGetVariable(SMPSVAR_COMMUNICATION);
@@ -186,7 +170,7 @@ int main(int argc, char* argv[])
 	StoppedTimer = -1;
 	CondVarChg = false;
 	GoToNextSong = false;
-	ExitWait = false;
+	ExitWait = 0;
 	
 	smps_playing = -1;
 	memset(&LastSmpsCfg, 0x00, sizeof(SMPS_SET));
@@ -276,10 +260,7 @@ int main(int argc, char* argv[])
 				NewSeqLen = GetFileData(FileList[cursor].Full, &NewSeqData);
 			if (NewSmpsEDef != NULL && NewSeqLen)
 			{
-				ThreadPauseConfrm = false;
-				PauseThread = true;
-				while(! ThreadPauseConfrm)
-					Sleep(1);
+				ThreadSync(1);
 				
 				vgm_set_loop(0x00);
 				vgm_dump_stop();
@@ -311,7 +292,7 @@ int main(int argc, char* argv[])
 			}
 			
 			PauseMode = false;
-			PauseThread = false;
+			ThreadSync(0);
 			PauseStream(PauseMode);
 			DisplayFileID(cursor);	// erase line and redraw text
 			if (LastSmpsCfg.Seq.Data == NULL)
@@ -324,13 +305,9 @@ int main(int argc, char* argv[])
 			
 			break;
 		case 'S':
-			ThreadPauseConfrm = false;
-			PauseThread = true;
-			while(! ThreadPauseConfrm)
-				Sleep(1);
-			
+			ThreadSync(1);
 			StopAllSound();
-			PauseThread = false;
+			ThreadSync(0);
 			break;
 		case 'V':
 			Enable_VGMDumping = ! Enable_VGMDumping;
@@ -370,7 +347,7 @@ int main(int argc, char* argv[])
 			DisplayFileID(cursor);
 			break;
 		case 'R':
-			/*PauseThread = true;
+			/*ThreadSync(1);
 			FreeDACData();
 			FreeFlutterData();
 			FreeGlobalInsSet();
@@ -379,7 +356,7 @@ int main(int argc, char* argv[])
 			LoadFlutterData(IniPath[0x00]);
 			LoadDACData(IniPath[0x01]);
 			LoadGlobalInsSet(IniPath[0x02]);
-			PauseThread = false;
+			ThreadSync(0);
 			
 			ClearLine();
 			printf("Data reloaded.\r");
@@ -414,7 +391,7 @@ int main(int argc, char* argv[])
 			else
 				FadeOutMusic();
 		}
-		else
+		else if (_kbhit())
 		{
 			inkey = _getch();
 			if (inkey == 0x00 || inkey == 0xE0)
@@ -424,10 +401,7 @@ int main(int argc, char* argv[])
 		}
 	}
 	
-	ThreadPauseConfrm = false;
-	PauseThread = true;
-	while(! ThreadPauseConfrm)
-		Sleep(1);
+	ThreadSync(1);
 	vgm_set_loop(0x00);
 	vgm_dump_stop();
 	
@@ -710,7 +684,8 @@ static void WaitForKey(void)
 		if (_kbhit())
 			break;
 	}
-	ExitWait = false;
+	if (ExitWait)
+		ExitWait --;
 	
 	return;
 }
@@ -720,7 +695,7 @@ void FinishedSongSignal(void)
 	if (AutoProgress)
 	{
 		GoToNextSong = true;
-		ExitWait = true;
+		ExitWait ++;
 	}
 	
 	return;
@@ -729,7 +704,7 @@ void FinishedSongSignal(void)
 void CommVarChangeCallback(void)
 {
 	CondVarChg = true;
-	ExitWait = true;
+	ExitWait ++;
 	
 	return;
 }

@@ -72,6 +72,10 @@ Thanks to Xeeynamo for contributing.
 
 History
 -------
+2015-xx-xx
+	fixed bug where a "Communication Variable" event prevented automatically going to the next song until a key is pressed
+	replaced sound output system with libvgm's Audio Output Library
+	added option to select audio API (previously only WinMM was supported)
 2015-07-07 - 2.11
 	improved loop detection
 	fixed delay during first tick of SMPS Z80 Type 1 songs

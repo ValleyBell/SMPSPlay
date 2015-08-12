@@ -2,11 +2,10 @@
 // -----------------
 // Written by Valley Bell, 2014-2015
 
-#include <memory.h>
+#include <string.h>
 #include <stdio.h>
 
-#include "stdtype.h"
-#include "../chips/mamedef.h"	// for INLINE
+#include <common_def.h>
 #include "smps_structs.h"
 #include "smps_structs_int.h"
 #include "smps.h"

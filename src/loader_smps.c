@@ -3,16 +3,14 @@
 // Written by Valley Bell, 2014
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds
 #include <stdio.h>
-#include <stdlib.h>	// for strtoul()
-#include <malloc.h>
-#include <memory.h>
-#include <string.h>	// for strrchr()
+#include <stdlib.h>
+#include <string.h>
 #include <stddef.h>	// for NULL
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
 
-#include "stdtype.h"
+#include <common_def.h>
 #include "loader.h"
 #include "Engine/smps_structs.h"
 #include "Engine/smps_structs_int.h"	// for PBKFLG_* defines

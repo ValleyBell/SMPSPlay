@@ -3,7 +3,7 @@
 // Written by Valley Bell, 2014-2015
 
 #include <stddef.h>	// for NULL
-#include "stdtype.h"
+#include <stdtype.h>
 #include "dac.h"
 #include "smps.h"
 #include "../chips/mamedef.h"

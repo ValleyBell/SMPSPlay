@@ -129,13 +129,12 @@
 /************************************************************************/
 
 //#include "emu.h"
-#include <malloc.h>
-#include <memory.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stddef.h>
 #include <math.h>
 #include "mamedef.h"
 #include "fm.h"
-
-#define NULL	((void *)0)
 
 /* shared function building option */
 #define BUILD_OPN (BUILD_YM2203||BUILD_YM2608||BUILD_YM2610||BUILD_YM2610B||BUILD_YM2612||BUILD_YM3438)

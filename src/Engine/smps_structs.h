@@ -1,7 +1,7 @@
 #ifndef __SMPS_STRUCTS_H__
 #define __SMPS_STRUCTS_H__
 
-#include "stdtype.h"
+#include <stdtype.h>
 #include "dac.h"	// for DAC_CFG
 
 typedef struct _file_data

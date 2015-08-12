@@ -14,12 +14,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <malloc.h>
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
 
-#include "stdtype.h"
+#include <common_def.h>
 
 
 void ClearLine(void);			// from main.c
