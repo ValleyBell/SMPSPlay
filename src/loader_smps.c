@@ -118,7 +118,7 @@ UINT8 GuessSMPSOffset(SMPS_SET* SmpsSet)
 		return 0x80;
 	
 	CurPos += 0x06;
-	TempOfs = CurPos + FMTrkCnt * 0x04 + PSGTrkCnt * 0x06;
+	TempOfs = CurPos + FMTrkCnt * 0x04 + PSGTrkCnt * 0x06 + SmpsCfg->AddChnCnt * 0x04;
 	if (FileLen < TempOfs)
 		return 0x81;
 	
@@ -237,7 +237,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	UINT8 StackPos;
 	UINT8 LoopID;
 	UINT8 UsageMask;
-	UINT8 IsDrmTrk;
+	UINT8 IsDacTrk;
 	UINT8 DACBank;
 	
 	FileLen = SmpsSet->Seq.Len;
@@ -333,10 +333,13 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 			continue;
 		}
 		
-		if (! CurTrk && FMTrkCnt)
-			IsDrmTrk = 0x01;
+		if (CurTrk < FMTrkCnt)
+			CurCmd = SmpsCfg->FMChnList[CurTrk];
+		else if (CurTrk < FMTrkCnt + PSGTrkCnt)
+			CurCmd = SmpsCfg->PSGChnList[CurTrk - FMTrkCnt];
 		else
-			IsDrmTrk = 0x00;
+			CurCmd = 0x00;
+		IsDacTrk = ((CurCmd & 0xF0) == 0x10) ? 0x01 : 0x00;
 		DACBank = 0xFF;
 		
 		memset(FileMask, 0x00, FileLen);
@@ -353,13 +356,13 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				{
 					CurPos += 0x02 + 0x01;	// frequency + delay
 				}
-				else if (FileData[CurPos] < SmpsSet->Cfg->NoteBase)
+				else if (FileData[CurPos] < SmpsCfg->NoteBase)
 				{
 					CurPos ++;	// delay
 				}
 				else
 				{
-					if (IsDrmTrk)
+					if (IsDacTrk)
 					{
 						if (! (TrkMode & PBKFLG_SPCMODE))	// if not Phantasy Star IV
 							MarkDrumNote(SmpsCfg, DACDrv, &SmpsCfg->DrumLib, FileData[CurPos]);
@@ -713,7 +716,7 @@ static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DA
 	SmplID = DACDrv->SmplTbl[DrumID].Sample;
 	if (SmplID >= DACDrv->SmplCount)
 		return;
-		
+	
 	DACDrv->Smpls[SmplID].UsageID = 0xFE;
 	
 	return;
