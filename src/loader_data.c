@@ -71,7 +71,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 	
 	char DACFile[0x100];
 	UINT8 CurAlgoID;
-	UINT8 DrumIDBase;
+	UINT16 DrumIDBase;
 	UINT16 CurDrumID;
 	DAC_NSMPL DSmpl;
 	DAC_ALGO* DAlgo;
@@ -169,6 +169,8 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 			else
 			{
 				CurDrumID = (UINT8)strtoul(RToken1, &RToken2, 0x10);
+				if (CurDrumID == 0 && ! (IniSection & 0x80) && DrumIDBase == 0x81)
+					DrumIDBase = CurDrumID;	// make NECPCM.ini work without setting DrumIDBase
 				if (RToken2 == RToken1 || CurDrumID < DrumIDBase)
 				{
 					IniSection = 0x00;
@@ -241,7 +243,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 			else if (! _stricmp(LToken, "ResampleMode"))
 				DACDrv->Cfg.SmplMode = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! _stricmp(LToken, "DrumIDBase"))
-				DrumIDBase = (UINT8)strtoul(RToken1, NULL, 0x10);
+				DrumIDBase = (UINT16)strtoul(RToken1, NULL, 0x10);
 		}
 		else if (IniSection == 0x02)
 		{
