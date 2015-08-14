@@ -24,12 +24,13 @@
 #include "loader.h"
 #include "ini_lib.h"
 #include "Sound.h"
-//#include "Stream.h"
 #include "Engine/smps_structs.h"
 #include "Engine/smps.h"
 #include "Engine/dac.h"
 #include "Engine/necpcm.h"
+#ifdef ENABLE_VGM_LOGGING
 #include "vgmwrite.h"
+#endif
 
 
 int main(int argc, char* argv[]);
@@ -74,8 +75,10 @@ bool PauseMode;
 bool PALMode;
 static bool AutoProgress;
 UINT8 DebugMsgs;
+#ifdef ENABLE_VGM_LOGGING
 UINT8 VGM_DataBlkCompress = 1;
 UINT8 VGM_NoLooping = 0;
+#endif
 static UINT8 LastLineState;
 
 static UINT8* CondJumpVar;
@@ -103,7 +106,9 @@ int main(int argc, char* argv[])
 	printf("by Valley Bell, beta version\n");
 #endif
 	
+#ifdef ENABLE_VGM_LOGGING
 	vgm_init();
+#endif
 	memset(&Config, 0x00, sizeof(CONFIG_DATA));
 	Config.FM6DACOff = 0xFF;
 	Config.ResmplForce = 0xFF;
@@ -120,7 +125,9 @@ int main(int argc, char* argv[])
 		goto FinishProgram;
 	}
 	
+#ifdef ENABLE_VGM_LOGGING
 	VGM_NoLooping = Config.DisableVGMLoop;
+#endif
 	if (Config.FM6DACOff != 0xFF)
 	{
 		for (smps_playing = 0; smps_playing < Config.ExtList.ExtCount; smps_playing ++)
@@ -262,8 +269,10 @@ int main(int argc, char* argv[])
 			{
 				ThreadSync(1);
 				
+#ifdef ENABLE_VGM_LOGGING
 				vgm_set_loop(0x00);
 				vgm_dump_stop();
+#endif
 				
 				PlayingTimer = 0;
 				smps_playing = -1;
@@ -281,7 +290,9 @@ int main(int argc, char* argv[])
 				if (! RetVal)
 				{
 					//FileList[cursor].SeqBase = LastSmpsCfg.SeqBase;
+#ifdef ENABLE_VGM_LOGGING
 					MakeVgmFileName(FileList[cursor].Title);
+#endif
 					PlayMusic(&LastSmpsCfg);
 					smps_playing = cursor;
 				}
@@ -309,6 +320,7 @@ int main(int argc, char* argv[])
 			StopAllSound();
 			ThreadSync(0);
 			break;
+#ifdef ENABLE_VGM_LOGGING
 		case 'V':
 			Enable_VGMDumping = ! Enable_VGMDumping;
 			ClearLine();
@@ -316,6 +328,7 @@ int main(int argc, char* argv[])
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);
 			break;
+#endif
 		case 'P':
 			PALMode = ! PALMode;
 			FrameDivider = PALMode ? 50 : 60;
@@ -402,14 +415,18 @@ int main(int argc, char* argv[])
 	}
 	
 	ThreadSync(1);
+#ifdef ENABLE_VGM_LOGGING
 	vgm_set_loop(0x00);
 	vgm_dump_stop();
+#endif
 	
 	DeinitDriver();
 	StopAudioOutput();
 	
 FinishProgram:
+#ifdef ENABLE_VGM_LOGGING
 	vgm_deinit();
+#endif
 	if (FileList != NULL)
 	{
 		UINT32 CurFile;

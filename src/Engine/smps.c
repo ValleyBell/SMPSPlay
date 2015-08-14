@@ -27,16 +27,25 @@ UINT8 ym2612_r(UINT8 ChipID, UINT32 offset);
 #define WritePSG(Data)			sn76496_psg_write(0x00, Data)
 int upd7759_busy_r(UINT8 ChipID);
 
+
+#ifndef DISABLE_DEBUG_MSGS
 extern UINT8 DebugMsgs;
+#else
+#define DebugMsgs	0
+#endif
 
 // from smps_extra.c
 void StartSignal(void);
 void StopSignal(void);
-//void LoopStartSignal(void);
-//void LoopEndSignal(void);
+#ifdef ENABLE_LOOP_DETECTION
 void Extra_LoopInit(void);
 void Extra_LoopStartCheck(TRK_RAM* Trk);
 //void Extra_LoopEndCheck(TRK_RAM* Trk);
+#else
+#define Extra_LoopInit()
+#define Extra_LoopStartCheck(x)
+#define Extra_LoopEndCheck(x)
+#endif
 
 
 // Function Prototypes
@@ -46,8 +55,6 @@ INLINE UINT16 ReadLE16(const UINT8* Data);
 INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
 INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet);
 INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet);
-
-// TODO: copy smps_int.h here
 
 
 #define VALID_FREQ(x)	((x & 0xFF00) != 0x8000)
@@ -2294,10 +2301,12 @@ static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UI
 		TempTrk->StackPtr = TRK_STACK_SIZE;
 		TempTrk->PanAFMS = 0xC0;
 		TempTrk->RemTicks = 0x01;
+#ifdef ENABLE_LOOP_DETECTION
 		if (SmpsSet->LoopPtrs != NULL)
 			TempTrk->LoopOfs = SmpsSet->LoopPtrs[TrkBase + CurTrk];
 		else
 			TempTrk->LoopOfs.Ptr = 0x0000;
+#endif
 		
 		if ((TempTrk->ChannelMask & 0xF8) == 0x10)	// DAC drum channels
 			TempTrk->SpcDacMode = SmpsSet->Cfg->DrumChnMode;

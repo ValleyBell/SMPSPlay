@@ -19,12 +19,19 @@
 #define WriteFMII(Reg, Data)	ym2612_fm_write(0x00, 0x01, Reg, Data)
 #define WritePSG(Data)			sn76496_psg_write(0x00, Data)
 
-void ClearLine(void);				// from main.c
+
 void CommVarChangeCallback(void);	// from main.c
+
+#ifndef DISABLE_DEBUG_MSGS
+void ClearLine(void);				// from main.c
+extern UINT8 DebugMsgs;
+#else
+#define ClearLine()
+#define DebugMsgs	0
+#endif
 
 
 extern SND_RAM SmpsRAM;
-extern UINT8 DebugMsgs;
 
 static const UINT8 AlgoOutMask[0x08] =
 	{0x08, 0x08, 0x08, 0x08, 0x0C, 0x0E, 0x0E, 0x0F};
@@ -61,7 +68,11 @@ static const UINT8 CoI_PSG_RelRates[0x10] = {
 
 // from smps_extra.c
 void Extra_StopCheck(void);
+#ifdef ENABLE_LOOP_DETECTION
 void Extra_LoopEndCheck(TRK_RAM* Trk);
+#else
+#define Extra_LoopEndCheck(x)
+#endif
 
 
 INLINE UINT16 ReadBE16(const UINT8* Data);
@@ -1829,6 +1840,7 @@ INLINE UINT16* GetFM3FreqPtr(void)
 
 static void print_msg(TRK_RAM* Trk, UINT8 CmdLen, const char* DescStr)
 {
+#ifndef DISABLE_DEBUG_MSGS
 	const UINT8* Data = Trk->SmpsSet->Seq.Data;
 	char TempStr[0x20];
 	char* StrPtr;
@@ -1868,6 +1880,7 @@ static void print_msg(TRK_RAM* Trk, UINT8 CmdLen, const char* DescStr)
 	else
 		printf("%s Track %u/%02X, Pos 0x%04X: Command %s- %s\n",
 				TrkStr, TrkID, Trk->ChannelMask, Trk->Pos, TempStr, DescStr);
+#endif
 	
 	return;
 }

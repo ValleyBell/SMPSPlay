@@ -11,7 +11,9 @@ typedef struct _dac_sample
 	UINT8* DPCMArr;
 	UINT32 Size;
 	UINT8 Compr;
+#ifdef ENABLE_VGM_LOGGING
 	UINT8 UsageID;
+#endif
 } DAC_SAMPLE;
 typedef struct _dac_table
 {

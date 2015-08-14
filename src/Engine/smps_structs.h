@@ -263,11 +263,13 @@ typedef struct _smps_configuration	// global SMPS driver configuration
 	CMD_LIB CmdMetaList;
 } SMPS_CFG;
 
+#ifdef ENABLE_LOOP_DETECTION
 typedef struct _smps_loop_pointer
 {
 	UINT16 Ptr;
 	UINT16 SrcOfs;
 } SMPS_LOOPPTR;
+#endif
 
 typedef struct _smps_settings	// sequence-specific settings
 {
@@ -283,7 +285,9 @@ typedef struct _smps_settings	// sequence-specific settings
 	UINT16 InsBase;
 	INS_LIB InsLib;
 	
+#ifdef ENABLE_LOOP_DETECTION
 	SMPS_LOOPPTR* LoopPtrs;
+#endif
 } SMPS_SET;
 
 

@@ -17,7 +17,9 @@
 #include "Engine/smps.h"
 #include "Engine/dac.h"
 #include "Engine/necpcm.h"
+#ifdef ENABLE_VGM_LOGGING
 #include "vgmwrite.h"
+#endif
 
 
 #ifdef _MSC_VER
@@ -744,14 +746,18 @@ static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 			StoppedTimer ++;
 			if (StoppedTimer == 2 * SampleRate)
 				FinishedSongSignal();
+#ifdef ENABLE_VGM_LOGGING
 			vgm_update(1);
+#endif
 		}
 		else
 		{
 			if (PlayingTimer != -1)
 			{
 				PlayingTimer ++;
+#ifdef ENABLE_VGM_LOGGING
 				vgm_update(1);
+#endif
 			}
 		}
 		
@@ -825,7 +831,9 @@ void ym2612_fm_write(UINT8 ChipID, UINT8 Port, UINT8 Register, UINT8 Data)
 	ym2612_w(ChipID, 0x00 | (Port << 1), Register);
 	ym2612_w(ChipID, 0x01 | (Port << 1), Data);
 	
+#ifdef ENABLE_VGM_LOGGING
 	vgm_write(VGMC_YM2612, Port, Register, Data);
+#endif
 	
 	return;
 }
@@ -834,7 +842,9 @@ void sn76496_psg_write(UINT8 ChipID, UINT8 Data)
 {
 	sn764xx_w(ChipID, 0x00, Data);
 	
+#ifdef ENABLE_VGM_LOGGING
 	vgm_write(VGMC_SN76496, 0, Data, 0);
+#endif
 	
 	return;
 }

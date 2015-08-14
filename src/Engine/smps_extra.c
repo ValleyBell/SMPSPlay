@@ -13,17 +13,23 @@
 #include <stdtype.h>
 #include "smps_structs_int.h"
 #include "dac.h"
+#ifdef ENABLE_VGM_LOGGING
 #include "../vgmwrite.h"
+#endif
 
 //void StartSignal(void);
 //void StopSignal(void);
-//void LoopStartSignal(void);
-//void LoopEndSignal(void);
+static void LoopStartSignal(void);
+static void LoopEndSignal(void);
 
+#ifdef ENABLE_LOOP_DETECTION
 //void Extra_StopCheck(void);
 //void Extra_LoopStartCheck(TRK_RAM* Trk);
 //void Extra_LoopEndCheck(TRK_RAM* Trk);
+#endif
+#ifdef ENABLE_VGM_LOGGING
 static void DumpDACSounds(DAC_CFG* DACDrv);
+#endif
 
 void FinishedSongSignal(void);	// from main.c
 
@@ -31,10 +37,13 @@ extern UINT32 PlayingTimer;
 INT32 LoopCntr;
 extern INT32 StoppedTimer;
 
+#ifdef ENABLE_VGM_LOGGING
 extern UINT8 VGM_DataBlkCompress;
 extern UINT8 VGM_NoLooping;
+#endif
 
 extern SND_RAM SmpsRAM;
+#ifdef ENABLE_LOOP_DETECTION
 static struct loop_state
 {
 	UINT8 Activated;
@@ -43,18 +52,22 @@ static struct loop_state
 	UINT16 TrkMaskE;	// Track Mask (loop end check)
 	SMPS_LOOPPTR TrkPos[MUS_TRKCNT];
 } LoopState;
+#endif
 
 
 void StartSignal(void)
 {
+#ifdef ENABLE_VGM_LOGGING
 	const DRUM_LIB* DrumLib;
 	UINT8 CurIdx;
 	UINT8 VgmChipMask;
+#endif
 	
 	PlayingTimer = -1;
 	LoopCntr = 0;
 	StoppedTimer = -1;
 	
+#ifdef ENABLE_VGM_LOGGING
 	VgmChipMask = 0x00;
 	for (CurIdx = 0; CurIdx < MUS_TRKCNT; CurIdx ++)
 	{
@@ -75,34 +88,41 @@ void StartSignal(void)
 	vgm_dump_start();
 	if (SmpsRAM.MusSet != NULL)
 		DumpDACSounds((DAC_CFG*)&SmpsRAM.MusSet->Cfg->DACDrv);
+#endif	// ENABLE_VGM_LOGGING
 	
 	return;
 }
 
 void StopSignal(void)
 {
+#ifdef ENABLE_VGM_LOGGING
 	vgm_set_loop(0);
 	vgm_dump_stop();
+#endif
 	LoopCntr = -1;
 	StoppedTimer = 0;
 	
 	return;
 }
 
-void LoopStartSignal(void)
+static void LoopStartSignal(void)
 {
+#ifdef ENABLE_VGM_LOGGING
 	if (! VGM_NoLooping)
 		vgm_set_loop(1);
+#endif
 	
 	LoopCntr = 1;
 	
 	return;
 }
 
-void LoopEndSignal(void)
+static void LoopEndSignal(void)
 {
+#ifdef ENABLE_VGM_LOGGING
 	if (! VGM_NoLooping)
 		vgm_dump_stop();
+#endif
 	
 	if (LoopCntr >= 2)
 		FinishedSongSignal();
@@ -133,6 +153,7 @@ void Extra_StopCheck(void)
 	return;
 }
 
+#ifdef ENABLE_LOOP_DETECTION
 void Extra_LoopInit(void)
 {
 	UINT8 CurTrk;
@@ -228,7 +249,9 @@ void Extra_LoopEndCheck(TRK_RAM* Trk)
 	
 	return;
 }
+#endif	// ENABLE_LOOP_DETECTION
 
+#ifdef ENABLE_VGM_LOGGING
 static void DumpDACSounds(DAC_CFG* DACDrv)
 {
 	UINT8 CurSnd;
@@ -337,3 +360,4 @@ static void DumpDACSounds(DAC_CFG* DACDrv)
 	
 	return;
 }
+#endif	// ENABLE_VGM_LOGGING

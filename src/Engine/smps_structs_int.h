@@ -123,7 +123,9 @@ typedef struct _track_ram
 	
 	UINT8 LoopStack[TRK_STACK_SIZE];	// 28-2F - Loop Data and GoSub Stack
 	
+#ifdef ENABLE_LOOP_DETECTION
 	SMPS_LOOPPTR LoopOfs;	// [not in driver] Loop Offset (for loop detection)
+#endif
 	UINT16 LastJmpPos;		// for loop detection
 } TRK_RAM;
 typedef struct _drum_track_ram

@@ -19,8 +19,14 @@
 #define WritePSG(Data)			sn76496_psg_write(0x00, Data)
 
 
-extern SND_RAM SmpsRAM;
+#ifndef DISABLE_DEBUG_MSGS
 extern UINT8 DebugMsgs;
+#else
+#define DebugMsgs	0
+#endif
+
+
+extern SND_RAM SmpsRAM;
 
 
 INLINE UINT16 ReadBE16(const UINT8* Data);
@@ -169,7 +175,9 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DTrkSet->Seq = DTrkLib->File;
 		DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
 		DTrkSet->InsLib = DTrkLib->InsLib;
+#ifdef ENABLE_LOOP_DETECTION
 		DTrkSet->LoopPtrs = NULL;
+#endif
 		
 		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
 		DrumTrk->SmpsSet = DTrkSet;
@@ -226,7 +234,9 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DTrkSet->Seq = DTrkLib->File;
 		DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
 		DTrkSet->InsLib = DTrkLib->InsLib;
+#ifdef ENABLE_LOOP_DETECTION
 		DTrkSet->LoopPtrs = NULL;
+#endif
 		
 		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
 		DrumTrk->SmpsSet = DTrkSet;

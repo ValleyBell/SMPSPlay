@@ -8,7 +8,9 @@
 #include "dac.h"	// for DAC_SAMPLE
 #include "../chips/mamedef.h"
 #include "../chips/upd7759.h"
+#ifdef ENABLE_VGM_LOGGING
 #include "../vgmwrite.h"
+#endif
 
 typedef struct _nec_state
 {
@@ -164,20 +166,26 @@ void UpdateNECPCM(void)
 void NECPCM_SetReset(UINT8 State)
 {
 	upd7759_reset_w(0x00, State);
+#ifdef ENABLE_VGM_LOGGING
 	vgm_write(VGMC_UPD7759, 0, 0x00, State);
+#endif
 	return;
 }
 
 void NECPCM_SetStart(UINT8 State)
 {
 	upd7759_start_w(0x00, State);
+#ifdef ENABLE_VGM_LOGGING
 	vgm_write(VGMC_UPD7759, 0, 0x01, State);
+#endif
 	return;
 }
 
 void NECPCM_WriteData(UINT8 Data)
 {
 	upd7759_port_w(0x00, 0x00, Data);
+#ifdef ENABLE_VGM_LOGGING
 	vgm_write(VGMC_UPD7759, 0, 0x02, Data);
+#endif
 	return;
 }

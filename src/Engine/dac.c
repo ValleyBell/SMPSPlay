@@ -9,7 +9,9 @@
 #include "../chips/mamedef.h"
 #include "../Sound.h"
 #include "../chips/2612intf.h"
+#ifdef ENABLE_VGM_LOGGING
 #include "../vgmwrite.h"
+#endif
 
 #define CLOCK_Z80	3579545
 
@@ -242,7 +244,9 @@ static UINT8 GetNextSample(DAC_STATE* ChnState, INT16* RetSmpl)
 static UINT8 HandleSampleEnd(DAC_STATE* ChnState)
 {
 	UINT8 RestartSmpl;
+#ifdef ENABLE_VGM_LOGGING
 	UINT8 VgmSmplID;
+#endif
 	
 	RestartSmpl = (ChnState->PbFlags & DACFLAG_LOOP);
 	if (ChnState->PbFlags & DACFLAG_FLIP_FLOP)
@@ -267,6 +271,7 @@ static UINT8 HandleSampleEnd(DAC_STATE* ChnState)
 		ChnState->Pos = 0x00;
 	ChnState->DPCMState = 0x80;
 	
+#ifdef ENABLE_VGM_LOGGING
 	VgmSmplID = ChnState->DACSmplPtr->UsageID;
 	if (VgmSmplID < 0xFE)
 	{
@@ -275,6 +280,7 @@ static UINT8 HandleSampleEnd(DAC_STATE* ChnState)
 		else
 			vgm_write_stream_data_command(0x00, 0x05, VgmSmplID);
 	}
+#endif
 	
 	return 0x00;
 }
@@ -531,7 +537,9 @@ void DAC_Stop(UINT8 Chn)
 	
 	DACChn->DACSmplPtr = NULL;
 	DACChn->SmplLast = DACChn->SmplNext = 0x0000;
+#ifdef ENABLE_VGM_LOGGING
 	vgm_write_stream_data_command(0x00, 0x04, 0x00);
+#endif
 	
 	for (CurChn = 0; CurChn < MAX_DAC_CHNS; CurChn ++)
 	{
@@ -628,6 +636,7 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 	SetDACState(0x80);	// also does WriteFMI(0x2B, 0x00);
 	if (TempEntry->Pan)
 		ym2612_fm_write(0x00, 0x01, 0xB6, TempEntry->Pan);
+#ifdef ENABLE_VGM_LOGGING
 	if (TempSmpl->UsageID < 0xFE)
 	{
 		vgm_write_stream_data_command(0x00, 0x02, FreqHz);
@@ -636,6 +645,7 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 		else
 			vgm_write_stream_data_command(0x00, 0x05, TempSmpl->UsageID);
 	}
+#endif
 	
 	return 0x00;
 }
@@ -683,8 +693,10 @@ void DAC_SetRate(UINT8 Chn, UINT32 Rate, UINT8 MidNote)
 			Rate = DACChn->DACTblPtr->Rate;
 	}
 	FreqHz = CalcDACFreq(DACChn->DACAlgo, Rate);
+#ifdef ENABLE_VGM_LOGGING
 	if (DACChn->DACSmplPtr->UsageID < 0xFE)
 		vgm_write_stream_data_command(0x00, 0x02, FreqHz);
+#endif
 	DACChn->DeltaFract = CalcDACDelta_Rate(DACChn->DACAlgo, Rate);
 	
 	return;
@@ -710,8 +722,10 @@ void DAC_SetFrequency(UINT8 Chn, UINT32 Freq, UINT8 MidNote)
 	}
 	else
 	{
+#ifdef ENABLE_VGM_LOGGING
 		if (DACChn->DACSmplPtr->UsageID < 0xFE)
 			vgm_write_stream_data_command(0x00, 0x02, Freq);
+#endif
 		DACChn->DeltaFract = CalcDACDelta_Hz(Freq);
 	}
 	

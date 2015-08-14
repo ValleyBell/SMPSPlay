@@ -18,9 +18,14 @@
 #include "Engine/dac.h"	// for DAC usage stuff
 
 
+#ifndef DISABLE_DEBUG_MSGS
 void ClearLine(void);			// from main.c
 
 extern UINT8 DebugMsgs;
+#else
+#define ClearLine()
+#define DebugMsgs	0
+#endif
 
 
 // Function Prototypes
@@ -36,11 +41,12 @@ INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET
 static void DuplicateInsTable(const INS_LIB* InsLibSrc, INS_LIB* InsLibDst);
 static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, const UINT8* FileData, UINT32 StartOfs);
 //UINT8 PreparseSMPSFile(SMPS_CFG* SmpsCfg);
+#ifdef ENABLE_VGM_LOGGING
 static void MarkDrumNote(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note);
 static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData);
 static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Bank, UINT8 Note);
 static void MarkDrumTrack(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData, UINT8 Mode);
-
+#endif
 //void FreeSMPSFile(SMPS_CFG* SmpsCfg);
 
 
@@ -218,7 +224,9 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	const CMD_LIB* CmdList;
 	const CMD_LIB* CmdMetaList;
 	const CMD_LIB* CmdLstCur;
+#ifdef ENABLE_VGM_LOGGING
 	DAC_CFG* DACDrv;	// can't be const, because I set the Usage counters
+#endif
 	UINT16 InsPtr;
 	UINT8 FMTrkCnt;
 	UINT8 PSGTrkCnt;
@@ -232,7 +240,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	UINT8 CurCmd;
 	UINT8 CmdLen;
 	UINT16 StackPtrs[0x08];
-	UINT16 LoopPtrs[0x08];
+	UINT16 LoopExitPtrs[0x08];
 	UINT16 StackPtrsE[0x08];	// GoSub Entry Pointer
 	UINT8 StackPos;
 	UINT8 LoopID;
@@ -246,7 +254,9 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		return 0xFF;
 	CmdList = &SmpsCfg->CmdList;
 	CmdMetaList = &SmpsCfg->CmdMetaList;
+#ifdef ENABLE_VGM_LOGGING
 	DACDrv = (DAC_CFG*)&SmpsCfg->DACDrv;
+#endif
 	
 	CurPos = 0x00;
 	InsPtr = ReadPtr(&FileData[CurPos + 0x00], SmpsSet);
@@ -310,19 +320,28 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		SmpsSet->InsLib.InsPtrs = NULL;
 	}
 	SmpsSet->UsageCounter = 0x01;
+#ifdef ENABLE_LOOP_DETECTION
 	SmpsSet->LoopPtrs = (SMPS_LOOPPTR*)malloc(TrkCount * sizeof(SMPS_LOOPPTR));
+#endif
 	
+#ifdef ENABLE_VGM_LOGGING
 	// reset DAC usage
 	for (TempOfs = 0x00; TempOfs < DACDrv->SmplCount; TempOfs ++)
 		DACDrv->Smpls[TempOfs].UsageID = 0xFF;
+#endif
 	
+	// Note: Preparsing the SMPS file is required, because it doesn't only detect
+	//       loops and enumerate DAC sounds - it also sets the correct SeqFlags.
+	//       (required for Sonic 1/2/3K Fade-In commands and Sonic 3K Continuous SFX)
 	SmpsSet->SeqFlags = 0x00;
 	
 	FileMask = (UINT8*)malloc(FileLen);
 	for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++)
 	{
 		CurPos = TrkOfs[CurTrk];
+#ifdef ENABLE_LOOP_DETECTION
 		SmpsSet->LoopPtrs[CurTrk].Ptr = 0x0000;
+#endif
 		if (CurPos >= FileLen)
 		{
 			if (DebugMsgs & 0x04)
@@ -343,7 +362,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		DACBank = 0xFF;
 		
 		memset(FileMask, 0x00, FileLen);
-		memset(LoopPtrs, 0x00, sizeof(UINT16) * 0x08);
+		memset(LoopExitPtrs, 0x00, sizeof(UINT16) * 0x08);
 		memset(StackPtrs, 0x00, sizeof(UINT16) * 0x08);
 		StackPos = 0x08;
 		TrkMode = PBKFLG_ACTIVE;
@@ -362,6 +381,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				}
 				else
 				{
+#ifdef ENABLE_VGM_LOGGING
 					if (IsDacTrk)
 					{
 						if (! (TrkMode & PBKFLG_SPCMODE))	// if not Phantasy Star IV
@@ -381,6 +401,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 							MarkDrum_DACNote(DACDrv, DACBank, 0x87);
 						}
 					}
+#endif
 					
 					CurPos ++;	// note
 					if (TrkMode & PBKFLG_PITCHSLIDE)
@@ -462,8 +483,10 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				UsageMask = (1 << (9 - StackPos)) - 1;
 				if (FileMask[CurPos] & UsageMask)
 				{
+#ifdef ENABLE_LOOP_DETECTION
 					SmpsSet->LoopPtrs[CurTrk].Ptr = CurPos;
 					SmpsSet->LoopPtrs[CurTrk].SrcOfs = OldPos;
+#endif
 					TrkMode = 0x00;
 					if (StackPos < 0x08 && (DebugMsgs & 0x04))
 					{
@@ -476,12 +499,12 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				break;
 			case CF_LOOP:
 				LoopID = FileData[CurPos + 0x01] & 0x07;
-				if (LoopPtrs[LoopID])
+				if (LoopExitPtrs[LoopID])
 				{
 					// a Loop Exit command was found, so process its data now
 					OldPos = CurPos;
-					CurPos = LoopPtrs[LoopID];
-					LoopPtrs[LoopID] = 0x0000;
+					CurPos = LoopExitPtrs[LoopID];
+					LoopExitPtrs[LoopID] = 0x0000;
 					CmdLen = 0x00;
 					if (CurPos >= FileLen)
 					{
@@ -499,8 +522,10 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 					UsageMask = (1 << (9 - StackPos)) - 1;
 					if (FileMask[CurPos] & UsageMask)
 					{
+#ifdef ENABLE_LOOP_DETECTION
 						SmpsSet->LoopPtrs[CurTrk].Ptr = CurPos;
 						SmpsSet->LoopPtrs[CurTrk].SrcOfs = OldPos;
+#endif
 						TrkMode = 0x00;
 					}
 				}
@@ -508,7 +533,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 			case CF_LOOP_EXIT:
 				LoopID = FileData[CurPos + 0x01] & 0x07;
 				TempOfs = CurPos + CmdLstCur->CmdData[CurCmd].JumpOfs;
-				LoopPtrs[LoopID] = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
+				LoopExitPtrs[LoopID] = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
 				break;
 			case CF_GOSUB:
 				if (! StackPos)
@@ -597,7 +622,9 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 						TrkMode &= ~PBKFLG_RAWFREQ;
 					break;
 				case CFS_PS4_SET_SND:
+#ifdef ENABLE_VGM_LOGGING
 					MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos + 0x01]);
+#endif
 					break;
 				}
 				break;
@@ -608,6 +635,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				DACBank = FileData[CurPos + 0x01];
 				break;
 			case CF_PLAY_DAC:
+#ifdef ENABLE_VGM_LOGGING
 				switch(CmdLen)
 				{
 				case 0x02:
@@ -625,6 +653,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 						printf("Unknown DAC command (Pos 0x%04X)\n", CurPos);
 					break;
 				}
+#endif
 				break;
 			case CF_PLAY_PWM:
 			case CF_DAC_CYMN:
@@ -655,6 +684,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	return 0x00;
 }
 
+#ifdef ENABLE_VGM_LOGGING
 static void MarkDrumNote(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note)
 {
 	if (Note < 0x80)
@@ -910,6 +940,7 @@ static void MarkDrumTrack(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_D
 	
 	return;
 }
+#endif	// ENABLE_VGM_LOGGING
 
 void FreeSMPSFile(SMPS_SET* SmpsSet)
 {
@@ -929,11 +960,13 @@ void FreeSMPSFile(SMPS_SET* SmpsSet)
 	free(SmpsSet->InsLib.InsPtrs);
 	SmpsSet->InsLib.InsPtrs = NULL;
 	
+#ifdef ENABLE_LOOP_DETECTION
 	if (SmpsSet->LoopPtrs != NULL)
 	{
 		free(SmpsSet->LoopPtrs);
 		SmpsSet->LoopPtrs = NULL;
 	}
+#endif
 	
 	return;
 }
