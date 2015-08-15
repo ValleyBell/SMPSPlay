@@ -13,10 +13,14 @@
 #include "chips/mamedef.h"
 #include "chips/2612intf.h"
 #include "chips/sn764intf.h"
+#ifndef DISABLE_NECPCM
 #include "chips/upd7759.h"
+#endif
 #include "Engine/smps.h"
 #include "Engine/dac.h"
+#ifndef DISABLE_NECPCM
 #include "Engine/necpcm.h"
+#endif
 #ifdef ENABLE_VGM_LOGGING
 #include "vgmwrite.h"
 #endif
@@ -61,7 +65,9 @@ typedef struct chip_audio_struct
 {
 	CAUD_ATTR SN76496;
 	CAUD_ATTR YM2612;
+#ifndef DISABLE_NECPCM
 	CAUD_ATTR uPD7759;
+#endif
 } CHIP_AUDIO;
 
 
@@ -201,12 +207,14 @@ UINT8 StartAudioOutput(void)
 	device_reset_sn764xx(0x00);
 	SetupResampler(CAA);
 	
+#ifndef DISABLE_NECPCM
 	CAA = &ChipAudio.uPD7759;
 	CAA->SmpRate = device_start_upd7759(0x00, 0x80000000 | (UPD7759_STANDARD_CLOCK * 2));
 	CAA->StreamUpdate = &upd7759_update;
 	CAA->Volume = 0x2B;	// ~0.33 * PSG according to Kega Fusion 3.64
 	device_reset_upd7759(0x00);
 	SetupResampler(CAA);
+#endif
 	
 	DeviceState = 0x01;
 	TimerExpired = 0xFF;
@@ -319,7 +327,9 @@ UINT8 StopAudioOutput(void)
 	
 	device_stop_ym2612(0x00);
 	device_stop_sn764xx(0x00);
+#ifndef DISABLE_NECPCM
 	device_stop_upd7759(0x00);
+#endif
 	DeviceState = 0x00;
 	
 	return 0x00;
@@ -739,7 +749,9 @@ static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 			TimerExpired = ym2612_r(0x00, 0x00) & TimerMask;
 		}
 		UpdateDAC(1);
+#ifndef DISABLE_NECPCM
 		UpdateNECPCM();
+#endif
 		
 		if (StoppedTimer != -1)
 		{
@@ -768,8 +780,10 @@ static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 		//	ResampleChipStream(CurChip, &TempBuf, 1);
 		ResampleChipStream(&ChipAudio.YM2612, &TempBuf, 1);
 		ResampleChipStream(&ChipAudio.SN76496, &TempBuf, 1);
+#ifndef DISABLE_NECPCM
 		if (! upd7759_busy_r(0x00))
 			ResampleChipStream(&ChipAudio.uPD7759, &TempBuf, 1);
+#endif
 		
 		// now done by the LimitXBit routines
 		//TempBuf.Left = TempBuf.Left >> VOL_SHIFT;

@@ -18,7 +18,9 @@
 #include "smps_int.h"
 #include "../Sound.h"
 #include "dac.h"
+#ifndef DISABLE_NECPCM
 #include "necpcm.h"
+#endif
 
 UINT8 ym2612_r(UINT8 ChipID, UINT32 offset);
 #define ReadFM()				ym2612_r(0x00, 0x00)
@@ -342,11 +344,13 @@ void UpdateMusic(void)
 	if (SmpsRAM.MusSet == NULL)
 		return;
 	
+#ifndef DISABLE_NECPCM
 	if (SmpsRAM.NecPcmOverride)
 	{
 		if (upd7759_busy_r(0x00))	// actually returns "ready"
 			SmpsRAM.NecPcmOverride = 0x00;	// PCM sound finished - remove PCM SFX lock
 	}
+#endif
 	
 	SmpsRAM.MusMultUpdate = 1;
 	DoTempo();
@@ -2192,7 +2196,9 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 	ResetYMTimerB();
 	
 	SetDACDriver((DAC_CFG*)&SmpsCfg->DACDrv);
+#ifndef DISABLE_NECPCM
 	SetNecPCMDriver((DAC_CFG*)&SmpsCfg->DACDrv);
+#endif
 	
 	DAC_ResetOverride();
 	
@@ -3051,7 +3057,9 @@ void StopAllSound(void)
 	
 	for (CurChn = 0; CurChn < 8; CurChn ++)
 		DAC_Stop(CurChn);
+#ifndef DISABLE_NECPCM
 	NECPCM_Stop();
+#endif
 	for (CurChn = 0; CurChn < 7; CurChn ++)
 	{
 		if ((CurChn & 0x03) == 0x03)
@@ -3318,7 +3326,9 @@ void RestoreMusic(MUS_STATE* MusState)
 	if (SmpsRAM.MusSet != NULL)
 	{
 		SetDACDriver((DAC_CFG*)&SmpsRAM.MusSet->Cfg->DACDrv);
+#ifndef DISABLE_NECPCM
 		SetNecPCMDriver((DAC_CFG*)&SmpsRAM.MusSet->Cfg->DACDrv);
+#endif
 		DAC_ResetOverride();
 	}
 	

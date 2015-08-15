@@ -27,7 +27,9 @@
 #include "Engine/smps_structs.h"
 #include "Engine/smps.h"
 #include "Engine/dac.h"
+#ifndef DISABLE_NECPCM
 #include "Engine/necpcm.h"
+#endif
 #ifdef ENABLE_VGM_LOGGING
 #include "vgmwrite.h"
 #endif
@@ -158,7 +160,9 @@ int main(int argc, char* argv[])
 	}
 	
 	DAC_Reset();
+#ifndef DISABLE_NECPCM
 	NECPCM_Reset();
+#endif
 	PALMode = false;
 	FrameDivider = PALMode ? 50 : 60;
 	

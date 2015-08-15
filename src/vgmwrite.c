@@ -428,7 +428,7 @@ static void vgm_header_clear(void)
 	UINT8 Padding[0x10];
 	UINT32 PaddBytes;
 	
-	if (! VgmFile.hFile)
+	if (VgmFile.hFile == NULL)
 		return;
 	
 	Header = &VgmFile.Header;
@@ -522,7 +522,7 @@ static void vgm_close(void)
 {
 	VGM_HEADER* Header;
 	
-	if (! VgmFile.hFile)
+	if (VgmFile.hFile == NULL)
 		return;
 	
 	Header = &VgmFile.Header;
@@ -647,7 +647,7 @@ void vgm_write(UINT8 chip_type, UINT8 port, UINT16 r, UINT8 v)
 	chip_id = ChipType2ID(chip_type);
 	if (chip_id == 0xFF)
 		return;
-	if (! VgmFile.hFile)
+	if (VgmFile.hFile == NULL)
 		return;
 	
 	if (! VgmChip[chip_id].HadWrite)
@@ -747,7 +747,7 @@ void vgm_write_large_data(UINT8 chip_type, UINT8 type, UINT32 datasize, UINT32 v
 	if (chip_id == 0xFF)
 		return;
 	
-	if (! VgmFile.hFile)
+	if (VgmFile.hFile == NULL)
 		return;
 	
 	vgm_write_delay();
@@ -961,7 +961,7 @@ void vgm_write_stream_data_command(UINT8 stream, UINT8 type, UINT32 data)
 
 void vgm_set_loop(UINT8 SetLoop)
 {
-	if (! VGM_Dumping || ! VgmFile.hFile)
+	if (! VGM_Dumping || VgmFile.hFile == NULL)
 		return;
 	
 	if (SetLoop)

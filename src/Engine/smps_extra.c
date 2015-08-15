@@ -19,10 +19,10 @@
 
 //void StartSignal(void);
 //void StopSignal(void);
+#ifdef ENABLE_LOOP_DETECTION
 static void LoopStartSignal(void);
 static void LoopEndSignal(void);
 
-#ifdef ENABLE_LOOP_DETECTION
 //void Extra_StopCheck(void);
 //void Extra_LoopStartCheck(TRK_RAM* Trk);
 //void Extra_LoopEndCheck(TRK_RAM* Trk);
@@ -79,8 +79,10 @@ void StartSignal(void)
 		DrumLib = &SmpsRAM.MusSet->Cfg->DrumLib;
 		for (CurIdx = 0; CurIdx < DrumLib->DrumCount; CurIdx ++)
 		{
+#ifndef DISABLE_NECPCM
 			if (DrumLib->DrumData[CurIdx].Type == DRMTYPE_NECPCM)
 				VgmChipMask |= VGM_CEN_PICOPCM;
+#endif
 		}
 	}
 	vgm_set_chip_enable(VgmChipMask);
@@ -105,6 +107,7 @@ void StopSignal(void)
 	return;
 }
 
+#ifdef ENABLE_LOOP_DETECTION
 static void LoopStartSignal(void)
 {
 #ifdef ENABLE_VGM_LOGGING
@@ -130,6 +133,7 @@ static void LoopEndSignal(void)
 	
 	return;
 }
+#endif	// ENABLE_LOOP_DETECTION
 
 
 void Extra_StopCheck(void)
