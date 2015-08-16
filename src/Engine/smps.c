@@ -36,9 +36,12 @@ extern UINT8 DebugMsgs;
 #define DebugMsgs	0
 #endif
 
+extern UINT32 SMPS_PlayingTimer;
+
+
 // from smps_extra.c
-void StartSignal(void);
-void StopSignal(void);
+void Extra_SongStart(UINT8 isRestore);
+void Extra_SongStop(UINT8 fromInit);
 #ifdef ENABLE_LOOP_DETECTION
 void Extra_LoopInit(void);
 void Extra_LoopStartCheck(TRK_RAM* Trk);
@@ -268,7 +271,6 @@ static void ResetYMTimerB(void)
 }
 
 
-extern UINT32 PlayingTimer;
 void UpdateAll(UINT8 Event)
 {
 	UINT8 TimerState;
@@ -329,8 +331,8 @@ void UpdateMusic(void)
 {
 	UINT8 CurTrk;
 	
-	if (PlayingTimer == -1)
-		PlayingTimer = 0;
+	if (SMPS_PlayingTimer == -1)
+		SMPS_PlayingTimer = 0;
 	
 	DoPause();
 	if (SmpsRAM.PauseMode)
@@ -2145,7 +2147,7 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 	TRK_RAM* TempTrk;
 	const SMPS_CFG_INIT* InitCfg;
 	
-	StopSignal();
+	Extra_SongStop(1);
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
@@ -2416,7 +2418,7 @@ void PlayMusic(SMPS_SET* SmpsFileSet)
 	}
 	CurPos += 0x06;
 	
-	StartSignal();
+	Extra_SongStart(0);
 	
 	TrkBase = 0x00;
 	// FM channels
@@ -3076,7 +3078,7 @@ void StopAllSound(void)
 	ResetSpcFM3Mode();
 	DAC_ResetOverride();
 	
-	StopSignal();
+	Extra_SongStop(0);
 	
 	CleanSmpsFiles();
 	return;
@@ -3282,6 +3284,7 @@ void RestoreMusic(MUS_STATE* MusState)
 	if (! MusState->InUse)
 		return;
 	
+	Extra_SongStop(1);
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
@@ -3312,6 +3315,8 @@ void RestoreMusic(MUS_STATE* MusState)
 	FreeSMPSFileRef_Zero(&MusState->MusSet);
 	MusState->InUse = 0x00;
 #endif
+	
+	Extra_SongStart(1);
 	
 	if (SmpsRAM.TimingMode == 0x00)
 		ym2612_timer_mask(0x00);	// no YM2612 Timer

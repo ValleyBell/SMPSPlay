@@ -33,10 +33,6 @@
 #endif
 
 
-// from main.c
-void FinishedSongSignal(void);
-
-
 typedef void (*strm_func)(UINT8 ChipID, stream_sample_t **outputs, int samples);
 
 typedef struct chip_audio_attributes CAUD_ATTR;
@@ -124,8 +120,10 @@ static UINT8 TimerMask;
 static UINT32 MuteChannelMaskYm2612 = 0;
 static UINT32 MuteChannelMaskSn76496 = 0;
 
-UINT32 PlayingTimer;
-INT32 StoppedTimer;
+volatile UINT32 SMPS_PlayingTimer;
+volatile INT32 SMPS_StoppedTimer;
+volatile INT32 SMPS_CountdownTimer;
+extern SMPS_CB_SIGNAL CB_Signal;
 
 static UINT32 GetAudioDriver(UINT8 Type, const char* PreferredDrv)
 {
@@ -219,8 +217,9 @@ UINT8 StartAudioOutput(void)
 	DeviceState = 0x01;
 	TimerExpired = 0xFF;
 	TimerMask = 0x03;
-	PlayingTimer = 0;
-	StoppedTimer = -1;
+	SMPS_PlayingTimer = 0;
+	SMPS_StoppedTimer = -1;
+	SMPS_CountdownTimer = 0;
 	
 	//SmplsPerFrame = SampleRate / 60;
 	SmplsTilFrame = 0;
@@ -753,25 +752,22 @@ static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 		UpdateNECPCM();
 #endif
 		
-		if (StoppedTimer != -1)
+		// count time and do VGM timing
+		if (SMPS_CountdownTimer)
 		{
-			StoppedTimer ++;
-			if (StoppedTimer == 2 * SampleRate)
-				FinishedSongSignal();
+			SMPS_CountdownTimer --;
+			if (! SMPS_CountdownTimer && CB_Signal != NULL)
+				CB_Signal();
+		}
+		if (SMPS_StoppedTimer != -1)
+			SMPS_StoppedTimer ++;
+		else if (SMPS_PlayingTimer != -1)
+			SMPS_PlayingTimer ++;
+		
 #ifdef ENABLE_VGM_LOGGING
+		if (SMPS_StoppedTimer != -1 || SMPS_PlayingTimer != -1)
 			vgm_update(1);
 #endif
-		}
-		else
-		{
-			if (PlayingTimer != -1)
-			{
-				PlayingTimer ++;
-#ifdef ENABLE_VGM_LOGGING
-				vgm_update(1);
-#endif
-			}
-		}
 		
 		TempBuf.Left = 0x00;
 		TempBuf.Right = 0x00;

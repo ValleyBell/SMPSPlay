@@ -671,8 +671,15 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				break;
 			case CF_FADE_IN_SONG:
 				if (CmdLstCur->CmdData[CurCmd].Len == 0x01)
+				{
 					TrkMode = 0x00;	// Sonic 1's Fade In command also terminates the song.
-				SmpsSet->SeqFlags |= SEQFLG_NEED_SAVE;
+					SmpsSet->SeqFlags |= SEQFLG_NEED_SAVE;
+				}
+				else if (FileData[CurPos + 0x01] == 0xFF)
+				{
+					// if not FF, the flag acts like CF_SET_COMM
+					SmpsSet->SeqFlags |= SEQFLG_NEED_SAVE;
+				}
 				break;
 			}
 			

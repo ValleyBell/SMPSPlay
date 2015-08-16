@@ -11,31 +11,37 @@
 #include <string.h>
 
 #include <stdtype.h>
+#include "smps.h"
 #include "smps_structs_int.h"
 #include "dac.h"
 #ifdef ENABLE_VGM_LOGGING
 #include "../vgmwrite.h"
 #endif
 
-//void StartSignal(void);
-//void StopSignal(void);
+void Extra_SongStart(UINT8 isRestore);
+void Extra_SongStop(UINT8 fromInit);
 #ifdef ENABLE_LOOP_DETECTION
 static void LoopStartSignal(void);
 static void LoopEndSignal(void);
 
-//void Extra_StopCheck(void);
-//void Extra_LoopStartCheck(TRK_RAM* Trk);
-//void Extra_LoopEndCheck(TRK_RAM* Trk);
+void Extra_StopCheck(void);
+void Extra_LoopStartCheck(TRK_RAM* Trk);
+void Extra_LoopEndCheck(TRK_RAM* Trk);
 #endif
 #ifdef ENABLE_VGM_LOGGING
 static void DumpDACSounds(DAC_CFG* DACDrv);
 #endif
 
-void FinishedSongSignal(void);	// from main.c
 
-extern UINT32 PlayingTimer;
-INT32 LoopCntr;
-extern INT32 StoppedTimer;
+extern volatile UINT32 SMPS_PlayingTimer;
+volatile INT32 SMPS_LoopCntr;
+extern volatile INT32 SMPS_StoppedTimer;
+
+static SMPS_CB_SIGNAL CB_Start = NULL;
+static SMPS_CB_SIGNAL CB_Stop = NULL;
+static SMPS_CB_SIGNAL CB_Loop = NULL;
+SMPS_CB_SIGNAL CB_Signal = NULL;	// not static due to being used by Sound.c
+SMPS_CB_SIGNAL CB_CommVar = NULL;
 
 #ifdef ENABLE_VGM_LOGGING
 extern UINT8 VGM_DataBlkCompress;
@@ -55,7 +61,38 @@ static struct loop_state
 #endif
 
 
-void StartSignal(void)
+void SMPSExtra_SetCallbacks(UINT8 cbType, SMPS_CB_SIGNAL cbFunc)
+{
+	switch(cbType)
+	{
+	case SMPSCB_START:
+		CB_Start = cbFunc;
+		break;
+	case SMPSCB_STOP:
+		CB_Stop = cbFunc;
+		break;
+	case SMPSCB_LOOP:
+		CB_Loop = cbFunc;
+		break;
+	case SMPSCB_CNTDOWN:
+		CB_Signal = cbFunc;
+		break;
+	case SMPSCB_COMM_VAR:
+		CB_CommVar = cbFunc;
+		break;
+	case SMPSCB_OFF:
+		CB_Start = NULL;
+		CB_Stop = NULL;
+		CB_Loop = NULL;
+		CB_Signal = NULL;
+		CB_CommVar = NULL;
+		break;
+	}
+	
+	return;
+}
+
+void Extra_SongStart(UINT8 isRestore)
 {
 #ifdef ENABLE_VGM_LOGGING
 	const DRUM_LIB* DrumLib;
@@ -63,9 +100,16 @@ void StartSignal(void)
 	UINT8 VgmChipMask;
 #endif
 	
-	PlayingTimer = -1;
-	LoopCntr = 0;
-	StoppedTimer = -1;
+	SMPS_LoopCntr = 0;
+	SMPS_StoppedTimer = -1;
+	if (isRestore)
+	{
+		SMPS_PlayingTimer = 0;	// we're already within the initial frame
+		return;	// no callback, no VGM starting when restoring from saves
+	}
+	SMPS_PlayingTimer = -1;
+	if (CB_Start != NULL)
+		CB_Start();
 	
 #ifdef ENABLE_VGM_LOGGING
 	VgmChipMask = 0x00;
@@ -95,14 +139,19 @@ void StartSignal(void)
 	return;
 }
 
-void StopSignal(void)
+void Extra_SongStop(UINT8 fromInit)
 {
 #ifdef ENABLE_VGM_LOGGING
 	vgm_set_loop(0);
 	vgm_dump_stop();
 #endif
-	LoopCntr = -1;
-	StoppedTimer = 0;
+	SMPS_LoopCntr = -1;
+	SMPS_StoppedTimer = 0;
+	if (fromInit)
+		return;
+	
+	if (CB_Stop != NULL && SmpsRAM.MusSet != NULL)
+		CB_Stop();
 	
 	return;
 }
@@ -115,7 +164,9 @@ static void LoopStartSignal(void)
 		vgm_set_loop(1);
 #endif
 	
-	LoopCntr = 1;
+	if (CB_Loop != NULL)
+		CB_Loop();
+	SMPS_LoopCntr = 1;
 	
 	return;
 }
@@ -127,9 +178,9 @@ static void LoopEndSignal(void)
 		vgm_dump_stop();
 #endif
 	
-	if (LoopCntr >= 2)
-		FinishedSongSignal();
-	LoopCntr ++;
+	if (CB_Loop != NULL)
+		CB_Loop();
+	SMPS_LoopCntr ++;
 	
 	return;
 }
@@ -152,7 +203,7 @@ void Extra_StopCheck(void)
 	}
 	
 	if (! TrkMask)
-		StopSignal();
+		Extra_SongStop(0x00);
 	
 	return;
 }

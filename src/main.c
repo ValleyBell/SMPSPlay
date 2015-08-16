@@ -44,10 +44,14 @@ static UINT32 GetFileData(const char* FileName, UINT8** RetBuffer);
 void ClearLine(void);
 void DisplayFileID(int FileID);
 void RedrawStatusLine(void);
-void ReDisplayFileID(int FileID);
+static void ReDisplayFileID(int FileID);
 static void WaitTimeForKey(unsigned int MSec);
 static void WaitForKey(void);
-void FinishedSongSignal(void);
+static void FinishedSongSignal(void);
+static void SmpsStopSignal(void);
+static void SmpsLoopSignal(void);
+static void SmpsCountdownSignal(void);
+static void CommVarChangeCallback(void);
 
 
 typedef struct _file_name
@@ -69,9 +73,10 @@ static bool CondVarChg;
 
 extern UINT32 SampleRate;	// from Sound.c
 extern UINT16 FrameDivider;
-extern UINT32 PlayingTimer;
-extern INT32 LoopCntr;
-extern INT32 StoppedTimer;
+extern volatile UINT32 SMPS_PlayingTimer;
+extern volatile INT32 SMPS_LoopCntr;
+extern volatile INT32 SMPS_StoppedTimer;
+extern volatile INT32 SMPS_CountdownTimer;
 
 bool PauseMode;
 bool PALMode;
@@ -174,11 +179,17 @@ int main(int argc, char* argv[])
 		goto FinishProgram;
 	
 	InitDriver();
+	//SMPSExtra_SetCallbacks(SMPSCB_START, NULL);
+	SMPSExtra_SetCallbacks(SMPSCB_STOP, &SmpsStopSignal);
+	SMPSExtra_SetCallbacks(SMPSCB_LOOP, &SmpsLoopSignal);
+	SMPSExtra_SetCallbacks(SMPSCB_CNTDOWN, &SmpsCountdownSignal);
+	SMPSExtra_SetCallbacks(SMPSCB_COMM_VAR, &CommVarChangeCallback);
 	CommunicationVar = SmpsGetVariable(SMPSVAR_COMMUNICATION);
 	CondJumpVar = SmpsGetVariable(SMPSVAR_CONDIT_JUMP);
-	PlayingTimer = 0;
-	LoopCntr = -1;
-	StoppedTimer = -1;
+	SMPS_PlayingTimer = 0;
+	SMPS_LoopCntr = -1;
+	SMPS_StoppedTimer = -1;
+	SMPS_CountdownTimer = 0;
 	CondVarChg = false;
 	GoToNextSong = false;
 	ExitWait = 0;
@@ -278,7 +289,7 @@ int main(int argc, char* argv[])
 				vgm_dump_stop();
 #endif
 				
-				PlayingTimer = 0;
+				SMPS_PlayingTimer = 0;
 				smps_playing = -1;
 				
 				InitSmpsFile(&LastSmpsCfg, NewSeqLen, NewSeqData, NewSmpsEDef);
@@ -299,6 +310,7 @@ int main(int argc, char* argv[])
 #endif
 					PlayMusic(&LastSmpsCfg);
 					smps_playing = cursor;
+					SMPS_CountdownTimer = 0;
 				}
 				else
 				{
@@ -323,6 +335,7 @@ int main(int argc, char* argv[])
 			ThreadSync(1);
 			StopAllSound();
 			ThreadSync(0);
+			SMPS_CountdownTimer = 0;
 			break;
 #ifdef ENABLE_VGM_LOGGING
 		case 'V':
@@ -610,7 +623,7 @@ void RedrawStatusLine(void)
 	return;
 }
 
-void ReDisplayFileID(int FileID)
+static void ReDisplayFileID(int FileID)
 {
 	char TempBuf[0x20];	// maximum is 0x18 chars (for 2 loop digits) + '\0' (without Z80 offset)
 	char* TempPnt;
@@ -635,7 +648,7 @@ void ReDisplayFileID(int FileID)
 		TempPnt = TempBuf + strlen(TempBuf);
 		strcpy(TempPnt, " (");	TempPnt += 0x02;
 		
-		PbTime = PlayingTimer;
+		PbTime = SMPS_PlayingTimer;
 		if (PbTime == -1)
 			PbTime = 0;
 		Rest = PbTime % SampleRate;
@@ -650,7 +663,7 @@ void ReDisplayFileID(int FileID)
 		Min = (UINT16)(Rest / 60);
 		
 		TempPnt += sprintf(TempPnt, "%02u:%02u.%02u", Min, Sec, DSec);
-		if (LoopCntr == -1)
+		if (SMPS_LoopCntr == -1)
 		{
 			NewLineState = 0x00;
 			TempPnt += sprintf(TempPnt, " %s", "finished");
@@ -659,8 +672,8 @@ void ReDisplayFileID(int FileID)
 		{
 			NewLineState = PauseMode ? 0x02 : 0x01;
 			TempPnt += sprintf(TempPnt, " %s", PauseMode ? "paused" : "playing");
-			if (LoopCntr > 0)
-				TempPnt += sprintf(TempPnt, " L %d", LoopCntr);
+			if (SMPS_LoopCntr > 0)
+				TempPnt += sprintf(TempPnt, " L %d", SMPS_LoopCntr);
 		}
 		strcpy(TempPnt, ")");	TempPnt += 0x01;
 	}
@@ -711,7 +724,7 @@ static void WaitForKey(void)
 	return;
 }
 
-void FinishedSongSignal(void)
+static void FinishedSongSignal(void)
 {
 	if (AutoProgress)
 	{
@@ -722,7 +735,30 @@ void FinishedSongSignal(void)
 	return;
 }
 
-void CommVarChangeCallback(void)
+static void SmpsStopSignal(void)
+{
+	if (SMPS_StoppedTimer == -1 || smps_playing == -1)
+		return;
+	
+	SMPS_CountdownTimer = 2 * SampleRate;
+	return;
+}
+
+static void SmpsLoopSignal(void)
+{
+	if (SMPS_LoopCntr >= 2)
+		FinishedSongSignal();
+	return;
+}
+
+static void SmpsCountdownSignal(void)
+{
+	if (SMPS_StoppedTimer > 0)
+		FinishedSongSignal();
+	return;
+}
+
+static void CommVarChangeCallback(void)
 {
 	CondVarChg = true;
 	ExitWait ++;

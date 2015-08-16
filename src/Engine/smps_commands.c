@@ -20,8 +20,6 @@
 #define WritePSG(Data)			sn76496_psg_write(0x00, Data)
 
 
-void CommVarChangeCallback(void);	// from main.c
-
 #ifndef DISABLE_DEBUG_MSGS
 void ClearLine(void);				// from main.c
 extern UINT8 DebugMsgs;
@@ -32,6 +30,7 @@ extern UINT8 DebugMsgs;
 
 
 extern SND_RAM SmpsRAM;
+extern SMPS_CB_SIGNAL CB_CommVar;
 
 static const UINT8 AlgoOutMask[0x08] =
 	{0x08, 0x08, 0x08, 0x08, 0x0C, 0x0E, 0x0E, 0x0F};
@@ -254,7 +253,8 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		break;
 	case CF_SET_COMM:	// E2 Set Communication Byte
 		SmpsRAM.CommData = Data[0x00];
-		CommVarChangeCallback();
+		if (CB_CommVar != NULL)
+			CB_CommVar();
 		break;
 	case CF_VOL_QUICK:
 		Data --;
@@ -1242,14 +1242,19 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		}
 		else
 		{
+			SmpsRAM.CommData = Data[0x00];	// do the actual behaviour first
+			
 			// Sonic 3K: sets the Communication Byte to FF to tell the driver that the previous
 			// song has to be restored.
-			if (Data[0x00] == 0xFF)
+			if (SmpsRAM.CommData == 0xFF)
 			{
 				SmpsRAM.LoadSaveRequest = 0x01;
+				SmpsRAM.CommData = 0x00;
 				SmpsRAM.FadeIn.Steps = SmpsCfg->FadeIn.Steps | 0x80;
 				SmpsRAM.FadeIn.DlyInit = SmpsCfg->FadeIn.Delay;
 			}
+			if (CB_CommVar != NULL)
+				CB_CommVar();
 		}
 		break;
 	case CF_SND_OFF:
