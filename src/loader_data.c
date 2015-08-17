@@ -519,6 +519,7 @@ UINT8 LoadEnvelopeData(const char* FileName, ENV_LIB* EnvLib)
 			fclose(hFile);
 			return 0x01;
 		}
+		TempEnv->alloc = 0x00;
 		TempEnv->Len = (UINT8)RetVal;
 		TempEnv->Data = (UINT8*)malloc(TempEnv->Len);
 		fread(TempEnv->Data, 0x01, TempEnv->Len, hFile);
@@ -638,6 +639,7 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		BaseOfs = InsOfs;
 	fseek(hFile, BaseOfs, SEEK_SET);
 	
+	DrumLib->File.alloc = 0x01;
 	DrumLib->File.Len = FileLen - BaseOfs;
 	DrumLib->File.Data = (UINT8*)malloc(DrumLib->File.Len);
 	fread(DrumLib->File.Data, 0x01, DrumLib->File.Len, hFile);
@@ -833,6 +835,7 @@ static UINT8 LoadSimpleInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* 
 	UINT16 CurIns;
 	UINT16 CurPos;
 	
+	SmpsCfg->GblIns.alloc = 0x01;
 	SmpsCfg->GblIns.Len = FileLen;
 	SmpsCfg->GblIns.Data = FileData;
 	InsCount = FileLen / SmpsCfg->InsRegCnt;
@@ -871,6 +874,7 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 	if (! InsOfs)
 		return 0xC1;	// invalid drum offset
 	
+	SmpsCfg->GblIns.alloc = 0x01;
 	SmpsCfg->GblIns.Len = FileLen;
 	SmpsCfg->GblIns.Data = FileData;
 	SmpsCfg->GblInsLib.InsCount = InsCount;
@@ -912,12 +916,16 @@ void FreeGlobalInstrumentLib(SMPS_CFG* SmpsCfg)
 
 void FreeFileData(FILE_DATA* File)
 {
+	if (! File->alloc)
+		return;
+	
 	File->Len = 0x00;
 	if (File->Data != NULL)
 	{
 		free(File->Data);
 		File->Data = NULL;
 	}
+	File->alloc = 0x00;
 	
 	return;
 }

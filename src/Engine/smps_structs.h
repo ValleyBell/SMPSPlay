@@ -6,6 +6,7 @@
 
 typedef struct _file_data
 {
+	UINT8 alloc;	// 0 - don't touch Data pointer, 1 - free automatically
 	UINT16 Len;
 	UINT8* Data;
 } FILE_DATA;

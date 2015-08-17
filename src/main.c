@@ -477,6 +477,7 @@ static void InitSmpsFile(SMPS_SET* SmpsFile, UINT32 FileLen, UINT8* FileData, co
 	for (; CurChr < 4; CurChr ++)
 		SmpsFile->CfgExtFCC[CurChr] = '\0';
 	
+	SmpsFile->Seq.alloc = 0x01;
 	SmpsFile->Seq.Len = (FileLen < 0x10000) ? FileLen : 0xFFFF;
 	SmpsFile->Seq.Data = FileData;
 	SmpsFile->SeqBase = 0x0000;

@@ -11,11 +11,13 @@
 #endif
 
 #include <common_def.h>
-#include "loader.h"
+//#include "loader.h"
 #include "Engine/smps_structs.h"
 #include "Engine/smps_structs_int.h"	// for PBKFLG_* defines
 #include "Engine/smps_commands.h"
 #include "Engine/dac.h"	// for DAC usage stuff
+
+void FreeFileData(FILE_DATA* File);
 
 
 #ifndef DISABLE_DEBUG_MSGS
