@@ -89,13 +89,19 @@ static void YM2612_Callback(void *param, int irq);
 #define CLOCK_YM2612	7670454
 #define CLOCK_SN76496	3579545
 
+#ifdef DISABLE_NECPCM
 #define CHIP_COUNT		0x02
+#else
+#define CHIP_COUNT		0x03
+#endif
 
-#define VOL_SHIFT		7	// shift X bits to the right after mixing everything together
+//#define VOL_SHIFT		7	// shift X bits to the right after mixing everything together
+#define VOL_SHIFT		10	// 7 [main shift] + (8-5) [OutputVolume post-shift]
 
 extern CONFIG_DATA Config;
 static AUDIO_OPTS* audOpts;
 UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
+INT32 OutputVolume = 0x100;
 
 UINT8 ResampleMode;	// 00 - HQ both, 01 - LQ downsampling, 02 - LQ both
 UINT8 CHIP_SAMPLING_MODE;
@@ -112,7 +118,6 @@ static void* audDrv;
 static void* audDrvLog;
 
 static UINT8 TimerExpired;
-static UINT8 SndLogEnable = 0x00;
 UINT16 FrameDivider = 60;
 //static UINT32 SmplsPerFrame;
 static UINT32 SmplsTilFrame;
@@ -175,6 +180,8 @@ UINT8 StartAudioOutput(void)
 	SampleRate = 44100;	// used by some chips as output sample rate
 	if (Config.SamplePerSec)
 		SampleRate = Config.SamplePerSec;
+	if (Config.Volume > 0.0f)
+		OutputVolume = (INT32)(Config.Volume * 0x100 + 0.5f);
 	
 	for (CurChip = 0x00; CurChip < CHIP_COUNT; CurChip ++)
 	{
@@ -426,26 +433,26 @@ static void SetupResampler(CAUD_ATTR* CAA)
 INLINE UINT8 Limit8Bit(INT32 Value)
 {
 	INT32 NewValue;
-
+	
 	// divide by (8 + VOL_SHIFT) with proper rounding
 	Value += (0x80 << VOL_SHIFT);	// add rounding term (1 << (8 + VOL_SHIFT)) / 2
 	NewValue = Value >> (8 + VOL_SHIFT);
 	if (NewValue < -0x80)
 		NewValue = -0x80;
-	if (NewValue > +0x7F)
+	else if (NewValue > +0x7F)
 		NewValue = +0x7F;
-
+	
 	return (UINT8)(0x80 + NewValue);	// return unsigned 8-bit
 }
 
 INLINE INT16 Limit16Bit(INT32 Value)
 {
 	INT32 NewValue;
-
+	
 	NewValue = Value >> VOL_SHIFT;
 	if (NewValue < -0x8000)
 		NewValue = -0x8000;
-	if (NewValue > +0x7FFF)
+	else if (NewValue > +0x7FFF)
 		NewValue = +0x7FFF;
 
 	return (INT16)NewValue;
@@ -455,10 +462,14 @@ INLINE INT32 Limit24Bit(INT32 Value)
 {
 	INT32 NewValue;
 	
+#if (VOL_SHIFT < 8)
 	NewValue = (Value << 8 >> VOL_SHIFT) + (Value >> (8 + VOL_SHIFT));
+#else
+	NewValue = (Value >> (VOL_SHIFT - 8)) + (Value >> (8 + VOL_SHIFT));
+#endif
 	if (NewValue < -0x800000)
 		NewValue = -0x800000;
-	if (NewValue > +0x7FFFFF)
+	else if (NewValue > +0x7FFFFF)
 		NewValue = +0x7FFFFF;
 	return NewValue;
 }
@@ -471,12 +482,12 @@ INLINE INT32 Limit32Bit(INT32 Value)
 #ifndef _MSC_VER
 	if (NewValue < -0x80000000LL)
 		NewValue = -0x80000000LL;
-	if (NewValue > +0x7FFFFFFFLL)
+	else if (NewValue > +0x7FFFFFFFLL)
 		NewValue = +0x7FFFFFFFLL;
 #else	// fallback for MS VC++ 6.0
 	if (NewValue < -0x80000000i64)
 		NewValue = -0x80000000i64;
-	if (NewValue > +0x7FFFFFFFi64)
+	else if (NewValue > +0x7FFFFFFFi64)
 		NewValue = +0x7FFFFFFFi64;
 #endif
 	return (INT32)NewValue;
@@ -781,6 +792,8 @@ static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 			ResampleChipStream(&ChipAudio.uPD7759, &TempBuf, 1);
 #endif
 		
+		TempBuf.Left = (TempBuf.Left >> 5) * OutputVolume;
+		TempBuf.Right = (TempBuf.Right >> 5) * OutputVolume;
 		// now done by the LimitXBit routines
 		//TempBuf.Left = TempBuf.Left >> VOL_SHIFT;
 		//TempBuf.Right = TempBuf.Right >> VOL_SHIFT;

@@ -223,6 +223,8 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 				CfgData->SamplePerSec = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "BitsPerSample"))
 				CfgData->BitsPerSample = (UINT8)strtoul(RToken1, NULL, 0);
+			else if (! stricmp(LToken, "Volume"))
+				CfgData->Volume = (float)strtod(RToken1, NULL);
 			else if (! stricmp(LToken, "AudioAPI"))
 				strdup_free(&CfgData->AudAPIName, RToken1);
 			else if (! stricmp(LToken, "AudioDevice"))

@@ -72,6 +72,7 @@ static bool GoToNextSong;
 static bool CondVarChg;
 
 extern UINT32 SampleRate;	// from Sound.c
+extern INT32 OutputVolume;
 extern UINT16 FrameDivider;
 extern volatile UINT32 SMPS_PlayingTimer;
 extern volatile INT32 SMPS_LoopCntr;

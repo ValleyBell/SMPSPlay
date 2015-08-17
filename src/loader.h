@@ -56,6 +56,7 @@ typedef struct _config_data
 	UINT8 LogWave;
 	UINT8 BitsPerSample;
 	UINT32 SamplePerSec;
+	float Volume;
 	UINT32 AudioBufs;
 	UINT32 AudioBufSize;
 	UINT32 AudAPIDev;

@@ -2165,7 +2165,8 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 	SmpsRAM.NoiseDrmVol = 0x00;
 	ResetSpcFM3Mode();
 	SmpsRAM.FadeOut.Steps = 0x00;
-	SmpsRAM.FadeIn.Steps = 0x00;
+	if (SmpsRAM.FadeIn.Steps)
+		SmpsRAM.FadeIn.Steps |= 0x80;	// allow for proper FadeIn when playing a new song
 	SmpsRAM.ModData = NULL;
 	
 	InitCfg = &SmpsCfg->InitCfg;
@@ -3378,6 +3379,8 @@ UINT8* SmpsGetVariable(UINT8 Type)
 		return &SmpsRAM.CommData;
 	case SMPSVAR_CONDIT_JUMP:
 		return &SmpsRAM.CondJmpVal;
+	case SMPSVAR_RESTORE_REQ:
+		return &SmpsRAM.LoadSaveRequest;
 	}
 	return NULL;
 }

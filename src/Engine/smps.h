@@ -26,6 +26,7 @@ UINT8 SmpsIsRunning(void);
 
 #define SMPSVAR_COMMUNICATION	0x00
 #define SMPSVAR_CONDIT_JUMP		0x01
+#define SMPSVAR_RESTORE_REQ		0x02
 UINT8* SmpsGetVariable(UINT8 Type);
 
 
