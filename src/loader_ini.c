@@ -383,37 +383,37 @@ static void LoadExtData_Single(SMPS_EXT_DEF* ExtDef)
 	}
 	if (ExtDef->ModEnvFile != NULL)
 	{
-		RetVal = LoadEnvelopeData(ExtDef->ModEnvFile, &SmpsCfg->ModEnvs);
+		RetVal = LoadEnvelopeData_File(ExtDef->ModEnvFile, &SmpsCfg->ModEnvs);
 		if (RetVal)
 			printf("Error loading %s %s: Code 0x%02X\n", "Modulation", "Envelopes", RetVal);
 	}
 	if (ExtDef->VolEnvFile != NULL)
 	{
-		RetVal = LoadEnvelopeData(ExtDef->VolEnvFile, &SmpsCfg->VolEnvs);
+		RetVal = LoadEnvelopeData_File(ExtDef->VolEnvFile, &SmpsCfg->VolEnvs);
 		if (RetVal)
 			printf("Error loading %s %s: Code 0x%02X\n", "Volume", "Envelopes", RetVal);
 	}
 	if (ExtDef->PanAniFile != NULL)
 	{
-		RetVal = LoadPanAniData(ExtDef->PanAniFile, &SmpsCfg->PanAnims);
+		RetVal = LoadPanAniData_File(ExtDef->PanAniFile, &SmpsCfg->PanAnims);
 		if (RetVal)
 			printf("Error loading %s: Code 0x%02X\n", "Pan Animation", RetVal);
 	}
 	if (ExtDef->FMDrmFile != NULL)
 	{
-		RetVal = LoadDrumTracks(ExtDef->FMDrmFile, &SmpsCfg->FMDrums, 0x01);
+		RetVal = LoadDrumTracks_File(ExtDef->FMDrmFile, &SmpsCfg->FMDrums, 0x01);
 		if (RetVal)
 			printf("Error loading %s %s: Code 0x%02X\n", "FM", "Drums", RetVal);
 	}
 	if (ExtDef->PSGDrmFile != NULL)
 	{
-		RetVal = LoadDrumTracks(ExtDef->PSGDrmFile, &SmpsCfg->PSGDrums, 0x00);
+		RetVal = LoadDrumTracks_File(ExtDef->PSGDrmFile, &SmpsCfg->PSGDrums, 0x00);
 		if (RetVal)
 			printf("Error loading %s %s: Code 0x%02X\n", "PSG", "Drums", RetVal);
 	}
 	if (ExtDef->GlbInsLibFile != NULL)
 	{
-		RetVal = LoadGlobalInstrumentLib(ExtDef->GlbInsLibFile, SmpsCfg);
+		RetVal = LoadGlobalInstrumentLib_File(ExtDef->GlbInsLibFile, SmpsCfg);
 		if (RetVal)
 			printf("Error loading %s: Code 0x%02X\n", "Instrument Library", RetVal);
 	}

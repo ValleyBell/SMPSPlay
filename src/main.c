@@ -379,14 +379,9 @@ int main(int argc, char* argv[])
 			break;
 		case 'R':
 			/*ThreadSync(1);
-			FreeDACData();
-			FreeFlutterData();
-			FreeGlobalInsSet();
+			FreeAll();
 			
 			LoadINIFile("data\\config.ini");
-			LoadFlutterData(IniPath[0x00]);
-			LoadDACData(IniPath[0x01]);
-			LoadGlobalInsSet(IniPath[0x02]);
 			ThreadSync(0);
 			
 			ClearLine();

@@ -40,16 +40,21 @@ typedef struct _dac_new_smpl
 static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, const DAC_NSMPL* SmplData);
 static UINT8 GetDACAlgoID(const DAC_SETTINGS* DACCfg, const DAC_NSMPL* SmplData);
 //void FreeDACData(DAC_CFG* DACDrv);
-//UINT8 LoadEnvelopeData(const char* FileName, ENV_LIB* EnvLib);
+//UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib);
+//UINT8 LoadEnvelopeData_Mem(UINT32 FileLen, const UINT8* FileData, ENV_LIB* EnvLib);
 //void FreeEnvelopeData(ENV_LIB* EnvLib);
-//UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode);
+//UINT8 LoadDrumTracks_File(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode);
+//UINT8 LoadDrumTracks_Mem(UINT32 FileLen, const UINT8* FileData, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode);
 //UINT8 FreeDrumTracks(DRUM_TRK_LIB* DrumLib)
-//UINT8 LoadPanAniData(const char* FileName, PAN_ANI_LIB* PAniLib);
+//UINT8 LoadPanAniData_File(const char* FileName, PAN_ANI_LIB* PAniLib);
+//UINT8 LoadPanAniData_Mem(UINT32 FileLen, const UINT8* FileData, PAN_ANI_LIB* PAniLib);
 //void FreePanAniData(PAN_ANI_LIB* PAniLib);
-//UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg);
+//UINT8 LoadGlobalInstrumentLib_File(const char* FileName, SMPS_CFG* SmpsCfg);
+//UINT8 LoadGlobalInstrumentLib_Mem(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg);
 static UINT8 LoadSimpleInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg);
 static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg);
 //void FreeGlobalInstrumentLib(SMPS_CFG* SmpsCfg);
+//void FreeFileData(FILE_DATA* File);
 INLINE UINT16 ReadLE16(const UINT8* Data);
 INLINE UINT16 ReadBE16(const UINT8* Data);
 INLINE UINT16 ReadPtr16(const UINT8* Data, const UINT8 Flags);
@@ -408,7 +413,7 @@ static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, 
 	
 	fseek(hFile, 0x00, SEEK_SET);
 	TempSmpl->Data = (UINT8*)malloc(TempSmpl->Size);
-	fread(TempSmpl->Data, 0x01, TempSmpl->Size, hFile);
+	TempSmpl->Size = fread(TempSmpl->Data, 0x01, TempSmpl->Size, hFile);
 	
 	fclose(hFile);
 	
@@ -470,62 +475,82 @@ void FreeDACData(DAC_CFG* DACDrv)
 
 
 // ---- Envelope Files ----
-UINT8 LoadEnvelopeData(const char* FileName, ENV_LIB* EnvLib)
+UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib)
 {
 	FILE* hFile;
-	UINT8 CurEnv;
-	char TempStr[0x07];
-	int RetVal;
-	ENV_DATA* TempEnv;
+	UINT32 FileLen;
+	UINT8* FileData;
+	UINT8 FileHdr[0x10];
+	UINT32 ReadBytes;
+	UINT8 RetVal;
 	
 	hFile = fopen(FileName, "rb");
 	if (hFile == NULL)
 		return 0xFF;
 	
-	fread(TempStr, 0x01, 0x07, hFile);
-	if (memcmp(TempStr, SIG_ENV, 0x07))
+	fseek(hFile, 0x00, SEEK_END);
+	FileLen = ftell(hFile);
+	
+	fseek(hFile, 0x00, SEEK_SET);
+	ReadBytes = (UINT32)fread(FileHdr, 0x01, 0x10, hFile);
+	if (ReadBytes < 0x08 || memcmp(FileHdr, SIG_ENV, 0x07))
 	{
 		fclose(hFile);
 		return 0x80;	// invalid file
 	}
 	
-	RetVal = fgetc(hFile);
-	if (RetVal == EOF)
-	{
-		fclose(hFile);
+	FileData = (UINT8*)malloc(FileLen);
+	memcpy(&FileData[0x00], FileHdr, ReadBytes);
+	FileLen = ReadBytes + fread(&FileData[ReadBytes], 0x01, FileLen - ReadBytes, hFile);
+	
+	fclose(hFile);
+	
+	RetVal = LoadEnvelopeData_Mem(FileLen, FileData, EnvLib);
+	free(FileData);
+	
+	return RetVal;
+}
+
+UINT8 LoadEnvelopeData_Mem(UINT32 FileLen, const UINT8* FileData, ENV_LIB* EnvLib)
+{
+	UINT8 CurEnv;
+	UINT32 NameLen;
+	UINT32 CurPos;
+	ENV_DATA* TempEnv;
+	
+	if (memcmp(&FileData[0x00], SIG_ENV, 0x07))
 		return 0x80;	// invalid file
-	}
-	EnvLib->EnvCount = (UINT8)RetVal;
+	
+	if (FileLen < 0x08)
+		return 0x80;
+	EnvLib->EnvCount = FileData[0x07];
 	EnvLib->EnvData = (ENV_DATA*)malloc(EnvLib->EnvCount * sizeof(ENV_DATA));
+	CurPos = 0x08;
 	for (CurEnv = 0x00; CurEnv < EnvLib->EnvCount; CurEnv ++)
 	{
 		TempEnv = &EnvLib->EnvData[CurEnv];
-		RetVal = fgetc(hFile);
-		if (RetVal == EOF)
-		{
-			EnvLib->EnvCount = CurEnv;
-			fclose(hFile);
-			return 0x01;
-		}
-		//TempEnv->Name = (char*)malloc(RetVal + 1);
-		//fread(TempEnv->Name, 0x01, RetVal, hFile);
-		//TempEnv->Name[TempByt] = '\0';
-		fseek(hFile, RetVal, SEEK_CUR);
+		if (CurPos < FileLen)
+			NameLen = FileData[CurPos];
+		else
+			NameLen = 0;
+		CurPos ++;
+		//TempEnv->Name = (char*)malloc(NameLen + 1);
+		//fread(TempEnv->Name, 0x01, NameLen, hFile);
+		//TempEnv->Name[NameLen] = '\0';
+		CurPos += NameLen;
 		
-		RetVal = fgetc(hFile);
-		if (RetVal == EOF)
+		if (CurPos >= FileLen)
 		{
 			EnvLib->EnvCount = CurEnv;
-			fclose(hFile);
 			return 0x01;
 		}
 		TempEnv->alloc = 0x00;
-		TempEnv->Len = (UINT8)RetVal;
+		TempEnv->Len = FileData[CurPos];
+		CurPos ++;
 		TempEnv->Data = (UINT8*)malloc(TempEnv->Len);
-		fread(TempEnv->Data, 0x01, TempEnv->Len, hFile);
+		memcpy(TempEnv->Data, &FileData[CurPos], TempEnv->Len);
+		CurPos += TempEnv->Len;
 	}
-	
-	fclose(hFile);
 	
 	return 0x00;
 }
@@ -554,21 +579,14 @@ void FreeEnvelopeData(ENV_LIB* EnvLib)
 
 
 // ---- FM/PSG SMPS Drum Tracks ----
-UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode)
+UINT8 LoadDrumTracks_File(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode)
 {
 	FILE* hFile;
 	UINT32 FileLen;
+	UINT8* FileData;
 	UINT8 FileHdr[0x10];
 	UINT32 ReadBytes;
-	UINT8 Flags;
-	UINT8 InsCount;
-	UINT16 DrumOfs;
-	UINT16 InsOfs;
-	UINT16 InsBaseOfs;
-	UINT16 BaseOfs;
-	UINT8 CurItm;
-	UINT16 CurPos;
-	UINT16 TempOfs;
+	UINT8 RetVal;
 	
 	hFile = fopen(FileName, "rb");
 	if (hFile == NULL)
@@ -585,20 +603,43 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		return 0x80;	// invalid file
 	}
 	
+	FileData = (UINT8*)malloc(FileLen);
+	memcpy(&FileData[0x00], FileHdr, ReadBytes);
+	FileLen = ReadBytes + fread(&FileData[ReadBytes], 0x01, FileLen - ReadBytes, hFile);
+	
+	fclose(hFile);
+	
+	RetVal = LoadDrumTracks_Mem(FileLen, FileData, DrumLib, DrumMode);
+	free(FileData);
+	
+	return RetVal;
+}
+
+UINT8 LoadDrumTracks_Mem(UINT32 FileLen, const UINT8* FileData, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode)
+{
+	const UINT8* FileHdr;
+	UINT8 Flags;
+	UINT8 InsCount;
+	UINT16 DrumOfs;
+	UINT16 InsOfs;
+	UINT16 InsBaseOfs;
+	UINT16 BaseOfs;
+	UINT8 CurItm;
+	UINT16 CurPos;
+	UINT16 TempOfs;
+	
+	FileHdr = &FileData[0x00];
+	if (FileLen < 0x05 || memcmp(FileHdr, SIG_DRUM, 0x04))
+		return 0x80;	// invalid file
+	
 	Flags = FileHdr[0x04];
 	if ((Flags & 0x0F) != DrumMode)
-	{
-		fclose(hFile);
 		return 0xC0;	// wrong drum mode
-	}
 	switch(DrumMode)
 	{
 	case 0x00:	// PSG drums (without Instrument lib.)
-		if (ReadBytes < 0x0A)
-		{
-			fclose(hFile);
+		if (FileLen < 0x0A)
 			return 0x80;	// invalid file
-		}
 		DrumLib->DrumCount = FileHdr[0x05];
 		DrumOfs = ReadPtr16(&FileHdr[0x06], Flags);
 		DrumLib->DrumBase = ReadPtr16(&FileHdr[0x08], Flags);
@@ -607,11 +648,8 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		InsOfs = 0x0000;
 		break;
 	case 0x01:	// FM drums (with Instrument lib.)
-		if (ReadBytes < 0x10)
-		{
-			fclose(hFile);
+		if (FileLen < 0x10)
 			return 0x80;	// invalid file
-		}
 		DrumLib->DrumCount = FileHdr[0x05];
 		DrumOfs = ReadPtr16(&FileHdr[0x06], Flags);
 		DrumLib->DrumBase = ReadPtr16(&FileHdr[0x08], Flags);
@@ -622,10 +660,7 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 		break;
 	}
 	if (! DrumOfs)
-	{
-		fclose(hFile);
 		return 0xC1;	// invalid drum offset
-	}
 	
 	if (! (Flags & 0x10))
 		DrumLib->SmpsPtrFmt = PTRFMT_Z80;
@@ -637,14 +672,11 @@ UINT8 LoadDrumTracks(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode
 	BaseOfs = DrumOfs;
 	if (InsOfs && InsOfs < BaseOfs)
 		BaseOfs = InsOfs;
-	fseek(hFile, BaseOfs, SEEK_SET);
 	
 	DrumLib->File.alloc = 0x01;
 	DrumLib->File.Len = FileLen - BaseOfs;
 	DrumLib->File.Data = (UINT8*)malloc(DrumLib->File.Len);
-	fread(DrumLib->File.Data, 0x01, DrumLib->File.Len, hFile);
-	
-	fclose(hFile);
+	memcpy(DrumLib->File.Data, &FileData[BaseOfs], DrumLib->File.Len);
 	
 	DrumLib->DrumList = (UINT16*)malloc(DrumLib->DrumCount * sizeof(UINT16));
 	CurPos = DrumOfs - BaseOfs;
@@ -703,17 +735,14 @@ void FreeDrumTracks(DRUM_TRK_LIB* DrumLib)
 
 
 // ---- Pan Animation Data ----
-UINT8 LoadPanAniData(const char* FileName, PAN_ANI_LIB* PAniLib)
+UINT8 LoadPanAniData_File(const char* FileName, PAN_ANI_LIB* PAniLib)
 {
 	FILE* hFile;
 	UINT32 FileLen;
-	UINT8 FileHdr[0x10];
+	UINT8* FileData;
 	UINT32 ReadBytes;
-	UINT16 AniOfs;
-	UINT8 Flags;
-	UINT8 CurItm;
-	UINT16 CurPos;
-	UINT16 PtrSize;
+	UINT8 FileHdr[0x10];
+	UINT8 RetVal;
 	
 	hFile = fopen(FileName, "rb");
 	if (hFile == NULL)
@@ -730,30 +759,44 @@ UINT8 LoadPanAniData(const char* FileName, PAN_ANI_LIB* PAniLib)
 		return 0x80;	// invalid file
 	}
 	
+	FileData = (UINT8*)malloc(FileLen);
+	memcpy(&FileData[0x00], FileHdr, ReadBytes);
+	FileLen = ReadBytes + fread(&FileData[ReadBytes], 0x01, FileLen - ReadBytes, hFile);
+	
+	fclose(hFile);
+	
+	RetVal = LoadPanAniData_Mem(FileLen, FileData, PAniLib);
+	free(FileData);
+	
+	return RetVal;
+}
+
+UINT8 LoadPanAniData_Mem(UINT32 FileLen, const UINT8* FileData, PAN_ANI_LIB* PAniLib)
+{
+	const UINT8* FileHdr;
+	UINT16 AniOfs;
+	UINT8 Flags;
+	UINT8 CurItm;
+	UINT16 CurPos;
+	UINT16 PtrSize;
+	
+	FileHdr = &FileData[0x00];
+	if (FileLen < 0x05 || memcmp(FileData, SIG_PANI, 0x04))
+		return 0x80;	// invalid file
+	
 	Flags = FileHdr[0x04];
 	if ((Flags & ~0x30) != 0x00)
-	{
-		fclose(hFile);
 		return 0xC0;	// wrong mode
-	}
 	PtrSize = (Flags & 0x20) ? 0x04 : 0x02;
 	PAniLib->AniCount = FileHdr[0x05];
 	AniOfs = ReadLE16(&FileHdr[0x06]);
 	PAniLib->AniBase = ReadPtr16(&FileHdr[0x08], Flags);
-	
 	if (! AniOfs)
-	{
-		fclose(hFile);
-		return 0xC1;	// invalid drum offset
-	}
-	
-	fseek(hFile, AniOfs, SEEK_SET);
+		return 0xC1;	// invalid pan animation offset
 	
 	PAniLib->DataLen = FileLen - AniOfs;
 	PAniLib->Data = (UINT8*)malloc(PAniLib->DataLen);
-	fread(PAniLib->Data, 0x01, PAniLib->DataLen, hFile);
-	
-	fclose(hFile);
+	memcpy(PAniLib->Data, &FileData[AniOfs], PAniLib->DataLen);
 	
 	PAniLib->AniList = (UINT16*)malloc(PAniLib->AniCount * sizeof(UINT16));
 	if (! (Flags & 0x10))
@@ -789,7 +832,7 @@ void FreePanAniData(PAN_ANI_LIB* PAniLib)
 }
 
 
-UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg)
+UINT8 LoadGlobalInstrumentLib_File(const char* FileName, SMPS_CFG* SmpsCfg)
 {
 	FILE* hFile;
 	UINT32 FileLen;
@@ -812,7 +855,7 @@ UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg)
 	
 	FileData = (UINT8*)malloc(FileLen);
 	fseek(hFile, 0x00, SEEK_SET);
-	fread(FileData, 0x01, FileLen, hFile);
+	FileLen = fread(FileData, 0x01, FileLen, hFile);
 	
 	fclose(hFile);
 	
@@ -825,8 +868,24 @@ UINT8 LoadGlobalInstrumentLib(const char* FileName, SMPS_CFG* SmpsCfg)
 		RetVal = LoadSimpleInstrumentLib(FileLen, FileData, SmpsCfg);
 		RetVal = SmpsOffsetFromFilename(FileName, &SmpsCfg->GblInsBase);
 	}
+	SmpsCfg->GblIns.alloc = 0x01;	// make it free the data when unloading
 	
-	return 0x00;
+	return RetVal;
+}
+
+UINT8 LoadGlobalInstrumentLib_Mem(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg)
+{
+	UINT8 RetVal;
+	
+	if (FileLen < 0x10)
+		return 0xFF;	// empty file == no file
+	
+	if (! memcmp(&FileData[0x00], SIG_INS, 0x04))
+		RetVal = LoadAdvancedInstrumentLib(FileLen, FileData, SmpsCfg);
+	else
+		RetVal = LoadSimpleInstrumentLib(FileLen, FileData, SmpsCfg);
+	
+	return RetVal;
 }
 
 static UINT8 LoadSimpleInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg)
@@ -835,8 +894,10 @@ static UINT8 LoadSimpleInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* 
 	UINT16 CurIns;
 	UINT16 CurPos;
 	
-	SmpsCfg->GblIns.alloc = 0x01;
-	SmpsCfg->GblIns.Len = FileLen;
+	if (FileLen > 0xFFFF)
+		FileLen = 0xFFFF;
+	SmpsCfg->GblIns.alloc = 0x00;
+	SmpsCfg->GblIns.Len = (UINT16)FileLen;
 	SmpsCfg->GblIns.Data = FileData;
 	InsCount = FileLen / SmpsCfg->InsRegCnt;
 	SmpsCfg->GblInsLib.InsCount = InsCount;
@@ -874,8 +935,10 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 	if (! InsOfs)
 		return 0xC1;	// invalid drum offset
 	
-	SmpsCfg->GblIns.alloc = 0x01;
-	SmpsCfg->GblIns.Len = FileLen;
+	if (FileLen > 0xFFFF)
+		FileLen = 0xFFFF;
+	SmpsCfg->GblIns.alloc = 0x00;
+	SmpsCfg->GblIns.Len = (UINT16)FileLen;
 	SmpsCfg->GblIns.Data = FileData;
 	SmpsCfg->GblInsLib.InsCount = InsCount;
 	SmpsCfg->GblInsLib.InsPtrs = NULL;
@@ -913,6 +976,7 @@ void FreeGlobalInstrumentLib(SMPS_CFG* SmpsCfg)
 	
 	return;
 }
+
 
 void FreeFileData(FILE_DATA* File)
 {
