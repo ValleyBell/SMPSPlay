@@ -2155,7 +2155,7 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 		DoNoteOff(TempTrk);
 		DisableSSGEG(TempTrk);
 		
-		if (TempTrk->SmpsSet != NULL && (TempTrk->PlaybkFlags & PBKFLG_ACTIVE))
+		if (TempTrk->SmpsSet != NULL)
 			TempTrk->SmpsSet->UsageCounter --;
 		TempTrk->PlaybkFlags = 0x00;
 		TempTrk->SmpsSet = NULL;
@@ -3269,7 +3269,7 @@ void BackupMusic(MUS_STATE* MusState)
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
 		TempTrk = &MusState->MusicTrks[CurTrk];
-		if (TempTrk->SmpsSet != NULL && (TempTrk->PlaybkFlags & PBKFLG_ACTIVE))
+		if (TempTrk->SmpsSet != NULL)
 			TempTrk->SmpsSet->UsageCounter ++;
 	}
 	MusState->InUse = 0x01;
@@ -3341,7 +3341,7 @@ void RestoreMusic(MUS_STATE* MusState)
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
 		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
-		if (TempTrk->SmpsSet != NULL && (TempTrk->PlaybkFlags & PBKFLG_ACTIVE))
+		if (TempTrk->SmpsSet != NULL)
 			TempTrk->SmpsSet->UsageCounter ++;
 		TempTrk->PlaybkFlags |= PBKFLG_ATREST;
 		RestoreBGMChannel(TempTrk);
