@@ -40,6 +40,8 @@ typedef struct _dac_new_smpl
 static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, const DAC_NSMPL* SmplData);
 static UINT8 GetDACAlgoID(const DAC_SETTINGS* DACCfg, const DAC_NSMPL* SmplData);
 //void FreeDACData(DAC_CFG* DACDrv);
+static UINT8 LoadFileData(const char* FileName, UINT32* RetFileLen, UINT8** RetFileData,
+						  UINT16 MinSize, UINT16 SigLen, const void* SigStr);
 //UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib);
 //UINT8 LoadEnvelopeData_Mem(UINT32 FileLen, const UINT8* FileData, ENV_LIB* EnvLib);
 //void FreeEnvelopeData(ENV_LIB* EnvLib);
@@ -474,15 +476,17 @@ void FreeDACData(DAC_CFG* DACDrv)
 }
 
 
-// ---- Envelope Files ----
-UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib)
+static UINT8 LoadFileData(const char* FileName, UINT32* RetFileLen, UINT8** RetFileData,
+						  UINT16 MinSize, UINT16 SigLen, const void* SigStr)
 {
 	FILE* hFile;
-	UINT32 FileLen;
+	size_t FileLen;
 	UINT8* FileData;
 	UINT8 FileHdr[0x10];
-	UINT32 ReadBytes;
-	UINT8 RetVal;
+	size_t ReadBytes;
+	
+	if (MinSize > 0x10 || SigLen > MinSize)
+		return 0xCC;	// invalid usage
 	
 	hFile = fopen(FileName, "rb");
 	if (hFile == NULL)
@@ -492,11 +496,19 @@ UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib)
 	FileLen = ftell(hFile);
 	
 	fseek(hFile, 0x00, SEEK_SET);
-	ReadBytes = (UINT32)fread(FileHdr, 0x01, 0x10, hFile);
-	if (ReadBytes < 0x08 || memcmp(FileHdr, SIG_ENV, 0x07))
+	ReadBytes = fread(FileHdr, 0x01, MinSize, hFile);
+	if (SigStr != NULL)
+	{
+		if (ReadBytes < (size_t)SigLen || memcmp(FileHdr, SigStr, SigLen))
+		{
+			fclose(hFile);
+			return 0x80;	// invalid file signature
+		}
+	}
+	if (ReadBytes < (size_t)MinSize)
 	{
 		fclose(hFile);
-		return 0x80;	// invalid file
+		return 0x81;	// file too small
 	}
 	
 	FileData = (UINT8*)malloc(FileLen);
@@ -504,6 +516,22 @@ UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib)
 	FileLen = ReadBytes + fread(&FileData[ReadBytes], 0x01, FileLen - ReadBytes, hFile);
 	
 	fclose(hFile);
+	
+	*RetFileLen = (UINT32)FileLen;
+	*RetFileData = FileData;
+	return 0x00;
+}
+
+// ---- Envelope Files ----
+UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib)
+{
+	UINT32 FileLen;
+	UINT8* FileData;
+	UINT8 RetVal;
+	
+	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x08, sizeof(SIG_ENV), SIG_ENV);
+	if (RetVal)
+		return RetVal;
 	
 	RetVal = LoadEnvelopeData_Mem(FileLen, FileData, EnvLib);
 	free(FileData);
@@ -581,33 +609,13 @@ void FreeEnvelopeData(ENV_LIB* EnvLib)
 // ---- FM/PSG SMPS Drum Tracks ----
 UINT8 LoadDrumTracks_File(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode)
 {
-	FILE* hFile;
 	UINT32 FileLen;
 	UINT8* FileData;
-	UINT8 FileHdr[0x10];
-	UINT32 ReadBytes;
 	UINT8 RetVal;
 	
-	hFile = fopen(FileName, "rb");
-	if (hFile == NULL)
-		return 0xFF;
-	
-	fseek(hFile, 0x00, SEEK_END);
-	FileLen = ftell(hFile);
-	
-	fseek(hFile, 0x00, SEEK_SET);
-	ReadBytes = (UINT32)fread(FileHdr, 0x01, 0x10, hFile);
-	if (ReadBytes < 0x05 || memcmp(FileHdr, SIG_DRUM, 0x04))
-	{
-		fclose(hFile);
-		return 0x80;	// invalid file
-	}
-	
-	FileData = (UINT8*)malloc(FileLen);
-	memcpy(&FileData[0x00], FileHdr, ReadBytes);
-	FileLen = ReadBytes + fread(&FileData[ReadBytes], 0x01, FileLen - ReadBytes, hFile);
-	
-	fclose(hFile);
+	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x05, sizeof(SIG_DRUM), SIG_DRUM);
+	if (RetVal)
+		return RetVal;
 	
 	RetVal = LoadDrumTracks_Mem(FileLen, FileData, DrumLib, DrumMode);
 	free(FileData);
@@ -737,33 +745,13 @@ void FreeDrumTracks(DRUM_TRK_LIB* DrumLib)
 // ---- Pan Animation Data ----
 UINT8 LoadPanAniData_File(const char* FileName, PAN_ANI_LIB* PAniLib)
 {
-	FILE* hFile;
 	UINT32 FileLen;
 	UINT8* FileData;
-	UINT32 ReadBytes;
-	UINT8 FileHdr[0x10];
 	UINT8 RetVal;
 	
-	hFile = fopen(FileName, "rb");
-	if (hFile == NULL)
-		return 0xFF;
-	
-	fseek(hFile, 0x00, SEEK_END);
-	FileLen = ftell(hFile);
-	
-	fseek(hFile, 0x00, SEEK_SET);
-	ReadBytes = (UINT32)fread(FileHdr, 0x01, 0x10, hFile);
-	if (ReadBytes < 0x05 || memcmp(FileHdr, SIG_PANI, 0x04))
-	{
-		fclose(hFile);
-		return 0x80;	// invalid file
-	}
-	
-	FileData = (UINT8*)malloc(FileLen);
-	memcpy(&FileData[0x00], FileHdr, ReadBytes);
-	FileLen = ReadBytes + fread(&FileData[ReadBytes], 0x01, FileLen - ReadBytes, hFile);
-	
-	fclose(hFile);
+	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x05, sizeof(SIG_PANI), SIG_PANI);
+	if (RetVal)
+		return RetVal;
 	
 	RetVal = LoadPanAniData_Mem(FileLen, FileData, PAniLib);
 	free(FileData);
@@ -834,30 +822,19 @@ void FreePanAniData(PAN_ANI_LIB* PAniLib)
 
 UINT8 LoadGlobalInstrumentLib_File(const char* FileName, SMPS_CFG* SmpsCfg)
 {
-	FILE* hFile;
 	UINT32 FileLen;
 	UINT8* FileData;
 	UINT8 RetVal;
 	
-	hFile = fopen(FileName, "rb");
-	if (hFile == NULL)
-		return 0xFF;
+	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x10, 0, NULL);
+	if (RetVal)
+		return RetVal;
 	
-	fseek(hFile, 0x00, SEEK_END);
-	FileLen = ftell(hFile);
-	if (FileLen < 0x10)
-	{
-		fclose(hFile);	// empty file == no file
-		return 0xFF;
-	}
 	if (FileLen > 0x4000)
+	{
 		FileLen = 0x4000;	// This is enough for 315 instruments with register-data interleaving.
-	
-	FileData = (UINT8*)malloc(FileLen);
-	fseek(hFile, 0x00, SEEK_SET);
-	FileLen = fread(FileData, 0x01, FileLen, hFile);
-	
-	fclose(hFile);
+		FileData = (UINT8*)realloc(FileData, FileLen);
+	}
 	
 	if (! memcmp(&FileData[0x00], SIG_INS, 0x04))
 	{
@@ -866,7 +843,7 @@ UINT8 LoadGlobalInstrumentLib_File(const char* FileName, SMPS_CFG* SmpsCfg)
 	else
 	{
 		RetVal = LoadSimpleInstrumentLib(FileLen, FileData, SmpsCfg);
-		RetVal = SmpsOffsetFromFilename(FileName, &SmpsCfg->GblInsBase);
+		SmpsOffsetFromFilename(FileName, &SmpsCfg->GblInsBase);
 	}
 	SmpsCfg->GblIns.alloc = 0x01;	// make it free the data when unloading
 	
