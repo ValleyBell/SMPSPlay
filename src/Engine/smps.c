@@ -2824,7 +2824,9 @@ static void DoFade(UINT8 FadeMode)
 				else
 					TempTrk->Volume += FadeCfg->AddFM * Fade->Steps;
 			}
-			Fade->DlyCntr = 1;	// enforce volume refresh
+			
+			// enforce volume refresh
+			Fade->DlyCntr = (SmpsCfg->FadeMode == FADEMODE_68K) ? 0 : 1;
 		}
 	}
 	

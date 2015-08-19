@@ -11,7 +11,9 @@
 #endif
 
 #include <common_def.h>
+#ifndef DISABLE_DLOAD_FILE
 #include "ini_lib.h"
+#endif
 #include "Engine/smps_structs.h"
 #include "Engine/dac.h"
 #include "loader_data.h"
@@ -36,13 +38,19 @@ typedef struct _dac_new_smpl
 	UINT8* DPCMData;
 } DAC_NSMPL;
 
+
 // Function Prototypes
+#ifndef DISABLE_DLOAD_FILE
 //void LoadDACData(const char* FileName, DAC_CFG* DACDrv);
 static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, const DAC_NSMPL* SmplData);
 static UINT8 GetDACAlgoID(const DAC_SETTINGS* DACCfg, const DAC_NSMPL* SmplData);
+#endif
 //void FreeDACData(DAC_CFG* DACDrv);
+
+#ifndef DISABLE_DLOAD_FILE
 static UINT8 LoadFileData(const char* FileName, UINT32* RetFileLen, UINT8** RetFileData,
 						  UINT16 MinSize, UINT16 SigLen, const void* SigStr);
+#endif
 //UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib);
 //UINT8 LoadEnvelopeData_Mem(UINT32 FileLen, const UINT8* FileData, ENV_LIB* EnvLib);
 //void FreeEnvelopeData(ENV_LIB* EnvLib);
@@ -64,6 +72,7 @@ INLINE UINT16 ReadPtr16(const UINT8* Data, const UINT8 Flags);
 
 
 // ---- DAC Files ---
+#ifndef DISABLE_DLOAD_FILE
 void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 {
 	FILE* hFile;
@@ -429,7 +438,7 @@ static UINT8 GetDACAlgoID(const DAC_SETTINGS* DACCfg, const DAC_NSMPL* SmplData)
 	
 	if (SmplData->Algo < 0xFF)
 		return SmplData->Algo;
-
+	
 	for (CurAlgo = 0x00; CurAlgo < DACCfg->AlgoCount; CurAlgo ++)
 	{
 		if (DACCfg->Algos[CurAlgo].DefCompr == SmplData->Compr)
@@ -439,6 +448,7 @@ static UINT8 GetDACAlgoID(const DAC_SETTINGS* DACCfg, const DAC_NSMPL* SmplData)
 	}
 	return 0x00;
 }
+#endif	// DISABLE_DLOAD_FILE
 
 void FreeDACData(DAC_CFG* DACDrv)
 {
@@ -477,6 +487,7 @@ void FreeDACData(DAC_CFG* DACDrv)
 }
 
 
+#ifndef DISABLE_DLOAD_FILE
 static UINT8 LoadFileData(const char* FileName, UINT32* RetFileLen, UINT8** RetFileData,
 						  UINT16 MinSize, UINT16 SigLen, const void* SigStr)
 {
@@ -539,6 +550,7 @@ UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib)
 	
 	return RetVal;
 }
+#endif	// DISABLE_DLOAD_FILE
 
 UINT8 LoadEnvelopeData_Mem(UINT32 FileLen, const UINT8* FileData, ENV_LIB* EnvLib)
 {
@@ -608,6 +620,7 @@ void FreeEnvelopeData(ENV_LIB* EnvLib)
 
 
 // ---- FM/PSG SMPS Drum Tracks ----
+#ifndef DISABLE_DLOAD_FILE
 UINT8 LoadDrumTracks_File(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode)
 {
 	UINT32 FileLen;
@@ -623,6 +636,7 @@ UINT8 LoadDrumTracks_File(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 Dru
 	
 	return RetVal;
 }
+#endif	// DISABLE_DLOAD_FILE
 
 UINT8 LoadDrumTracks_Mem(UINT32 FileLen, const UINT8* FileData, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode)
 {
@@ -744,6 +758,7 @@ void FreeDrumTracks(DRUM_TRK_LIB* DrumLib)
 
 
 // ---- Pan Animation Data ----
+#ifndef DISABLE_DLOAD_FILE
 UINT8 LoadPanAniData_File(const char* FileName, PAN_ANI_LIB* PAniLib)
 {
 	UINT32 FileLen;
@@ -759,6 +774,7 @@ UINT8 LoadPanAniData_File(const char* FileName, PAN_ANI_LIB* PAniLib)
 	
 	return RetVal;
 }
+#endif	// DISABLE_DLOAD_FILE
 
 UINT8 LoadPanAniData_Mem(UINT32 FileLen, const UINT8* FileData, PAN_ANI_LIB* PAniLib)
 {
@@ -821,6 +837,7 @@ void FreePanAniData(PAN_ANI_LIB* PAniLib)
 }
 
 
+#ifndef DISABLE_DLOAD_FILE
 UINT8 LoadGlobalInstrumentLib_File(const char* FileName, SMPS_CFG* SmpsCfg)
 {
 	UINT32 FileLen;
@@ -850,6 +867,7 @@ UINT8 LoadGlobalInstrumentLib_File(const char* FileName, SMPS_CFG* SmpsCfg)
 	
 	return RetVal;
 }
+#endif	// DISABLE_DLOAD_FILE
 
 UINT8 LoadGlobalInstrumentLib_Mem(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg)
 {
