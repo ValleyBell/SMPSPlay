@@ -9,6 +9,12 @@
 #include <stdtype.h>
 #include "ini_lib.h"
 
+#ifdef _MSC_VER
+#define stricmp		_stricmp
+#else
+#define stricmp		strcasecmp
+#endif
+
 UINT8 GetTextLine(UINT32 BufSize, char* Buffer, FILE* hFile)
 {
 	char* TempPtr;
@@ -284,9 +290,9 @@ UINT32 ParseNumber(char* Token, char** NextToken, char** RetParseEnd)
 
 UINT8 GetBoolValue(const char* Token, const char* StrTrue, const char* StrFalse)
 {
-	if (! _stricmp(Token, StrTrue))
+	if (! stricmp(Token, StrTrue))
 		return 1;
-	else if (! _stricmp(Token, StrFalse))
+	else if (! stricmp(Token, StrFalse))
 		return 0;
 	else
 		return strtol(Token, NULL, 0) ? 1 : 0;

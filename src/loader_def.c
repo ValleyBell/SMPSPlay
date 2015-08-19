@@ -16,6 +16,13 @@
 #include "Engine/smps_commands.h"
 #include "loader_def.h"
 
+#ifdef _MSC_VER
+#define stricmp		_stricmp
+#else
+#define stricmp		strcasecmp
+#endif
+
+
 typedef struct _option_list
 {
 	const char* Text;
@@ -440,7 +447,7 @@ static UINT8 GetOptionValue(const OPT_LIST* OptList, const char* ValueStr)
 	CurOpt = OptList;
 	while(CurOpt->Text != NULL)
 	{
-		if (! _stricmp(CurOpt->Text, ValueStr))
+		if (! stricmp(CurOpt->Text, ValueStr))
 			return CurOpt->Value;
 		
 		CurOpt ++;
@@ -491,11 +498,11 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 		if (*LToken == '[')
 		{
 			// [Section]
-			if (! _stricmp(RToken1, "Main"))
+			if (! stricmp(RToken1, "Main"))
 				Group = 0x00;
-			else if (! _stricmp(RToken1, "EnvelopeCmds"))
+			else if (! stricmp(RToken1, "EnvelopeCmds"))
 				Group = 0x10;
-			else if (! _stricmp(RToken1, "Settings"))
+			else if (! stricmp(RToken1, "Settings"))
 				Group = 0x20;
 			else
 				Group = 0xFF;
@@ -505,11 +512,11 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 		RToken2 = TrimToken(RToken1);
 		if (Group == 0x00)	// [Main] group
 		{
-			if (! _stricmp(LToken, "PtrFmt"))
+			if (! stricmp(LToken, "PtrFmt"))
 				SmpsCfg->PtrFmt = GetOptionValue(OPT_PTRFMT, RToken1);
-			else if (! _stricmp(LToken, "InsMode"))
+			else if (! stricmp(LToken, "InsMode"))
 				SmpsCfg->InsMode = GetOptionValue(OPT_INSMODE, RToken1);
-			else if (! _stricmp(LToken, "InsRegs"))
+			else if (! stricmp(LToken, "InsRegs"))
 			{
 				RevertTokenTrim(RToken1, RToken2);
 				if (CstRegList != NULL)
@@ -518,7 +525,7 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				}
 				CstRegCnt = (UINT8)ReadHexData(RToken1, &CstRegList);
 			}
-			else if (! _stricmp(LToken, "FMChnOrder"))
+			else if (! stricmp(LToken, "FMChnOrder"))
 			{
 				UINT32 ChnCount;
 				UINT8* ChnIDs;
@@ -554,7 +561,7 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				
 				free(ChnIDs);
 			}
-			else if (! _stricmp(LToken, "AddChnOrder"))
+			else if (! stricmp(LToken, "AddChnOrder"))
 			{
 				UINT32 ChnCount;
 				UINT8* ChnIDs;
@@ -570,31 +577,31 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				
 				free(ChnIDs);
 			}
-			else if (! _stricmp(LToken, "TempoMode"))
+			else if (! stricmp(LToken, "TempoMode"))
 				SmpsCfg->TempoMode = GetOptionValue(OPT_TEMPOMODE, RToken1);
-			else if (! _stricmp(LToken, "Tempo1Tick"))
+			else if (! stricmp(LToken, "Tempo1Tick"))
 				SmpsCfg->Tempo1Tick = GetOptionValue(OPT_TEMP1TICK, RToken1);
-			else if (! _stricmp(LToken, "FMBaseNote"))
+			else if (! stricmp(LToken, "FMBaseNote"))
 				SmpsCfg->FMBaseNote = GetBaseNote(OPT_FMBASENOTE, RToken1);
-			else if (! _stricmp(LToken, "FMBaseOctave"))
+			else if (! stricmp(LToken, "FMBaseOctave"))
 				SmpsCfg->FMBaseOct = strtoul(RToken1, NULL, 0) & 7;
-			else if (! _stricmp(LToken, "PSGBaseNote"))
+			else if (! stricmp(LToken, "PSGBaseNote"))
 				SmpsCfg->PSGBaseNote = GetBaseNote(OPT_PSGBASENOTE, RToken1);
-			else if (! _stricmp(LToken, "DelayFreq"))
+			else if (! stricmp(LToken, "DelayFreq"))
 				SmpsCfg->DelayFreq = GetOptionValue(OPT_DELAYFREQ, RToken1);
-			else if (! _stricmp(LToken, "NoteOnPrevent"))
+			else if (! stricmp(LToken, "NoteOnPrevent"))
 				SmpsCfg->NoteOnPrevent = GetOptionValue(OPT_NONPREVENT, RToken1);
-			else if (! _stricmp(LToken, "DetuneOctWrap"))
+			else if (! stricmp(LToken, "DetuneOctWrap"))
 				SmpsCfg->FMOctWrap = GetBoolValue(RToken1, "True", "False");
-			else if (! _stricmp(LToken, "FM6DACOff"))
+			else if (! stricmp(LToken, "FM6DACOff"))
 				SmpsCfg->FM6DACOff = GetBoolValue(RToken1, "True", "False");
-			else if (! _stricmp(LToken, "ModAlgo"))
+			else if (! stricmp(LToken, "ModAlgo"))
 				SmpsCfg->ModAlgo = GetOptionValue(OPT_MODALGO, RToken1);
-			else if (! _stricmp(LToken, "EnvMult"))
+			else if (! stricmp(LToken, "EnvMult"))
 				SmpsCfg->EnvMult = GetOptionValue(OPT_ENVMULT, RToken1);
-			else if (! _stricmp(LToken, "VolMode"))
+			else if (! stricmp(LToken, "VolMode"))
 				SmpsCfg->VolMode = GetOptionValue(OPT_VOLMODE, RToken1);
-			else if (! _stricmp(LToken, "FMFreqs") || ! _stricmp(LToken, "PSGFreqs") || ! _stricmp(LToken, "FM3Freqs"))
+			else if (! stricmp(LToken, "FMFreqs") || ! stricmp(LToken, "PSGFreqs") || ! stricmp(LToken, "FM3Freqs"))
 			{
 				UINT8* FreqCntPtr;
 				UINT16** FreqDataPtr;
@@ -602,19 +609,19 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				UINT8 NewFreqCnt;
 				UINT16* NewFreqData;
 				
-				if (! _stricmp(LToken, "FMFreqs"))
+				if (! stricmp(LToken, "FMFreqs"))
 				{
 					FreqMode = 0x00;
 					FreqCntPtr = &SmpsCfg->FMFreqCnt;
 					FreqDataPtr = &SmpsCfg->FMFreqs;
 				}
-				else if (! _stricmp(LToken, "PSGFreqs"))
+				else if (! stricmp(LToken, "PSGFreqs"))
 				{
 					FreqMode = 0x01;
 					FreqCntPtr = &SmpsCfg->PSGFreqCnt;
 					FreqDataPtr = &SmpsCfg->PSGFreqs;
 				}
-				else if (! _stricmp(LToken, "FM3Freqs"))
+				else if (! stricmp(LToken, "FM3Freqs"))
 				{
 					FreqMode = 0x02;
 					FreqCntPtr = &SmpsCfg->FM3FreqCnt;
@@ -668,21 +675,21 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				*FreqCntPtr = NewFreqCnt;
 				*FreqDataPtr = NewFreqData;
 			}
-			else if (! _stricmp(LToken, "FadeMode"))
+			else if (! stricmp(LToken, "FadeMode"))
 				SmpsCfg->FadeMode = GetOptionValue(OPT_FADEMODE, RToken1);
-			else if (! _stricmp(LToken, "FadeOutSteps"))
+			else if (! stricmp(LToken, "FadeOutSteps"))
 				SmpsCfg->FadeOut.Steps = (UINT8)ParseNumber(RToken1, NULL, NULL);
-			else if (! _stricmp(LToken, "FadeOutDelay"))
+			else if (! stricmp(LToken, "FadeOutDelay"))
 				SmpsCfg->FadeOut.Delay = (UINT8)ParseNumber(RToken1, NULL, NULL);
-			else if (! _stricmp(LToken, "FadeOutVolAddFM"))
+			else if (! stricmp(LToken, "FadeOutVolAddFM"))
 				SmpsCfg->FadeOut.AddFM = (UINT8)ParseNumber(RToken1, NULL, NULL);
-			else if (! _stricmp(LToken, "FadeOutVolAddPSG"))
+			else if (! stricmp(LToken, "FadeOutVolAddPSG"))
 				SmpsCfg->FadeOut.AddPSG = (UINT8)ParseNumber(RToken1, NULL, NULL);
-			else if (! _stricmp(LToken, "DrumChMode"))
+			else if (! stricmp(LToken, "DrumChMode"))
 				SmpsCfg->DrumChnMode = GetOptionValue(OPT_DRMCHNMODE, RToken1);
-			else if (! _stricmp(LToken, "DACChns"))
+			else if (! stricmp(LToken, "DACChns"))
 				SmpsCfg->DACDrv.Cfg.Channels = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "DACVolDiv"))
+			else if (! stricmp(LToken, "DACVolDiv"))
 				SmpsCfg->DACDrv.Cfg.VolDiv = (INT8)strtol(RToken1, NULL, 0);
 		}
 		else if (Group == 0x10)	// [EnvelopeCmds] group
@@ -698,13 +705,13 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 		}
 		else if (Group == 0x20)	// [Settings] group
 		{
-			if (! _stricmp(LToken, "DefTimingMode"))
+			if (! stricmp(LToken, "DefTimingMode"))
 				SmpsCfg->InitCfg.Timing_DefMode = (UINT8)strtoul(RToken1, NULL, 0x10);
-			else if (! _stricmp(LToken, "LockTimingMode"))
+			else if (! stricmp(LToken, "LockTimingMode"))
 				SmpsCfg->InitCfg.Timing_Lock = GetBoolValue(RToken1, "True", "False");
-			else if (! _stricmp(LToken, "DefTimerA"))
+			else if (! stricmp(LToken, "DefTimerA"))
 				SmpsCfg->InitCfg.Timing_TimerA = (UINT16)ParseNumber(RToken1, NULL, NULL);
-			else if (! _stricmp(LToken, "DefTimerB"))
+			else if (! stricmp(LToken, "DefTimerB"))
 				SmpsCfg->InitCfg.Timing_TimerB = (UINT8)ParseNumber(RToken1, NULL, NULL);
 		}
 	}
@@ -746,7 +753,7 @@ static INT8 GetBaseNote(const OPT_LIST* OptList, const char* ValueStr)
 	CurOpt = OptList;
 	while(CurOpt->Text != NULL)
 	{
-		if (! _stricmp(CurOpt->Text, ValueStr))
+		if (! stricmp(CurOpt->Text, ValueStr))
 			return (INT8)CurOpt->Value;
 		
 		CurOpt ++;
@@ -951,12 +958,12 @@ void LoadCommandDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 			// [Section]
 			if (CurCLib != NULL && CurCF)
 				ApplyCommandFlags(CurCF, CF_IDList, CFBuffer, CurCLib);
-			if (! _stricmp(LToken, "Main"))
+			if (! stricmp(LToken, "Main"))
 			{
 				Group = 0x00;
 				CurCLib = &SmpsCfg->CmdList;
 			}
-			else if (! _stricmp(LToken, "Meta"))
+			else if (! stricmp(LToken, "Meta"))
 			{
 				Group = 0x01;
 				CurCLib = &SmpsCfg->CmdMetaList;
@@ -1079,9 +1086,9 @@ void LoadDrumDefinition(const char* FileName, DRUM_LIB* DrumDef)
 		if (*LToken == '[')
 		{
 			// [Section]
-			if (! _stricmp(RToken, "Main"))
+			if (! stricmp(RToken, "Main"))
 				Group = 0x00;
-			else if (! _stricmp(RToken, "Drums"))
+			else if (! stricmp(RToken, "Drums"))
 				Group = 0x01;
 			else
 				Group = 0xFF;
@@ -1098,13 +1105,13 @@ void LoadDrumDefinition(const char* FileName, DRUM_LIB* DrumDef)
 				continue;
 			
 			TrimToken(RToken);
-			if (! _stricmp(LToken, "DrumMode"))
+			if (! stricmp(LToken, "DrumMode"))
 				DrumDef->Mode = GetOptionValue(OPT_DRUMMODE, RToken);
-			else if (! _stricmp(LToken, "Mask1"))
+			else if (! stricmp(LToken, "Mask1"))
 				DrumDef->Mask1 = (UINT8)strtoul(RToken, NULL, 0x10);
-			else if (! _stricmp(LToken, "Mask2"))
+			else if (! stricmp(LToken, "Mask2"))
 				DrumDef->Mask2 = (UINT8)strtoul(RToken, NULL, 0x10);
-			else if (! _stricmp(LToken, "DrumIDBase"))
+			else if (! stricmp(LToken, "DrumIDBase"))
 				DrumIDBase = (UINT16)strtol(RToken, NULL, 0x10);	// allow -1
 		}
 		else if (Group == 0x01)	// [Drums] group
@@ -1226,9 +1233,9 @@ void LoadPSGDrumDefinition(const char* FileName, PSG_DRUM_LIB* DrumDef)
 		if (*LToken == '[')
 		{
 			// [Section]
-			/*if (! _stricmp(RToken, "Main"))
+			/*if (! stricmp(RToken, "Main"))
 				Group = 0x00;
-			else*/ if (! _stricmp(RToken, "Drums"))
+			else*/ if (! stricmp(RToken, "Drums"))
 				Group = 0x01;
 			else
 				Group = 0xFF;

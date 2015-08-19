@@ -19,6 +19,18 @@
 #include "loader_data.h"
 #include "loader_smps.h"	// for SmpsOffsetFromFilename()
 
+#ifdef _MSC_VER
+
+#ifndef strdup	// crtdbg.h redefines strdup, usually it throws a warning
+#define strdup		_strdup
+#endif
+#define stricmp		_stricmp
+
+#else
+#define stricmp		strcasecmp
+#endif
+
+
 static const UINT8 DefDPCMData[0x10] =
 {	0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40,
 	0x80, 0xFF, 0xFE, 0xFC, 0xF8, 0xF0, 0xE0, 0xC0};
@@ -179,7 +191,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 					IniSection = 0x01;
 				}
 			}
-			else if (! _stricmp(RToken1, "Banks"))
+			else if (! stricmp(RToken1, "Banks"))
 			{
 				IniSection = 0x02;
 			}
@@ -211,7 +223,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 			continue;
 		
 		// "DPCMData" is valid in all sections
-		if (! _stricmp(LToken, "DPCMData"))
+		if (! stricmp(LToken, "DPCMData"))
 		{
 			//RevertTokenTrim(RToken1, RToken2);
 			ArrSize = ReadHexData(RToken1, &ArrPtr);
@@ -232,34 +244,34 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 		RToken2 = TrimToken(RToken1);
 		if (IniSection == 0x01)
 		{
-			if (! _stricmp(LToken, "BaseRate"))
+			if (! stricmp(LToken, "BaseRate"))
 				DAlgo->BaseRate = (UINT32)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "RateDiv"))
+			else if (! stricmp(LToken, "RateDiv"))
 				DAlgo->Divider = (UINT32)(strtod(RToken1, NULL) * 100 + 0.5);
-			else if (! _stricmp(LToken, "BaseCycles"))
+			else if (! stricmp(LToken, "BaseCycles"))
 				DAlgo->BaseCycles = (UINT32)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "LoopCycles"))
+			else if (! stricmp(LToken, "LoopCycles"))
 				DAlgo->LoopCycles = (UINT32)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "LoopSamples"))
+			else if (! stricmp(LToken, "LoopSamples"))
 				DAlgo->LoopSamples = (UINT32)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "RateMode"))
+			else if (! stricmp(LToken, "RateMode"))
 				DAlgo->RateMode = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "RateOverflow"))
+			else if (! stricmp(LToken, "RateOverflow"))
 				DAlgo->RateOverflow = (UINT32)(strtol(RToken1, NULL, 0));
-			else if (! _stricmp(LToken, "DefCompr"))
+			else if (! stricmp(LToken, "DefCompr"))
 			{
-				if (! _stricmp(RToken1, "All"))
+				if (! stricmp(RToken1, "All"))
 					DAlgo->DefCompr = 0xFF;
-				else if (! _stricmp(RToken1, "PCM"))
+				else if (! stricmp(RToken1, "PCM"))
 					DAlgo->DefCompr = COMPR_PCM;
-				else if (! _stricmp(RToken1, "DPCM"))
+				else if (! stricmp(RToken1, "DPCM"))
 					DAlgo->DefCompr = COMPR_DPCM;
 				else
 					DAlgo->DefCompr = (UINT8)strtoul(RToken1, NULL, 0);
 			}
-			else if (! _stricmp(LToken, "ResampleMode"))
+			else if (! stricmp(LToken, "ResampleMode"))
 				DACDrv->Cfg.SmplMode = (UINT8)strtoul(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "DrumIDBase"))
+			else if (! stricmp(LToken, "DrumIDBase"))
 				DrumIDBase = (UINT16)strtoul(RToken1, NULL, 0x10);
 		}
 		else if (IniSection == 0x02)
@@ -284,34 +296,34 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 		}
 		else
 		{
-			if (! _stricmp(LToken, "File"))
+			if (! stricmp(LToken, "File"))
 			{
 				RevertTokenTrim(RToken1, RToken2);
 				strcpy(DACFile, BasePath);
 				strcat(DACFile, RToken1);
 				StandardizePath(DACFile);
 			}
-			else if (! _stricmp(LToken, "Compr"))
+			else if (! stricmp(LToken, "Compr"))
 			{
 				// "False" and "True" are for backwards compatibility with
 				// older DAC.ini files.
-				if (! _stricmp(RToken1, "PCM") || ! _stricmp(RToken1, "False"))
+				if (! stricmp(RToken1, "PCM") || ! stricmp(RToken1, "False"))
 					DSmpl.Compr = COMPR_PCM;
-				else if (! _stricmp(RToken1, "DPCM") || ! _stricmp(RToken1, "True"))
+				else if (! stricmp(RToken1, "DPCM") || ! stricmp(RToken1, "True"))
 					DSmpl.Compr = COMPR_DPCM;
 				else
 					DSmpl.Compr = strtol(RToken1, NULL, 0) ? 0x01 : 0x00;
 			}
-			else if (! _stricmp(LToken, "Rate"))
+			else if (! stricmp(LToken, "Rate"))
 				DSmpl.Rate = (UINT32)strtol(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "Pan"))
+			else if (! stricmp(LToken, "Pan"))
 				DSmpl.Pan = (UINT8)strtol(RToken1, NULL, 0);
-			else if (! _stricmp(LToken, "Looping"))
+			else if (! stricmp(LToken, "Looping"))
 			{
 				DSmpl.Flags &= ~DACFLAG_LOOP;
 				DSmpl.Flags |= GetBoolValue(RToken1, "True", "False") << 0;
 			}
-			else if (! _stricmp(LToken, "Reverse"))
+			else if (! stricmp(LToken, "Reverse"))
 			{
 				DSmpl.Flags &= ~DACFLAG_REVERSE;
 				DSmpl.Flags |= GetBoolValue(RToken1, "True", "False") << 1;
@@ -368,7 +380,7 @@ static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, 
 	{
 		for (CurSmpl = 0x00; CurSmpl < DACDrv->SmplCount; CurSmpl ++)
 		{
-			if (! _stricmp(FileName, DACDrv->Smpls[CurSmpl].File))
+			if (! stricmp(FileName, DACDrv->Smpls[CurSmpl].File))
 				break;
 		}
 		if (CurSmpl >= DACDrv->SmplAlloc)
@@ -386,13 +398,13 @@ static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, 
 		TempTbl->Sample = CurSmpl;
 	}
 	
-	if (TempSmpl->File != NULL && ! _stricmp(FileName, TempSmpl->File))
+	if (TempSmpl->File != NULL && ! stricmp(FileName, TempSmpl->File))
 		return;	// already loaded
 	
 	if (TempSmpl->File != NULL)
 		free(TempSmpl->File);
 	TempInt = strlen(FileName) + 1;
-	TempSmpl->File = _strdup(FileName);
+	TempSmpl->File = strdup(FileName);
 	TempSmpl->Compr = SmplData->Compr;
 	if (SmplData->DPCMData == NULL)
 	{
