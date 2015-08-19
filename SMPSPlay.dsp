@@ -147,6 +147,22 @@ SOURCE=.\src\loader.h
 # End Source File
 # Begin Source File
 
+SOURCE=.\src\loader_data.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\src\loader_def.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\src\loader_ini.h
+# End Source File
+# Begin Source File
+
+SOURCE=.\src\loader_smps.h
+# End Source File
+# Begin Source File
+
 SOURCE=.\src\Engine\necpcm.h
 # End Source File
 # Begin Source File

@@ -1,5 +1,5 @@
-#ifndef __LOADER_INI_H__
-#define __LOADER_INI_H__
+#ifndef __INI_LIB_H__
+#define __INI_LIB_H__
 
 #include <stdio.h>	// for FILE
 #include <stdtype.h>	// for UINT32
@@ -32,4 +32,4 @@ UINT32 ReadHexData(const char* ArrayStr, UINT8** RetBuffer);
 UINT32 ReadArrayData(char* ArrayStr, void** RetBuffer, UINT8 ValType, char** RetParseEnd);
 UINT32 ReadMultilineArrayData(FILE* hFile, char* ArrayStr, void** RetBuffer, UINT8 ValType);
 
-#endif	// __LOADER_INI_H__
+#endif	// __INI_LIB_H__

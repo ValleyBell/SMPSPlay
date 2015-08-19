@@ -193,6 +193,10 @@
     <ClInclude Include="src\Engine\smps_structs_int.h" />
     <ClInclude Include="src\ini_lib.h" />
     <ClInclude Include="src\loader.h" />
+    <ClInclude Include="src\loader_data.h" />
+    <ClInclude Include="src\loader_def.h" />
+    <ClInclude Include="src\loader_ini.h" />
+    <ClInclude Include="src\loader_smps.h" />
     <ClInclude Include="src\Sound.h" />
     <ClInclude Include="src\stdbool.h" />
     <ClInclude Include="src\stdtype.h" />

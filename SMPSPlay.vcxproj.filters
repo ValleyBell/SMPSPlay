@@ -146,5 +146,17 @@
     <ClInclude Include="src\Engine\necpcm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\loader_data.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\loader_def.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\loader_ini.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\loader_smps.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

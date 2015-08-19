@@ -12,9 +12,10 @@
 
 #include <common_def.h>
 #include "ini_lib.h"
-#include "Engine/dac.h"
 #include "Engine/smps_structs.h"
-#include "loader.h"	// for SmpsOffsetFromFilename()
+#include "Engine/dac.h"
+#include "loader_data.h"
+#include "loader_smps.h"	// for SmpsOffsetFromFilename()
 
 static const UINT8 DefDPCMData[0x10] =
 {	0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40,
@@ -415,7 +416,7 @@ static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, 
 	
 	fseek(hFile, 0x00, SEEK_SET);
 	TempSmpl->Data = (UINT8*)malloc(TempSmpl->Size);
-	TempSmpl->Size = fread(TempSmpl->Data, 0x01, TempSmpl->Size, hFile);
+	TempSmpl->Size = (UINT32)fread(TempSmpl->Data, 0x01, TempSmpl->Size, hFile);
 	
 	fclose(hFile);
 	
@@ -529,7 +530,7 @@ UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib)
 	UINT8* FileData;
 	UINT8 RetVal;
 	
-	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x08, sizeof(SIG_ENV), SIG_ENV);
+	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x08, 0x07, SIG_ENV);
 	if (RetVal)
 		return RetVal;
 	
@@ -613,7 +614,7 @@ UINT8 LoadDrumTracks_File(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 Dru
 	UINT8* FileData;
 	UINT8 RetVal;
 	
-	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x05, sizeof(SIG_DRUM), SIG_DRUM);
+	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x05, 0x04, SIG_DRUM);
 	if (RetVal)
 		return RetVal;
 	
@@ -749,7 +750,7 @@ UINT8 LoadPanAniData_File(const char* FileName, PAN_ANI_LIB* PAniLib)
 	UINT8* FileData;
 	UINT8 RetVal;
 	
-	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x05, sizeof(SIG_PANI), SIG_PANI);
+	RetVal = LoadFileData(FileName, &FileLen, &FileData, 0x05, 0x04, SIG_PANI);
 	if (RetVal)
 		return RetVal;
 	

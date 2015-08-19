@@ -14,6 +14,7 @@
 #include "ini_lib.h"
 #include "Engine/smps_structs.h"
 #include "Engine/smps_commands.h"
+#include "loader_def.h"
 
 typedef struct _option_list
 {

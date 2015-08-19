@@ -11,8 +11,8 @@
 
 #include <common_def.h>
 #include "ini_lib.h"
-#include "loader.h"
 #include "Engine/smps_structs.h"
+#include "loader.h"
 
 
 #ifdef _MSC_VER

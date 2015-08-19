@@ -21,7 +21,8 @@
 
 #include <common_def.h>
 
-#include "loader.h"
+#include "loader_ini.h"
+#include "loader_smps.h"
 #include "ini_lib.h"
 #include "Sound.h"
 #include "Engine/smps_structs.h"
