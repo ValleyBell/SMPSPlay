@@ -488,7 +488,7 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 		
 		if (DoNoteStop(Trk))
 		{
-			//Trk->PlaybkFlags |= PBKFLG_ATREST;
+			Trk->PlaybkFlags |= PBKFLG_ATREST;
 			DoNoteOff(Trk);
 			return;
 		}
@@ -1855,11 +1855,8 @@ void DoNoteOff(TRK_RAM* Trk)
 
 static void DoPSGNoteOff(TRK_RAM* Trk, UINT8 OffByTimeout)
 {
-	UINT8 EnforceOff;
-	
 	// also known as SetRest
-	if (Trk->PlaybkFlags & PBKFLG_HOLD)
-		return;
+	UINT8 EnforceOff;
 	
 	if (Trk->SmpsSet->Cfg->TempoMode == TEMPO_TOUT_REV)	// Castle Of Illusion
 		EnforceOff = OffByTimeout;
@@ -1872,7 +1869,10 @@ static void DoPSGNoteOff(TRK_RAM* Trk, UINT8 OffByTimeout)
 	}
 	else
 	{
-		Trk->PlaybkFlags |= PBKFLG_ATREST;
+		Trk->PlaybkFlags |= PBKFLG_ATREST;	// doing this is important for cases like 80 0C E7 80 60
+		if (Trk->PlaybkFlags & PBKFLG_HOLD)
+			return;
+		
 		if (Trk->ChannelMask & 0x80)
 			DoNoteOff(Trk);
 	}
