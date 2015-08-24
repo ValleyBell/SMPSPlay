@@ -108,6 +108,7 @@ INLINE void strdup_free(char** DestStr, const char* SrcStr)
 
 UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 {
+	AUDIO_CFG* AudCfg = CfgData->AudioCfg;
 	FILE* hFile;
 	UINT32 BasePathAlloc;
 	UINT32 DataPathAlloc;
@@ -220,21 +221,21 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 			else if (! stricmp(LToken, "DebugMsgs"))
 				CfgData->DebugMsgs = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "SamplesPerSec"))
-				CfgData->SamplePerSec = (UINT32)strtoul(RToken1, NULL, 0);
+				AudCfg->SamplePerSec = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "BitsPerSample"))
-				CfgData->BitsPerSample = (UINT8)strtoul(RToken1, NULL, 0);
+				AudCfg->BitsPerSample = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "Volume"))
-				CfgData->Volume = (float)strtod(RToken1, NULL);
+				AudCfg->Volume = (float)strtod(RToken1, NULL);
 			else if (! stricmp(LToken, "AudioAPI"))
-				strdup_free(&CfgData->AudAPIName, RToken1);
+				strdup_free(&AudCfg->AudAPIName, RToken1);
 			else if (! stricmp(LToken, "AudioDevice"))
-				CfgData->AudAPIDev = (UINT32)strtoul(RToken1, NULL, 0);
+				AudCfg->AudAPIDev = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "AudioBuffers"))
-				CfgData->AudioBufs = (UINT32)strtoul(RToken1, NULL, 0);
+				AudCfg->AudioBufs = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "AudioBufSize"))
-				CfgData->AudioBufSize = (UINT32)strtoul(RToken1, NULL, 0);
+				AudCfg->AudioBufSize = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "LogWave"))
-				CfgData->LogWave = GetBoolValue(RToken1, "True", "False");
+				AudCfg->LogWave = GetBoolValue(RToken1, "True", "False");
 		}
 		else if (Group == 0x10)	// [.ext] group
 		{
@@ -290,13 +291,14 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 void FreeConfigurationFiles(CONFIG_DATA* CfgData)
 {
 	// Note: Make sure to call FreeExtentionData() first!
+	AUDIO_CFG* AudCfg = CfgData->AudioCfg;
 	FILE_LIST* FLst;
 	EXT_LIST* ExtList;
 	SMPS_EXT_DEF* ExtDef;
 	UINT32 CurItem;
 	
 	free(CfgData->MusPath);		CfgData->MusPath = NULL;
-	free(CfgData->AudAPIName);	CfgData->AudAPIName = NULL;
+	free(AudCfg->AudAPIName);	AudCfg->AudAPIName = NULL;
 	
 	FLst = &CfgData->CfgFiles;
 	for (CurItem = 0; CurItem < FLst->FileCount; CurItem ++)

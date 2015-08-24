@@ -13,7 +13,6 @@
 
 #include <stdtype.h>
 #include "Sound.h"
-#include "loader.h"	// for CONFIG_DATA
 #include <audio/AudioStream.h>
 #include <audio/AudioStream_SpcDrvFuns.h>
 
@@ -41,6 +40,17 @@
 
 
 typedef void (*strm_func)(UINT8 ChipID, stream_sample_t **outputs, int samples);
+
+typedef struct waveform_16bit_stereo
+{
+	INT16 Left;
+	INT16 Right;
+} WAVE_16BS;
+typedef struct waveform_32bit_stereo
+{
+	INT32 Left;
+	INT32 Right;
+} WAVE_32BS;
 
 typedef struct chip_audio_attributes CAUD_ATTR;
 struct chip_audio_attributes
@@ -74,7 +84,13 @@ typedef struct chip_audio_struct
 } CHIP_AUDIO;
 
 
+//void InitAudioOutput(void);
+//void DeinitAudioOutput(void);
 static UINT32 GetAudioDriver(UINT8 Type, const char* PreferredDrv);
+static void InitalizeChips(void);
+static void DeinitChips(void);
+//UINT8 QueryDeviceParams(const char* audAPIName, AUDIO_CFG* retAudioCfg);
+//void SetAudioHWnd(void* hWnd);
 //UINT8 StartAudioOutput(void);
 //UINT8 StopAudioOutput(void);
 //void PauseStream(UINT8 PauseOn);
@@ -105,7 +121,7 @@ static void YM2612_Callback(void *param, int irq);
 //#define VOL_SHIFT		7	// shift X bits to the right after mixing everything together
 #define VOL_SHIFT		10	// 7 [main shift] + (8-5) [OutputVolume post-shift]
 
-extern CONFIG_DATA Config;
+AUDIO_CFG AudioCfg;
 static AUDIO_OPTS* audOpts;
 UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
 INT32 OutputVolume = 0x100;
@@ -120,7 +136,7 @@ static CHIP_AUDIO ChipAudio;
 static INT32* StreamBufs[0x02];
 stream_sample_t* DUMMYBUF[0x02] = {NULL, NULL};
 
-static UINT8 DeviceState = 0x00;	// 00 - not running, 01 - running
+static UINT8 DeviceState = 0xFF;	// FF - not initialized, 00 - not running, 01 - running
 static void* audDrv;
 static void* audDrvLog;
 
@@ -139,10 +155,28 @@ extern SMPS_CB_SIGNAL CB_Signal;
 
 #ifdef _WIN32
 HANDLE hMutex = NULL;
+HWND hWndSnd = NULL;
 #else
 pthread_mutex_t hMutex = 0;
 #endif
 static UINT8 lastMutexLockMode;
+
+void InitAudioOutput(void)
+{
+	memset(&AudioCfg, 0x00, sizeof(AUDIO_CFG));
+	
+	Audio_Init();
+	
+	DeviceState = 0x00;
+	return;
+}
+
+void DeinitAudioOutput(void)
+{
+	Audio_Deinit();
+	
+	return;
+}
 
 static UINT32 GetAudioDriver(UINT8 Type, const char* PreferredDrv)
 {
@@ -159,43 +193,38 @@ static UINT32 GetAudioDriver(UINT8 Type, const char* PreferredDrv)
 		if (drvInfo->drvType != Type)
 			continue;
 		
-		if (PreferredDrv != NULL && ! stricmp(drvInfo->drvName, PreferredDrv))
-			return curDrv;
-		
-		if (drvInfo->drvSig == ADRVSIG_WASAPI)
-			continue;	// WASAPI is crap due to limited sample rates
-		
-		// uncomment to use the first possible device
-		//if (idDrv == (UINT32)-1)
-		// We use the last device ID here, because the more "advanced" devices
-		// have later IDs.
-		idDrv = curDrv;
+		if (PreferredDrv != NULL)
+		{
+			if (! stricmp(drvInfo->drvName, PreferredDrv))
+				return curDrv;
+		}
+		else
+		{
+			if (drvInfo->drvSig == ADRVSIG_WASAPI)
+				continue;	// WASAPI is crap due to limited sample rates
+			
+			// uncomment to use the first possible device
+			//if (idDrv == (UINT32)-1)
+			// We use the last device ID here, because the more "advanced" devices
+			// have later IDs.
+			idDrv = curDrv;
+		}
 	}
 	return idDrv;
 }
 
-UINT8 StartAudioOutput(void)
+static void InitalizeChips(void)
 {
 	UINT8 CurChip;
-	UINT8 RetVal;
 	CAUD_ATTR* CAA;
-	UINT32 idWaveOut;
-	UINT32 idWaveWrt;
-	AUDDRV_INFO* drvInfo;
-	AUDIO_OPTS* optsLog;
-	void* aDrv;
 	
 	if (DeviceState)
-		return 0x80;	// already running
+		return;
 	
 	ResampleMode = 0x00;
 	CHIP_SAMPLING_MODE = 0x00;
 	CHIP_SAMPLE_RATE = 0x00000000;
-	SampleRate = 44100;	// used by some chips as output sample rate
-	if (Config.SamplePerSec)
-		SampleRate = Config.SamplePerSec;
-	if (Config.Volume > 0.0f)
-		OutputVolume = (INT32)(Config.Volume * 0x100 + 0.5f);
+	SampleRate = audOpts->sampleRate;	// used by some chips as output sample rate
 	
 	for (CurChip = 0x00; CurChip < CHIP_COUNT; CurChip ++)
 	{
@@ -235,7 +264,6 @@ UINT8 StartAudioOutput(void)
 	SetupResampler(CAA);
 #endif
 	
-	DeviceState = 0x01;
 	TimerExpired = 0xFF;
 	TimerMask = 0x03;
 	SMPS_PlayingTimer = 0;
@@ -245,11 +273,82 @@ UINT8 StartAudioOutput(void)
 	//SmplsPerFrame = SampleRate / 60;
 	SmplsTilFrame = 0;
 	
+	DeviceState = 0x01;
+	return;
+}
+
+static void DeinitChips(void)
+{
+	if (DeviceState != 0x01)
+		return;
 	
-	Audio_Init();
+	free(StreamBufs[0x00]);	StreamBufs[0x00] = NULL;
+	free(StreamBufs[0x01]);	StreamBufs[0x01] = NULL;
+	
+	device_stop_ym2612(0x00);
+	device_stop_sn764xx(0x00);
+#ifndef DISABLE_NECPCM
+	device_stop_upd7759(0x00);
+#endif
+	DeviceState = 0x00;
+	
+	return;
+}
+
+
+UINT8 QueryDeviceParams(const char* audAPIName, AUDIO_CFG* retAudioCfg)
+{
+	UINT8 RetVal;
+	UINT32 idWaveOut;
+	void* tempAudDrv;
+	AUDDRV_INFO* drvInfo;
+	AUDIO_OPTS* tempAudOpts;
+	
+	idWaveOut = GetAudioDriver(ADRVTYPE_OUT, audAPIName);
+	if (idWaveOut == (UINT32)-1)
+		return 0xFF;
+	
+	RetVal = AudioDrv_Init(idWaveOut, &tempAudDrv);
+	if (RetVal)
+		return 0xC0;
+	Audio_GetDriverInfo(idWaveOut, &drvInfo);
+	
+	tempAudOpts = AudioDrv_GetOptions(tempAudDrv);
+	memset(retAudioCfg, 0x00, sizeof(AUDIO_CFG));
+	retAudioCfg->AudAPIName = (char*)audAPIName;
+	retAudioCfg->AudioBufs = tempAudOpts->numBuffers;
+	retAudioCfg->AudioBufSize = (tempAudOpts->usecPerBuf + 500) / 1000;
+	retAudioCfg->SamplePerSec = tempAudOpts->sampleRate;
+	retAudioCfg->BitsPerSample = tempAudOpts->numBitsPerSmpl;
+	
+	AudioDrv_Deinit(&tempAudDrv);
+	
+	return 0x00;
+}
+
+#ifdef _WIN32
+void SetAudioHWnd(void* hWnd)
+{
+	hWndSnd = (HWND)hWnd;
+	
+	return;
+}
+#endif
+
+UINT8 StartAudioOutput(void)
+{
+	UINT8 RetVal;
+	UINT32 idWaveOut;
+	UINT32 idWaveWrt;
+	AUDDRV_INFO* drvInfo;
+	AUDIO_OPTS* optsLog;
+	void* aDrv;
+	
+	if (DeviceState)
+		return 0x80;	// already running
 	
 	audDrv = audDrvLog = NULL;
-	idWaveOut = GetAudioDriver(ADRVTYPE_OUT, Config.AudAPIName);
+	idWaveOut = GetAudioDriver(ADRVTYPE_OUT, AudioCfg.AudAPIName);
 	idWaveWrt = GetAudioDriver(ADRVTYPE_DISK, "WaveWrite");
 	
 	RetVal = AudioDrv_Init(idWaveOut, &audDrv);
@@ -261,21 +360,14 @@ UINT8 StartAudioOutput(void)
 		return 0xC0;
 	}
 	Audio_GetDriverInfo(idWaveOut, &drvInfo);
+#if defined(_WIN32) && defined(AUDDRV_DSOUND)
 	if (drvInfo->drvSig == ADRVSIG_DSOUND)
 	{
-#ifdef _WIN32
-		HWND hWnd;
-		
 		aDrv = AudioDrv_GetDrvData(audDrv);
-#if _WIN32_WINNT >= 0x500
-		hWnd = GetConsoleWindow();
-#else
-		hWnd = GetDesktopWindow();	// not as nice, but works
-#endif
-		DSound_SetHWnd(aDrv, hWnd);
-#endif	// _WIN32
+		DSound_SetHWnd(aDrv, hWndSnd);
 	}
-	if (Config.LogWave && idWaveWrt != (UINT32)-1 && Config.WaveLogPath != NULL)
+#endif
+	if (AudioCfg.LogWave && idWaveWrt != (UINT32)-1 && AudioCfg.WaveLogPath != NULL)
 	{
 		RetVal = AudioDrv_Init(idWaveWrt, &audDrvLog);
 		if (! RetVal)
@@ -284,20 +376,23 @@ UINT8 StartAudioOutput(void)
 			if (drvInfo->drvSig == ADRVSIG_WAVEWRT)
 			{
 				aDrv = AudioDrv_GetDrvData(audDrvLog);
-				WavWrt_SetFileName(aDrv, Config.WaveLogPath);
+				WavWrt_SetFileName(aDrv, AudioCfg.WaveLogPath);
 			}
 		}
 	}
 	
 	audOpts = AudioDrv_GetOptions(audDrv);
-	audOpts->sampleRate = SampleRate;
+	if (AudioCfg.SamplePerSec)
+		audOpts->sampleRate = AudioCfg.SamplePerSec;
 	audOpts->numChannels = 2;
-	if (Config.BitsPerSample)
-		audOpts->numBitsPerSmpl = Config.BitsPerSample;
-	if (Config.AudioBufs)
-		audOpts->numBuffers = Config.AudioBufs;
-	if (Config.AudioBufSize)
-		audOpts->usecPerBuf = Config.AudioBufSize * 1000;
+	if (AudioCfg.BitsPerSample)
+		audOpts->numBitsPerSmpl = AudioCfg.BitsPerSample;
+	if (AudioCfg.AudioBufs)
+		audOpts->numBuffers = AudioCfg.AudioBufs;
+	if (AudioCfg.AudioBufSize)
+		audOpts->usecPerBuf = AudioCfg.AudioBufSize * 1000;
+	if (AudioCfg.Volume > 0.0f)
+		OutputVolume = (INT32)(AudioCfg.Volume * 0x100 + 0.5f);
 	if (audDrvLog != NULL)
 	{
 		optsLog = AudioDrv_GetOptions(audDrvLog);
@@ -318,7 +413,8 @@ UINT8 StartAudioOutput(void)
 	pthread_mutex_init(&hMutex, NULL);
 #endif
 	lastMutexLockMode = 0;
-	RetVal = AudioDrv_Start(audDrv, Config.AudAPIDev);
+	InitalizeChips();
+	RetVal = AudioDrv_Start(audDrv, AudioCfg.AudAPIDev);
 	if (RetVal)
 	{
 		printf("Error openning Sound Device! (Error Code %02X)\n", RetVal);
@@ -332,9 +428,6 @@ UINT8 StartAudioOutput(void)
 UINT8 StopAudioOutput(void)
 {
 	UINT8 RetVal;
-	
-	if (! DeviceState)
-		return 0x00;	// not running
 	
 #ifdef _WIN32
 	if (hMutex != NULL)
@@ -362,17 +455,8 @@ UINT8 StopAudioOutput(void)
 		RetVal = AudioDrv_Stop(audDrvLog);
 		RetVal = AudioDrv_Deinit(&audDrvLog);
 	}
-	RetVal = Audio_Deinit();
 	
-	free(StreamBufs[0x00]);	StreamBufs[0x00] = NULL;
-	free(StreamBufs[0x01]);	StreamBufs[0x01] = NULL;
-	
-	device_stop_ym2612(0x00);
-	device_stop_sn764xx(0x00);
-#ifndef DISABLE_NECPCM
-	device_stop_upd7759(0x00);
-#endif
-	DeviceState = 0x00;
+	DeinitChips();
 	
 	return 0x00;
 }

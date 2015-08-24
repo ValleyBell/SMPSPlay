@@ -94,6 +94,7 @@ static UINT8* CondJumpVar;
 static UINT8* CommunicationVar;
 
 CONFIG_DATA Config;
+extern AUDIO_CFG AudioCfg;
 
 int main(int argc, char* argv[])
 {
@@ -115,10 +116,12 @@ int main(int argc, char* argv[])
 	printf("by Valley Bell, beta version\n");
 #endif
 	
+	InitAudioOutput();
 #ifdef ENABLE_VGM_LOGGING
 	vgm_init();
 #endif
 	memset(&Config, 0x00, sizeof(CONFIG_DATA));
+	Config.AudioCfg = &AudioCfg;
 	Config.FM6DACOff = 0xFF;
 	Config.ResmplForce = 0xFF;
 	
@@ -174,7 +177,15 @@ int main(int argc, char* argv[])
 	FrameDivider = PALMode ? 50 : 60;
 	
 	_mkdir("dumps");
-	Config.WaveLogPath = "dumps/out.wav";
+	AudioCfg.WaveLogPath = "dumps/out.wav";
+	
+#ifdef _WIN32
+#if _WIN32_WINNT >= 0x500
+	SetAudioHWnd(GetConsoleWindow());
+#else
+	SetAudioHWnd(GetDesktopWindow());	// not as nice, but works
+#endif
+#endif	// _WIN32
 	
 	RetVal = StartAudioOutput();
 	if (RetVal)
@@ -441,6 +452,7 @@ FinishProgram:
 #ifdef ENABLE_VGM_LOGGING
 	vgm_deinit();
 #endif
+	DeinitAudioOutput();
 	if (FileList != NULL)
 	{
 		UINT32 CurFile;

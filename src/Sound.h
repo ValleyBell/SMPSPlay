@@ -3,17 +3,19 @@
 
 #include <stdtype.h>
 
-typedef struct waveform_16bit_stereo
+typedef struct _audio_config
 {
-	INT16 Left;
-	INT16 Right;
-} WAVE_16BS;
-
-typedef struct waveform_32bit_stereo
-{
-	INT32 Left;
-	INT32 Right;
-} WAVE_32BS;
+	char* AudAPIName;
+	char* WaveLogPath;
+	
+	UINT8 LogWave;
+	UINT8 BitsPerSample;
+	UINT32 SamplePerSec;
+	float Volume;
+	UINT32 AudioBufs;
+	UINT32 AudioBufSize;
+	UINT32 AudAPIDev;
+} AUDIO_CFG;
 
 typedef enum chip_type
 {
@@ -21,6 +23,12 @@ typedef enum chip_type
 	CHIP_SN76496,
 } CHIP;
 
+void InitAudioOutput(void);
+void DeinitAudioOutput(void);
+#ifdef _WIN32
+void SetAudioHWnd(void* hWnd);
+#endif
+UINT8 QueryDeviceParams(const char* audAPIName, AUDIO_CFG* retAudioCfg);
 UINT8 StartAudioOutput(void);
 UINT8 StopAudioOutput(void);
 void PauseStream(UINT8 PauseOn);
