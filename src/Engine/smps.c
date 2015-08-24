@@ -174,8 +174,8 @@ void DeinitDriver(void)
 		FreeSMPSFileRef_Zero(&SmpsRAM.SFXSet[CurSet]);
 	if (MusicSaveState.MusSet != NULL)
 	{
+		MusicSaveState.InUse = 0x00;
 		MusicSaveState.MusSet->UsageCounter = 0;
-		FreeSMPSFile(MusicSaveState.MusSet);
 		FreeSMPSFileRef_Zero(&MusicSaveState.MusSet);
 	}
 	
@@ -222,6 +222,7 @@ static void CleanSmpsFiles(void)
 {
 	UINT8 CurTrk;
 	UINT8 CurSet;
+	UINT8 MusTrkPlaying;
 	
 	CurSet = 0;
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
@@ -235,13 +236,23 @@ static void CleanSmpsFiles(void)
 	}
 	
 	CurSet = 0;
+	MusTrkPlaying = 0;
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
+	{
 		CurSet += CleanSmpsTrack(&SmpsRAM.MusicTrks[CurTrk]);
+		if (SmpsRAM.MusicTrks[CurTrk].PlaybkFlags & PBKFLG_ACTIVE)
+			MusTrkPlaying ++;
+	}
 	for (CurTrk = 0; CurTrk < SFX_TRKCNT; CurTrk ++)
 		CurSet += CleanSmpsTrack(&SmpsRAM.SFXTrks[CurTrk]);
 	for (CurTrk = 0; CurTrk < SPCSFX_TRKCNT; CurTrk ++)
 		CurSet += CleanSmpsTrack(&SmpsRAM.SpcSFXTrks[CurTrk]);
 	
+	if (! MusTrkPlaying && SmpsRAM.MusSet != NULL)
+	{
+		if (SmpsRAM.MusSet->UsageCounter > 0 && SmpsRAM.MusSet == MusicSaveState.MusSet)
+			SmpsRAM.MusSet = NULL;	// remove main reference and keep Save State reference only
+	}
 	if (! CurSet)
 		return;
 	
@@ -3084,6 +3095,12 @@ void StopAllSound(void)
 	Extra_SongStop(0);
 	
 	CleanSmpsFiles();
+	if (MusicSaveState.MusSet != NULL)
+	{
+		MusicSaveState.InUse = 0x00;
+		MusicSaveState.MusSet->UsageCounter = 0;
+		FreeSMPSFileRef_Zero(&MusicSaveState.MusSet);
+	}
 	return;
 }
 
@@ -3383,6 +3400,8 @@ UINT8* SmpsGetVariable(UINT8 Type)
 		return &SmpsRAM.CondJmpVal;
 	case SMPSVAR_RESTORE_REQ:
 		return &SmpsRAM.LoadSaveRequest;
+	case SMPSVAR_MUSSTATE_USE:
+		return &MusicSaveState.InUse;
 	}
 	return NULL;
 }
