@@ -601,7 +601,9 @@ static void UpdatePSGVolume(TRK_RAM* Trk, UINT8 WasNewNote)
 			EnvVol = DoVolumeEnvelope(Trk, Trk->Instrument);
 		if (EnvVol & 0x80)
 		{
-			if (EnvVol == 0x81)	// SMPS Z80 does it for 0x80 too, but that breaks my Note Stop effect implementation
+			if (WasNewNote && EnvVol == 0x80 && Trk->SmpsSet->Cfg->NoteOnPrevent == NONPREV_HOLD)
+				EnvVol = 0x81;	// SMPS Z80 sets PBKFLG_ATREST for 0x80 too (fixes 80 0C E7 60)
+			if (EnvVol == 0x81)
 			{
 				Trk->PlaybkFlags |= PBKFLG_ATREST;
 				return;
