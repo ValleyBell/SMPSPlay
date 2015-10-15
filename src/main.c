@@ -257,7 +257,7 @@ int main(int argc, char* argv[])
 				ChipName = "DAC";
 			}
 			ClearLine();
-			printf("Channel %i of %s %s\r", NChannel + 1, ChipName, MuteToggleResult ? "enabled" : "disabled");
+			printf("Channel %d of %s %s\r", NChannel + 1, ChipName, MuteToggleResult ? "enabled" : "disabled");
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);
 			break;

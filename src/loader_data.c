@@ -214,6 +214,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 					DSmpl.Rate = 0x00;
 					DSmpl.Pan = 0x00;
 					DSmpl.Flags = 0x00;
+					DSmpl.Algo = 0xFF;
 				}
 			}
 			continue;

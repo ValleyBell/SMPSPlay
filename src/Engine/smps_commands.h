@@ -47,6 +47,7 @@
 	#define CFS_VOL_SPC_TMP			0x84	// E6 [Tempo 32x] (change FM volume, set PSG volume)
 	#define CFS_VOL_ABS_COI			0x85	// F1 [Castle of Illusion]
 	#define CFS_VOL_SET_BASE		0x86	// FF [Castle of Illusion]
+	#define CFS_VOL_ABS_PERC		0x87	// (absolute Volume, 00..63 min...max scale for FM and PSG)
 	#define CFS_VOL_ABS_PDRM		0xC0
 	#define CFS_VOL_CHG_PDRM		0xC1	// E4 [Master System SMPS]
 #define CF_HOLD					0x05	// E7 (known as "no attack")
@@ -198,6 +199,9 @@
 	#define CFS_VQ_SET_4B_WOI		0x10	// D0..DF [World Of Illusion Beta]
 	#define CFS_VQ_SET_4B_WOI2		0x11	// D0..DF [World Of Illusion Final]
 	#define CFS_VQ_SET_4B_QS		0x12	// D0..DF [Quack Shot]
+#define CF_CINO_PORTAMNT		0x88	// Cinossu's Portamento for Sonic 1
+	#define CFS_CPTM_SPEED			0x00
+	#define CFS_CPTM_NOTE			0x01
 
 #define CF_DAC_PS4				0x90
 	#define CFS_PS4_VOLCTRL			0x00

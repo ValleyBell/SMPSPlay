@@ -504,12 +504,14 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 			return;
 		}
 		
+		DoCinossuPortamento(Trk);
 		Freq = DoPitchSlide(Trk);
 		if (Trk->PlaybkFlags & PBKFLG_LOCKFREQ)
 			return;
 		
 		FreqUpdate = DoModulation(Trk, &Freq);
-		if ((Trk->PlaybkFlags & PBKFLG_PITCHSLIDE) || FreqUpdate == 0x01)
+		if ((Trk->PlaybkFlags & PBKFLG_PITCHSLIDE) ||
+			! (Trk->CinoP_Speed & 0x80) || FreqUpdate == 0x01)
 			SendFMFrequency(Trk, Freq);
 	}
 	
@@ -572,6 +574,7 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 			DoPSGNoteOff(Trk, 0x01);	// Master System SMPS
 			return;
 		}
+		DoCinossuPortamento(Trk);
 		Freq = DoPitchSlide(Trk);
 		FreqUpdate = DoModulation(Trk, &Freq);
 		WasNewNote = 0x00;
@@ -580,7 +583,8 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 	if (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)
 		return;
 	
-	if (WasNewNote || (Trk->PlaybkFlags & PBKFLG_PITCHSLIDE) || FreqUpdate == 0x01)
+	if (WasNewNote || (Trk->PlaybkFlags & PBKFLG_PITCHSLIDE) ||
+		! (Trk->CinoP_Speed & 0x80) || FreqUpdate == 0x01)
 		SendPSGFrequency(Trk, Freq);
 	
 	UpdatePSGVolume(Trk, WasNewNote);
@@ -954,6 +958,7 @@ static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 			DoPSGNoteOff(Trk, 0x01);
 			return;
 		}
+		DoCinossuPortamento(Trk);
 		Freq = DoPitchSlide(Trk);
 		WasNewNote = 0x00;
 	}
@@ -1083,12 +1088,21 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			{
 				DoPSGNoteOff(Trk, 0x00);
 				if (SmpsCfg->DelayFreq == DLYFREQ_RESET)
+				{
 					Trk->Frequency = (Trk->ChannelMask & 0x80) ? 0xFFFF : 0x0000;
+					Trk->CinoP_DstFreq = 0x0000;	// enforce no portamento for next note
+				}
 			}
 			else
 			{
+				UINT16 Freq;
+				
 				Trk->ADSR.State &= 0x7F;
-				Trk->Frequency = GetNote(Trk, Note);
+				Freq = GetNote(Trk, Note);
+				
+				if (! (Trk->CinoP_Speed & 0x80) || Trk->CinoP_DstFreq == 0x0000)
+					Trk->Frequency = Freq;
+				Trk->CinoP_DstFreq = Freq;	// Cinossu Portamento: set destination frequency
 			}
 			
 			if (! (Trk->PlaybkFlags & PBKFLG_PITCHSLIDE))
@@ -1201,7 +1215,7 @@ static UINT8 DoNoteStop(TRK_RAM* Trk)
 	return 0x00;
 }
 
-static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
+UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 {
 	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
 	INT16 Note;
@@ -1329,7 +1343,8 @@ static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue)
 	PanData = PAniLib->Data[DataPtr];
 	
 	Trk->PanAni.AniIdx ++;
-	if (Trk->PanAni.AniIdx == Trk->PanAni.AniLen)
+	//if (Trk->PanAni.AniIdx == Trk->PanAni.AniLen)	// SMPS Z80
+	if (Trk->PanAni.AniIdx >= Trk->PanAni.AniLen)	// SMPS 68k
 	{
 		if (Trk->PanAni.Type == 2)
 			Trk->PanAni.AniIdx --;
@@ -1907,6 +1922,63 @@ void Do2OpNote(void)
 	return;
 }
 
+static void DoCinossuPortamento(TRK_RAM* Trk)
+{
+	// The implementation of Cinossu's Portamentos is loosely based on the topic
+	// "Sonic 1 Sound Driver : Portamento Support" from Sonic Retro.
+	// http://forums.sonicretro.org/index.php?showtopic=18959
+	UINT16 FreqInc;
+	
+	UINT16 LOW_FREQ;
+	UINT16 HIGH_FREQ;
+	UINT16 FREQFIX_DOWN;
+	UINT16 FREQFIX_UP;
+	
+	if (! (Trk->CinoP_Speed & 0x80))
+		return;
+	if (Trk->Frequency == Trk->CinoP_DstFreq)
+		return;
+	
+	FREQFIX_DOWN = FREQFIX_UP = 0x5A0;
+	LOW_FREQ = (Trk->SmpsSet->Cfg->FMFreqs[11] & 0x7FF) - 0x800 + FREQFIX_UP;
+	HIGH_FREQ = (Trk->SmpsSet->Cfg->FMFreqs[0] & 0x7FF) + 0x800 - FREQFIX_DOWN;
+	
+	FreqInc = Trk->CinoP_Speed & 0x7F;
+	if (Trk->Frequency < Trk->CinoP_DstFreq)
+	{
+		// upwards
+		Trk->Frequency += FreqInc;
+		if (Trk->Frequency > Trk->CinoP_DstFreq)
+			Trk->Frequency = Trk->CinoP_DstFreq;
+		
+		if (! (Trk->ChannelMask & 0x80))	// FM channels only
+		{
+			// Higher Frequency Limit: 0x4BE = 0x25E + 0x800 - 0x5A0
+			if ((Trk->Frequency & 0x7FF) >= HIGH_FREQ)
+				Trk->Frequency += FREQFIX_UP;	// fix FM octave
+		}
+	}
+	else //if (Trk->Frequency > Trk->CinoP_DstFreq)
+	{
+		// downwards
+		if (Trk->Frequency < FreqInc)
+			FreqInc = Trk->Frequency;	// prevent underflow
+		
+		Trk->Frequency -= FreqInc;
+		if (Trk->Frequency < Trk->CinoP_DstFreq)
+			Trk->Frequency = Trk->CinoP_DstFreq;
+		
+		if (! (Trk->ChannelMask & 0x80))	// FM channels only
+		{
+			// Lower Frequency Limit: 0x21C = 0x47C + 0x5A0 - 0x800
+			if ((Trk->Frequency & 0x7FF) <= LOW_FREQ)
+				Trk->Frequency -= FREQFIX_DOWN;	// fix FM octave
+		}
+	}
+	
+	return;
+}
+
 static UINT16 DoPitchSlide(TRK_RAM* Trk)
 {
 	UINT16 NewFreq;
@@ -1920,12 +1992,22 @@ static UINT16 DoPitchSlide(TRK_RAM* Trk)
 		UINT16 BaseFreq;
 		UINT16 OctFreq;	// frequency within octave
 		
+		UINT16 LOW_FREQ;
+		UINT16 HIGH_FREQ;
+		UINT16 FREQFIX_DOWN;
+		UINT16 FREQFIX_UP;
+		
 		BaseFreq = Trk->SmpsSet->Cfg->FMFreqs[0] & 0x7FF;
+		LOW_FREQ = BaseFreq;
+		HIGH_FREQ = BaseFreq * 2;
+		FREQFIX_DOWN = 0x7FF - BaseFreq;
+		FREQFIX_UP = 0x800 - BaseFreq;
+		
 		OctFreq = NewFreq & 0x7FF;
-		if (OctFreq < BaseFreq)
-			NewFreq -= (0x7FF - BaseFreq);
-		else if (OctFreq > BaseFreq * 2)
-			NewFreq += (0x800 - BaseFreq);
+		if (OctFreq < LOW_FREQ)
+			NewFreq -= FREQFIX_DOWN;
+		else if (OctFreq > HIGH_FREQ)
+			NewFreq += FREQFIX_UP;
 		
 		/* Original formula:
 	SMPS Z80 (Type 1/2):
@@ -3304,7 +3386,11 @@ void RestoreMusic(MUS_STATE* MusState)
 	TRK_RAM* TempTrk;
 	
 	if (! MusState->InUse)
+	{
+		if (SmpsRAM.FadeIn.Steps)
+			SmpsRAM.FadeIn.Steps = 0x00;
 		return;
+	}
 	
 	Extra_SongStop(1);
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)

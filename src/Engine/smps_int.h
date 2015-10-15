@@ -42,7 +42,7 @@ static void SendPSGFrequency(TRK_RAM* Trk, UINT16 Freq);
 static void TrkUpdate_Proc(TRK_RAM* Trk);
 static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration);
 static UINT8 DoNoteStop(TRK_RAM* Trk);
-static UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd);
+UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd);
 
 static void DoPanAnimation(TRK_RAM* Trk, UINT8 Continue);
 static void InitLFOModulation(TRK_RAM* Trk);
@@ -61,6 +61,7 @@ void DoNoteOn(TRK_RAM* Trk);
 void DoNoteOff(TRK_RAM* Trk);
 static void DoPSGNoteOff(TRK_RAM* Trk, UINT8 OffByTimeout);
 void Do2OpNote(void);
+static void DoCinossuPortamento(TRK_RAM* Trk);
 static UINT16 DoPitchSlide(TRK_RAM* Trk);
 const INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID);
 void SendFMIns(TRK_RAM* Trk, const UINT8* InsData);

@@ -120,6 +120,8 @@ typedef struct _track_ram
 	UINT8 PS4_AltTrkMode;
 	UINT8 GA3_DacMode;	// 2-note DAC mode on/off
 	UINT8 CoI_VolBase;	// Volume Base value (added to all volume changes)
+	UINT8 CinoP_Speed;
+	UINT16 CinoP_DstFreq;
 	
 	UINT8 LoopStack[TRK_STACK_SIZE];	// 28-2F - Loop Data and GoSub Stack
 	

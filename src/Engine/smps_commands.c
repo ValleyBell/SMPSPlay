@@ -1328,6 +1328,21 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			CmdLen = 0x00;
 		}
 		break;
+	case CF_CINO_PORTAMNT:
+		switch(CFlag->SubType)
+		{
+		case CFS_CPTM_SPEED:	// set Portamento Speed
+			Trk->CinoP_Speed = Data[0x00];
+			break;
+		case CFS_CPTM_NOTE:		// set Portamento Pre-Note
+			if (Data[0x00] > SmpsCfg->NoteBase)	// >= 0x81
+			{
+				Trk->Frequency = GetNote(Trk, Data[0x00]);
+				Trk->CinoP_DstFreq = Trk->Frequency;	// make it use the frequency
+			}
+			break;
+		}
+		break;
 	case CF_DAC_PS4:
 	case CF_DAC_CYMN:
 	case CF_DAC_GAXE3:
@@ -1695,6 +1710,26 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 			{
 				Trk->Volume = Params[0x00] >> 2;
 				Trk->Volume += Trk->CoI_VolBase;
+				RefreshFMVolume(Trk);
+			}
+			break;
+		case CFS_VOL_ABS_PERC:
+			// scale 00 (min) .. 63 (max)
+			if (Trk->ChannelMask & 0x80)
+			{
+				if (Params[0x00] == 0)
+					TempByt = 0x0F;
+				else
+					TempByt = 99 - (Params[0x00] >> 3);
+				Trk->Volume = TempByt;
+			}
+			else
+			{
+				if (Params[0x00] == 0)
+					TempByt = 0x7F;
+				else
+					TempByt = 99 - Params[0x00];
+				Trk->Volume = TempByt;
 				RefreshFMVolume(Trk);
 			}
 			break;

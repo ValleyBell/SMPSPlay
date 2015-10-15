@@ -79,6 +79,8 @@ VOLUME - change or set channel volume
 	command E6, size 02, Tempo 32x
   VOL_ABS_COI - set volume
 	command F1, size 02, Castle of Illusion
+  VOL_ABS_PERC - set volume, range is 00 (min) .. 63 (max, decimal) and is scaled to match the FM/PSG volume range
+	size 02
   VOL_SET_BASE - set volume base value (this value is added to the volume set by VOL_ABS_COI)
 	command FF, size 02, Castle of Illusion, World of Illusion
   VOL_ABS_PDRM - set volume of PSG Noise drums
@@ -397,6 +399,12 @@ VOL_QUICK - use bits of the command ID to set the channel volume
 	commands D0..DF, size 01, World of Illusion (Final)
   VQ_SET_4B_QS - 4-bit volume: PSG: set to (Command ID & 0F), FM: set to Volume Base + (Command ID & 0F)
 	commands D0..DF, size 01, Quack Shot
+
+CINO_PORTAMNT - Cinossu's Portamento
+  CPTM_SPEED - enable portamento (value 80h+) and set portamento speed
+	command FA, size 02
+  CPTM_NOTE - set portamento source note
+	command FB, size 02
 
 DAC_PS4 - special DAC flags for Phantasy Star IV
 	Note: DAC_VOLCTRL is present in every song and is used to trigger PS4's special mode for the DAC channel.
