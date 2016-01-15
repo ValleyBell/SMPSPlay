@@ -50,10 +50,10 @@ typedef struct _adsr_volume_data
 
 #define TRK_STACK_SIZE		8
 #define PBKFLG_SPCMODE		0x01	// Bit 0 - Special Mode (Special FM 3 or Noise) [Z80 only]
-#define PBKFLG_HOLD			0x02	// Bit 1 - Hold Note
+#define PBKFLG_HOLD			0x02	// Bit 1 - Hold Note [SMPS 68k: 0x10]
 #define PBKFLG_OVERRIDDEN	0x04	// Bit 2 - overridden by SFX
 #define PBKFLG_RAWFREQ		0x08	// Bit 3 - raw frequency mode [Z80 only]
-#define PBKFLG_ATREST		0x10	// Bit 4 - at rest
+#define PBKFLG_ATREST		0x10	// Bit 4 - at rest [SMPS 68k: 0x02]
 #define PBKFLG_PITCHSLIDE	0x20	// Bit 5 - Pitch Slide [Z80 only]
 #define PBKFLG_LOCKFREQ		0x40	// Bit 6 - lock frequency [Z80 only]
 #define PBKFLG_ACTIVE		0x80	// Bit 7 - track is active

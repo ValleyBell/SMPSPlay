@@ -90,7 +90,7 @@ static SMPS_EXT_DEF* GetNewExtentionData(EXT_LIST* ExtList, const char* ExtStr)
 	TempExt->FMDrmFile = NULL;
 	TempExt->PSGDrmFile = NULL;
 	TempExt->GlbInsLibFile = NULL;
-	memset(&TempExt->SmpsCfg, 0x00, sizeof(SMPS_EXT_DEF));
+	memset(&TempExt->SmpsCfg, 0x00, sizeof(SMPS_CFG));
 	ExtList->ExtCount ++;
 	
 	return TempExt;
@@ -117,7 +117,7 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 	char* BasePath;	// Additional Base Path
 	char* DataPath;
 	char* PathBuf;
-	char LineStr[0x100];
+	char* LineStr;
 	char* LToken;
 	char* RToken1;
 	char* RToken2;
@@ -136,6 +136,7 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 		return 0xFF;
 	}
 	
+	LineStr = (char*)malloc(0x100 * sizeof(char));
 	IniPath = strdup(FileName);
 	LToken = GetFileTitle(IniPath);	// can't return NULL
 	*LToken = '\0';
@@ -280,6 +281,7 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 	}
 	
 	fclose(hFile);
+	free(LineStr);
 	free(IniPath);
 	free(BasePath);
 	free(DataPath);

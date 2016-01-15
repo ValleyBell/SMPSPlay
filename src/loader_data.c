@@ -424,6 +424,10 @@ static void LoadDACSample(DAC_CFG* DACDrv, UINT16 DACSnd, const char* FileName, 
 		
 		free(TempSmpl->File);	TempSmpl->File = NULL;
 		TempTbl->Sample = 0xFFFF;
+		if (TempSmpl->DPCMArr != DefDPCMData)
+		{
+			free(TempSmpl->DPCMArr);	TempSmpl->DPCMArr = NULL;
+		}
 		
 		if (CurSmpl == (DACDrv->SmplCount - 1))
 			DACDrv->SmplCount --;

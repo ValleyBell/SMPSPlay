@@ -499,7 +499,11 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 		
 		if (DoNoteStop(Trk))
 		{
-			Trk->PlaybkFlags |= PBKFLG_ATREST;
+			// Present in SMPS 68k only.
+			// breaks Ristar: "Round 2-2 - Break Silence"
+			//if (Trk->SmpsSet->Cfg->NoteOnPrevent == NONPREV_REST)
+			//	Trk->PlaybkFlags |= PBKFLG_ATREST;
+			
 			DoNoteOff(Trk);
 			return;
 		}

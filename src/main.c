@@ -328,7 +328,9 @@ int main(int argc, char* argv[])
 				else
 				{
 					StopAllSound();
+					FreeSMPSFile(&LastSmpsCfg);
 				}
+				NewSeqData = NULL;
 			}
 			
 			PauseMode = false;
@@ -491,6 +493,9 @@ static void InitSmpsFile(SMPS_SET* SmpsFile, UINT32 FileLen, UINT8* FileData, co
 	SmpsFile->SeqBase = 0x0000;
 	SmpsFile->InsLib.InsCount = 0x00;
 	SmpsFile->InsLib.InsPtrs = NULL;
+#ifdef ENABLE_LOOP_DETECTION
+	SmpsFile->LoopPtrs = NULL;
+#endif
 	
 	return;
 }

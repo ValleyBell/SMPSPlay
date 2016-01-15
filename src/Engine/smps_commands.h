@@ -38,7 +38,7 @@
 	#define CFS_VOL_CC_FM			0x20	// E6 [Sonic 3K]
 	#define CFS_VOL_CC_PSG			0x21	// EC [SMPS Z80 Type 2]
 	#define CFS_VOL_CC_FMP			0x22	// E5 (FM+PSG)
-	#define CFS_VOL_CC_FMP2			0x23	// E5 [Sonic 3K] (FM+PSG, broken)
+	#define CFS_VOL_CC_FMP2			0x23	// E5 [Sonic 3K] (broken, acts as FM with the 1st byte ignored)
 	#define CFS_VOL_ABS				0x40	// F0 [preSMPS] (absolute Volume)
 	#define CFS_VOL_ABS_S3K			0x80	// E4 [Sonic 3K] (absolute Volume, 00..7F min...max scale for FM and PSG)
 	#define CFS_VOL_ABS_HF			0x81	// FF 07 [Hybrid Front] (absolute Volume + global)
