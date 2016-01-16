@@ -117,6 +117,15 @@ UINT8 GuessSMPSOffset(SMPS_SET* SmpsSet)
 	if (! FileLen || FileData == NULL)
 		return 0xFF;
 	
+	if (! memcmp(FileData, "PSMP", 0x04))
+	{
+		if (FileData[0x04] & 0x10)
+			SmpsSet->SeqBase = ReadBE16(&FileData[0x06]);
+		else
+			SmpsSet->SeqBase = ReadLE16(&FileData[0x06]);
+		return 0x00;
+	}
+	
 	CurPos = 0x00;
 	InsPtr = ReadRawPtr(&FileData[CurPos + 0x00], SmpsCfg);
 	FMTrkCnt = FileData[CurPos + 0x02];
@@ -229,6 +238,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	DAC_CFG* DACDrv;	// can't be const, because I set the Usage counters
 #endif
 	UINT16 InsPtr;
+	UINT8 IsPreSMPS;
 	UINT8 FMTrkCnt;
 	UINT8 PSGTrkCnt;
 	UINT8 TrkCount;
@@ -259,25 +269,109 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	DACDrv = (DAC_CFG*)&SmpsCfg->DACDrv;
 #endif
 	
-	CurPos = 0x00;
-	InsPtr = ReadPtr(&FileData[CurPos + 0x00], SmpsSet);
-	FMTrkCnt = FileData[CurPos + 0x02];
-	PSGTrkCnt = FileData[CurPos + 0x03];
-	if (FMTrkCnt > SmpsCfg->FMChnCnt || PSGTrkCnt > SmpsCfg->PSGChnCnt)
-		return 0x80;
-	
-	CurPos += 0x06;
-	TempOfs = CurPos + FMTrkCnt * 0x04 + PSGTrkCnt * 0x06 + SmpsCfg->AddChnCnt * 0x04;
-	if (FileLen < TempOfs)
-		return 0x81;
-	
-	TrkCount = 0x00;
-	for (CurTrk = 0x00; CurTrk < FMTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
-		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
-	for (CurTrk = 0x00; CurTrk < PSGTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x06)
-		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
-	for (CurTrk = 0x00; CurTrk < SmpsCfg->AddChnCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
-		TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
+	if (! memcmp(FileData, "PSMP", 0x04))
+	{
+		// pre-SMPS
+		const SMPS_CFG_PREHDR* PreHdr = &SmpsCfg->PreHdr;
+		UINT8 foundMask;
+		UINT16 maskPbActive;
+		UINT16 ofsPbFlg;
+		UINT16 ofsPtrLSB;
+		UINT16 ofsPtrMSB;
+		
+		SmpsSet->SeqBase -= 0x08;	// make up for the header
+		
+		IsPreSMPS = 0x01;
+		InsPtr = 0x0000;
+		if (! PreHdr->TrkHdrSize)
+			return 0xFF;
+		
+		foundMask = 0x00;
+		for (CurPos = 0x00; CurPos < PreHdr->TrkHdrSize; CurPos ++)
+		{
+			if (PreHdr->TrkHdrMap[CurPos] == TRKHDR_PBFLAGS)
+			{
+				foundMask |= 0x10;
+				ofsPbFlg = CurPos;
+			}
+			else if (PreHdr->TrkHdrMap[CurPos] == TRKHDR_PTR_LSB)
+			{
+				foundMask |= 0x01;
+				ofsPtrLSB = CurPos;
+			}
+			else if (PreHdr->TrkHdrMap[CurPos] == TRKHDR_PTR_MSB)
+			{
+				foundMask |= 0x02;
+				ofsPtrMSB = CurPos;
+			}
+			else if (PreHdr->TrkHdrMap[CurPos] == TRKHDR_CHNBITS)
+			{
+				foundMask |= 0x04;
+			}
+		}
+		if (~foundMask & 0x07)	// Pointer MSB+LSB/ChnBits must be found, PbFlags are optional
+			return 0xFF;
+		maskPbActive = 0x00;
+		if (foundMask & 0x01)
+		{
+			for (CurPos = 0; CurPos < 8; CurPos ++)
+			{
+				if (PreHdr->PbFlagMap[CurPos] == HDR_PBBIT_ACTIVE)
+				{
+					maskPbActive = (1 << PreHdr->PbFlagMap[CurPos]);
+					break;
+				}
+			}
+		}
+		
+		CurPos = 0x08;
+		FMTrkCnt = FileData[CurPos];
+		CurPos ++;
+		if (FMTrkCnt > SmpsCfg->FMChnCnt + SmpsCfg->PSGChnCnt + SmpsCfg->AddChnCnt)
+			return 0x80;
+		
+		TempOfs = CurPos + FMTrkCnt * PreHdr->TrkHdrSize;
+		if (FileLen < TempOfs)
+			return 0x81;
+		
+		TrkCount = 0x00;
+		for (CurTrk = 0x00; CurTrk < FMTrkCnt; CurTrk ++, TrkCount ++, CurPos += PreHdr->TrkHdrSize)
+		{
+			if (maskPbActive)
+			{
+				if (! (FileData[CurPos + ofsPbFlg] & maskPbActive))
+					continue;	// skip disabled channels
+			}
+			TrkOfs[CurTrk] =	(FileData[CurPos + ofsPtrMSB] << 8) |
+								(FileData[CurPos + ofsPtrLSB] << 0);
+			TrkOfs[CurTrk] -= SmpsSet->SeqBase;
+		}
+	}
+	else
+	{
+		// usual SMPS
+		IsPreSMPS = 0x00;
+		CurPos = 0x00;
+		
+		InsPtr = ReadPtr(&FileData[CurPos + 0x00], SmpsSet);
+		FMTrkCnt = FileData[CurPos + 0x02];
+		PSGTrkCnt = FileData[CurPos + 0x03];
+		if (FMTrkCnt > SmpsCfg->FMChnCnt || PSGTrkCnt > SmpsCfg->PSGChnCnt)
+			return 0x80;
+		
+		CurPos += 0x06;
+		TempOfs = CurPos + FMTrkCnt * 0x04 + PSGTrkCnt * 0x06 + SmpsCfg->AddChnCnt * 0x04;
+		if (FileLen < TempOfs)
+			return 0x81;
+		
+		TrkCount = 0x00;
+		for (CurTrk = 0x00; CurTrk < FMTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
+			TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
+		for (CurTrk = 0x00; CurTrk < PSGTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x06)
+			TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
+		for (CurTrk = 0x00; CurTrk < SmpsCfg->AddChnCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
+			TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
+	}
 	
 	if (SmpsCfg->InsMode & INSMODE_INT)
 	{

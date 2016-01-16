@@ -1,0 +1,156 @@
+; --- Space Harrier II SMPS Driver Definition ---
+; pre-SMPS Z80
+
+[Settings]
+DefTimingMode = 00
+LockTimingMode = True
+DefTimerA = 000h
+DefTimerB = 00h
+
+[Main]
+; Pointer Format
+;	68K - SMPS 68k
+;	RST - SMPS 68k/Ristar
+;	Z80 - SMPS Z80
+PtrFmt = Z80
+
+; Instrument Mode
+;	DEFAULT - default SMPS registers (B0 30 38 34 3C 50 ... 8C 40 48 44 4C)
+;	HARDWARE - hardware order for operators (B0 30 34 38 3C 50 ...)
+;	CUSTOM - custom instrument definition, needs additional InsRegs setting
+; 	INTERLEAVED - interleaved register/data format (for external instrument lib. only)
+InsMode = Interleaved
+InsRegs = 30 38 34 3C 40 48 44 4C 50 58 54 5C 60 68 64 6C 70 78 74 7C 80 88 84 8C B0 B4
+
+; FM Channel Order
+;	Here you can rearrange the 6 FM channels. You'll need this if FM drums use the Special FM3 mode.
+;	Channels numbers are: 0..2 (FM 1..3), 4..6 (FM 4..6)
+;	Note: The drum channel is (10 + FM channel).
+;	Examples:
+;		16 0 1 2 4 5 6 (default)
+;		12 0 1 4 5 6 2 (commonly used from pre-SMPS Z80 to SMPS Z80 Type 1 with FM/PSG drums)
+;FMChnOrder = 12 0 1 4 5 6 2 F0
+FMChnOrder = 12 F0 0 1 4 5 6 2
+;FMChnOrder = 12 0 1 4 5 6 2
+;PSGChnOrder = 80 A0 F0	; 3 PSG channels (last one is Noise [E0] + Drums [10])
+
+; Tempo Mode
+;	TIMEOUT - used by preSMPS, SMPS Z80 Type 1 and most SMPS 68k
+;	OVERFLOW - used by SMPS Z80 Type 2 and some late SMPS 68k
+;	OVERFLOW2 - used by Sonic 2
+TempoMode = Timeout
+
+; Order of the execution of PlaySoundID and DoTempo
+;	DOTEMPO - DoTempo is executed first, PlaySoundID then. So when a new song gets started, one DoTempo is missed.
+;	PLAYMUSIC - PlaySoundID is executed first.
+Tempo1Tick = PlayMusic
+
+; FM Base Note
+;	B - frequency table begins with a B note, so the table entry is (note - 80h) [SMPS 68k]
+;	C - frequency table begins with a C note, so the table entry is (note - 81h) [SMPS Z80]
+FMBaseNote = C
+; FM Base Octave - usually 0, can be 1 if the FM tables begin with a 0Axx frequency
+FMBaseOctave = 0
+; Octave Wrap for Detune (caused by PitchSlide routine)
+;	If enabled, frequencies <284h are moved to the next lower octave.
+DetuneOctWrap = False
+
+; prevent FM Note On from being sent when HOLD (SMPS Z80) or REST (SMPS 68k) flag is set.
+NoteOnPrevent = Hold
+
+; Note-Rest-Delay-Delay behaviour
+;	RESET - a Rest resets the note frequency, so the 2nd Delay plays nothing [most SMPS 68k]
+;	KEEP - a Rest keeps the note frequency, so the 2nd Delay replays the last Note [all SMPS Z80, some SMPS 68k]
+DelayFreq = Reset
+
+; Modulation Algorithm
+;	can be 68K or Z80
+ModAlgo = Z80
+
+; Envelope Multiplier Mode
+;	PRE - preSMPS 68k
+;	68K - SMPS 68k
+;	Z80 - SMPS Z80, preSMPS Z80
+EnvMult = Z80
+
+; Volume Mode
+;	ALGO - the FM Algorithm/Connection setting defines the TL operators affected by the channel volume [SMPS 68k]
+;	BIT7 - TL operators with Bit 7 set (value 80-FF) are affected by the channel volume [SMPS Z80]
+VolMode = Algo
+
+; Frequency values
+;	Values can be decimal or hexadecimal (0xABC, $ABC or ABCh) and separates by spaces.
+;	All numbers on the line are read until something invalid is found.
+;	A multiline frequency list is possible by enclosing the block with curly brackets {}
+;	Note: Due to how the parser works, there must be a space before the closing bracket.
+;	
+;	You can also use these default frequency values:
+;	FMFreqs: DEF_68K, DEF_Z80
+;	PSGFreqs: DEF_PRE (pre-SMPS), DEF_68K, DEF_Z80_T1, DEF_Z80_T2
+FMFreqs = {	0A69h 0A8Dh 0AB4h 0ADDh 0B09h 0B37h 0B68h 0B9Ch 0BD3h 0C0Dh 0C4Bh 0C8Ch
+		1269h 128Dh 12B4h 12DDh 1309h 1337h 1368h 139Ch 13D3h 140Dh 144Bh 148Ch
+		1A69h 1A8Dh 1AB4h 1ADDh 1B09h 1B37h 1B68h 1B9Ch 1BD3h 1C0Dh 1C4Bh 1C8Ch
+		2269h 228Dh 22B4h 22DDh 2309h 2337h 2368h 239Ch 23D3h 240Dh 244Bh 248Ch
+		2A69h 2A8Dh 2AB4h 2ADDh 2B09h 2B37h 2B68h 2B9Ch 2BD3h 2C0Dh 2C4Bh 2C8Ch
+		3269h 328Dh 32B4h 32DDh 3309h 3337h 3368h 339Ch 33D3h 340Dh 344Bh 348Ch
+		3A69h 3A8Dh 3AB4h 3ADDh 3B09h 3B37h 3B68h 3B9Ch 3BD3h 3C0Dh 3C4Bh 3C8Ch }
+PSGFreqs = {	3F8h 3BFh 389h
+		356h 326h 2FAh 2CEh 2A6h 280h 25Ch 23Ah 21Ah 1FCh 1DFh 1C4h
+		1ABh 193h 17Dh 167h 153h 140h 12Eh 11Dh 10Dh 0FEh 0F0h 0E2h
+		0D6h 0CAh 0BEh 0B4h 0AAh 0A0h 097h 08Fh 087h 07Fh 078h 071h
+		06Bh 065h 05Fh 05Ah 055h 050h 04Bh 047h 043h 040h 03Ch 03Ah
+		036h 033h 030h 02Dh 02Bh 028h 025h 023h 021h 01Fh 01Eh 01Bh
+		01Ah 019h 017h 016h 015h 014h 013h 012h 011h }
+FM3Freqs = 000h	; actually unused
+
+
+[EnvelopeCmds]
+; Possible commands:
+;	RESET - reset the Envelope Index to 0
+;	HOLD - hold the envelope at the current level
+;	LOOP - loop back to the Envelope Index set by the following byte
+;	STOP - stop the envelope and note
+;	CHG_MULT - change the Envelope Multiplier (Modulation Envelope only)
+;	VOLSTOP_MODHOLD - like STOP for volume envelopes and like HOLD for modulation envelopes
+80 = Reset
+81 = Hold
+83 = VolStop_ModHold
+84 = Chg_Mult
+85 = Loop
+
+
+[preSMPSTrkHdr]
+; TrkHdrSize must be set first, then all offsets (hex) in the
+; range of 00 to (TrkHdrSize-1) are usable.
+; Possible values are:
+; PBFLAGS, CHNBITS, TICKMULT, PTRLSB, PTRMSB, TRANSP, MODENV, VOLENV, VOLUME, PANAFMS
+TrkHdrSize = 09
+00 = PbFlags
+01 = ChnBits
+02 = TickMult
+03 = PtrLSB
+04 = PtrMSB
+05 = Transp
+06 = ModEnv
+07 = VolEnv
+08 = Volume
+
+; For the Playback Flags bitfield, the meaning of each bit can be defined.
+; Format: PbBit_# = value (where # is a number from 0 to 7)
+; Possible values:
+; SPECIALMODE, HOLD, OVERRIDDEN, RAWFREQ, ATREST, PITCHSLIDE,
+; LOCKFREQ, ACTIVE, PAUSED, HOLDLOCK, PANANI, [nothing]
+PbBit_0 = SpecialMode
+PbBit_1 = HoldLock
+PbBit_2 = Overridden
+PbBit_3 = RawFreq
+PbBit_4 = ; unused
+PbBit_5 = PitchSlide
+PbBit_6 = PanAni	; equals SMPS Pan Animation Type 01
+PbBit_7 = Active
+
+; This is used to remap channel IDs from the values in the preSMPS files
+; to their standardized meaning used by SMPSPlay.
+; The channel ID on the right side must be defined by FMChnOrder/PSGChnOrder.
+ChnMap_02 = 12	; FM drum channel
+ChnMap_C0 = F0	; PSG drum channel

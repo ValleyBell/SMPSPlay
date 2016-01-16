@@ -18,8 +18,10 @@
 
 #ifdef _MSC_VER
 #define stricmp		_stricmp
+#define strnicmp	_strnicmp
 #else
 #define stricmp		strcasecmp
+#define strnicmp	strncasecmp
 #endif
 
 
@@ -208,6 +210,34 @@ static const UINT8 INSOPS_HARDWARE[] =
 
 static const UINT8 FMCHN_ORDER[7] = {0x16, 0, 1, 2, 4, 5, 6};
 static const UINT8 PSGCHN_ORDER[3] = {0x80, 0xA0, 0xC0};
+
+static const OPT_LIST OPT_PRETRKHDR[] =
+{	{"PBFLAGS", TRKHDR_PBFLAGS},
+	{"CHNBITS", TRKHDR_CHNBITS},
+	{"TICKMULT", TRKHDR_TICKMULT},
+	{"PTRLSB", TRKHDR_PTR_LSB},
+	{"PTRMSB", TRKHDR_PTR_MSB},
+	{"TRANSP", TRKHDR_TRANSP},
+	{"MODENV", TRKHDR_MODENV},
+	{"VOLENV", TRKHDR_VOLENV},
+	{"VOLUME", TRKHDR_VOLUME},
+	{"PANAFMS", TRKHDR_PANAFMS},
+	{"", 0xFF},	// handle undefined
+	{NULL, 0}};
+static const OPT_LIST OPT_PRE_PBFLAGS[] =
+{	{"SPECIALMODE", HDR_PBBIT_SPCMODE},
+	{"HOLD", HDR_PBBIT_HOLD},
+	{"OVERRIDDEN", HDR_PBBIT_OVERRIDDEN},
+	{"RAWFREQ", HDR_PBBIT_RAWFREQ},
+	{"ATREST", HDR_PBBIT_ATREST},
+	{"PITCHSLIDE", HDR_PBBIT_PITCHSLIDE},
+	{"LOCKFREQ", HDR_PBBIT_LOCKFREQ},
+	{"ACTIVE", HDR_PBBIT_ACTIVE},
+	{"PAUSED", HDR_PBBIT_PAUSED},
+	{"HOLDLOCK", HDR_PBBIT_HOLD_LOCK},
+	{"PANANI", HDR_PBBIT_PAN_ANI},
+	{"", 0xFF},	// handle undefined
+	{NULL, 0}};
 
 static const OPT_LIST OPT_CFLAGS[] =
 {	{"IGNORE", CF_IGNORE},
@@ -489,6 +519,9 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 	SmpsCfg->AddChnCnt = 0x00;
 	SmpsCfg->FadeMode = 0xFF;
 	
+	for (Group = 0; Group < 8; Group ++)
+		SmpsCfg->PreHdr.PbFlagMap[Group] = Group;
+	
 	Group = 0xFF;
 	CstRegList = NULL;
 	while(! feof(hFile))
@@ -509,6 +542,8 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				Group = 0x10;
 			else if (! stricmp(RToken1, "Settings"))
 				Group = 0x20;
+			else if (! stricmp(RToken1, "preSMPSTrkHdr"))
+				Group = 0x40;
 			else
 				Group = 0xFF;
 			continue;
@@ -719,6 +754,97 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 			else if (! stricmp(LToken, "DefTimerB"))
 				SmpsCfg->InitCfg.Timing_TimerB = (UINT8)ParseNumber(RToken1, NULL, NULL);
 		}
+		else if (Group == 0x40)	// [preSMPSTrkHdr] group
+		{
+			SMPS_CFG_PREHDR* PreHdr = &SmpsCfg->PreHdr;
+			
+			if (! stricmp(LToken, "TrkHdrSize"))
+			{
+				PreHdr->TrkHdrSize = (UINT8)strtoul(RToken1, NULL, 0x10);
+				if (PreHdr->TrkHdrMap != NULL)
+					free(PreHdr->TrkHdrMap);
+				PreHdr->TrkHdrMap = (UINT8*)malloc(PreHdr->TrkHdrSize);
+				memset(PreHdr->TrkHdrMap, 0xFF, PreHdr->TrkHdrSize);
+			}
+			else
+			{
+				char* endStr;
+				
+				if (! strnicmp(LToken, "PbBit_", 6))
+				{
+					// Playback Bits
+					UINT8 pbBit;
+					
+					LToken += 6;
+					pbBit = (UINT8)strtoul(LToken, &endStr, 0);
+					if (pbBit < 8 && endStr != LToken)
+						PreHdr->PbFlagMap[pbBit] = GetOptionValue(OPT_PRE_PBFLAGS, RToken1);
+				}
+				else if (! strnicmp(LToken, "ChnMap_", 7))
+				{
+					// Channel Bit Map
+					UINT8 chnFrom;
+					UINT8 chnTo;
+					UINT8 chnSlot;
+					
+					LToken += 7;
+					chnFrom = (UINT8)strtoul(LToken, &endStr, 0x10);
+					if (endStr == LToken)
+						chnFrom = 0xFF;
+					chnTo = (UINT8)strtoul(RToken1, &endStr, 0x10);
+					if (endStr == RToken1)
+						chnTo = 0xFF;
+					if (chnFrom != 0xFF && chnTo != 0xFF)
+					{
+						if (! PreHdr->ChnMapSize)
+						{
+							UINT8 cMapIdx;
+							UINT8 cDefIdx;
+							
+							PreHdr->ChnMapSize = SmpsCfg->FMChnCnt + SmpsCfg->PSGChnCnt + SmpsCfg->AddChnCnt;
+							PreHdr->ChnMap = (CHNBITS_MAP*)malloc(PreHdr->ChnMapSize * sizeof(CHNBITS_MAP));
+							cMapIdx = 0x00;
+							for (cDefIdx = 0x00; cDefIdx < SmpsCfg->FMChnCnt; cDefIdx ++, cMapIdx ++)
+							{
+								PreHdr->ChnMap[cMapIdx].from = SmpsCfg->FMChnList[cDefIdx];
+								PreHdr->ChnMap[cMapIdx].to = SmpsCfg->FMChnList[cDefIdx];
+							}
+							for (cDefIdx = 0x00; cDefIdx < SmpsCfg->PSGChnCnt; cDefIdx ++, cMapIdx ++)
+							{
+								PreHdr->ChnMap[cMapIdx].from = SmpsCfg->PSGChnList[cDefIdx];
+								PreHdr->ChnMap[cMapIdx].to = SmpsCfg->PSGChnList[cDefIdx];
+							}
+							for (cDefIdx = 0x00; cDefIdx < SmpsCfg->AddChnCnt; cDefIdx ++, cMapIdx ++)
+							{
+								PreHdr->ChnMap[cMapIdx].from = SmpsCfg->AddChnList[cDefIdx];
+								PreHdr->ChnMap[cMapIdx].to = SmpsCfg->AddChnList[cDefIdx];
+							}
+						}
+						
+						// Note: We map "file" to "SMPS driver", with the latter being defined in
+						//       SmpsCfg->*ChnList. So we search for "driver" (Map.to) and
+						//       set "file" (Map.from).
+						for (chnSlot = 0x00; chnSlot < PreHdr->ChnMapSize; chnSlot ++)
+						{
+							if (PreHdr->ChnMap[chnSlot].to == chnTo)
+							{
+								PreHdr->ChnMap[chnSlot].from = chnFrom;
+								break;
+							}
+						}
+					}
+				}
+				else
+				{
+					// Track Header Bytes
+					UINT8 trkOfs;
+					
+					trkOfs = (UINT8)strtoul(LToken, &endStr, 0x10);
+					if (trkOfs < SmpsCfg->PreHdr.TrkHdrSize && endStr != LToken)
+						PreHdr->TrkHdrMap[trkOfs] = GetOptionValue(OPT_PRETRKHDR, RToken1);
+				}
+			}
+		}
 	}
 	
 	Group = ((SmpsCfg->PtrFmt & PTRFMT_EMASK) == PTRFMT_BE);	// Big Endian pointers -> SMPS 68k
@@ -862,6 +988,17 @@ static void LoadRegisterList(SMPS_CFG* SmpsCfg, UINT8 CstRegCnt, const UINT8* Cs
 
 void FreeDriverDefinition(SMPS_CFG* SmpsCfg)
 {
+	if (SmpsCfg->PreHdr.TrkHdrMap != NULL)
+	{
+		SmpsCfg->PreHdr.TrkHdrSize = 0x00;
+		free(SmpsCfg->PreHdr.TrkHdrMap);	SmpsCfg->PreHdr.TrkHdrMap = NULL;
+	}
+	if (SmpsCfg->PreHdr.ChnMap != NULL)
+	{
+		SmpsCfg->PreHdr.ChnMapSize = 0x00;
+		free(SmpsCfg->PreHdr.ChnMap);	SmpsCfg->PreHdr.ChnMap = NULL;
+	}
+	
 	if (SmpsCfg->InsRegs != NULL)
 	{
 		SmpsCfg->InsRegCnt = 0x00;

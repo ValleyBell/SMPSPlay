@@ -1,0 +1,6 @@
+4 bytes - Signature "PSMP" (Pre-SMPs)
+1 byte  - Type
+	Bit 4 - Big Endian pointers (on) / Little Endian pointers (off)
+1 byte  - song tempo
+2 bytes - base offset (counting starts at file offset 08)
+? bytes - SMPS data

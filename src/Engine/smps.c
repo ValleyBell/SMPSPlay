@@ -2307,6 +2307,257 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 	return;
 }
 
+static void InitTempo(UINT8 TempoVal)
+{
+	const SMPS_CFG* SmpsCfg = SmpsRAM.MusSet->Cfg;
+	
+	SmpsRAM.TempoInit = TempoVal;
+	SmpsRAM.TempoCntr = SmpsRAM.TempoInit;
+	if (SmpsCfg->Tempo1Tick == T1TICK_NOTEMPO)
+	{
+		// DoTempo is called before PlayMusic and thus isn't executed during the first tick.
+		// So we undo one DoTempo.
+		switch(SmpsCfg->TempoMode)
+		{
+		case TEMPO_TIMEOUT:
+			SmpsRAM.TempoCntr ++;
+			break;
+		case TEMPO_OVERFLOW:
+			SmpsRAM.TempoCntr -= SmpsRAM.TempoInit;	// prevent overflow
+			break;
+		case TEMPO_OVERFLOW2:
+			// This is not 100% correct, but all games with this algorithm execute PlayMusic first anyway.
+			SmpsRAM.TempoCntr = (UINT8)(0x100 - SmpsRAM.TempoInit);
+			break;
+		case TEMPO_TOUT_OFLW:
+			if (! (SmpsRAM.TempoInit & 0x80))
+				SmpsRAM.TempoCntr ++;
+			else
+				SmpsRAM.TempoCntr -= (SmpsRAM.TempoInit & 0x7F);	// prevent overflow
+			break;
+		case TEMPO_OFLW_MULT:
+			SmpsRAM.TempoCntr -= SmpsRAM.TempoInit;	// prevent overflow
+			if (SmpsRAM.TempoInit & 0x80)
+				SmpsRAM.MusMultUpdate --;	// The first tick won't overflow and add 1 to the counter.
+			break;
+		case TEMPO_TOUT_REV:
+			SmpsRAM.TempoCntr = 1;
+			break;
+		}
+	}
+	
+	return;
+}
+
+static UINT8 GetTrackIDFromChnBits(SMPS_SET* SmpsSet, UINT8 ChnBits)
+{
+	UINT8 ChnLstSize[3];
+	const UINT8* ChnList[3];
+	UINT8 ChnLstID;
+	UINT8 ChnID;
+	UINT8 ChnBase;
+	
+	ChnLstSize[0] = SmpsSet->Cfg->FMChnCnt;
+	ChnList[0] = SmpsSet->Cfg->FMChnList;
+	ChnLstSize[1] = SmpsSet->Cfg->PSGChnCnt;
+	ChnList[1] = SmpsSet->Cfg->PSGChnList;
+	ChnLstSize[2] = SmpsSet->Cfg->AddChnCnt;
+	ChnList[2] = SmpsSet->Cfg->AddChnList;
+	for (ChnLstID = 0; ChnLstID < 3; ChnLstID ++)
+	{
+		for (ChnID = 0x00; ChnID < ChnLstSize[ChnLstID]; ChnID ++)
+		{
+			if (ChnList[ChnLstID][ChnID] == ChnBits)
+			{
+				switch(ChnLstID)
+				{
+				case 0:
+					if (ChnBits & 0x10)
+						return TRACK_MUS_DRUM + ChnID;
+					for (ChnBase = 0; ChnBase < ChnLstSize[0]; ChnBase ++)
+					{
+						if (! (ChnList[0][ChnBase] & 0x10))	// search for first non-drum channel
+							break;
+					}
+					return TRACK_MUS_FM1 + (ChnID - ChnBase);
+				case 1:
+					return TRACK_MUS_PSG1 + ChnID;
+				case 2:
+					return TRACK_MUS_PWM1 + ChnID;
+				}
+			}
+		}
+	}
+	return 0xFF;
+}
+
+static void PlayPreSMPS(SMPS_SET* SmpsSet)
+{
+	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
+	const SMPS_CFG_PREHDR* PreHdr = &SmpsSet->Cfg->PreHdr;
+	const UINT8* Data;
+	UINT16 CurPos;
+	UINT16 THdrOfs;
+	UINT16 ChnBitOfs;
+	UINT8 TrkCount;
+	UINT8 CurTrk;
+	UINT8 TrkID;
+	UINT8 ChnBitsMapped;
+	UINT8 CurCMap;
+	UINT8 PbBit;
+	TRK_RAM* TempTrk;
+	
+	ChnBitOfs = 0xFF;
+	for (CurPos = 0x00; CurPos < PreHdr->TrkHdrSize; CurPos ++)
+	{
+		if (PreHdr->TrkHdrMap[CurPos] == TRKHDR_CHNBITS)
+		{
+			ChnBitOfs = CurPos;
+			break;
+		}
+	}
+	
+	Data = SmpsSet->Seq.Data;
+	if (Data[0x04] & 0x10)
+		SmpsSet->SeqBase = ReadBE16(&Data[0x06]);
+	else
+		SmpsSet->SeqBase = ReadLE16(&Data[0x06]);
+	SmpsSet->SeqBase -= 0x08;	// make up for the file header
+	
+	InitTempo(Data[0x05]);
+	CurPos = 0x08;
+	
+	Extra_SongStart(0);
+	
+	TrkCount = Data[CurPos];
+	CurPos ++;
+	for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++, CurPos += PreHdr->TrkHdrSize)
+	{
+		if (ChnBitOfs == 0xFF)
+		{
+			TrkID = 0xFF;
+		}
+		else
+		{
+			ChnBitsMapped = Data[CurPos + ChnBitOfs];
+			for (CurCMap = 0x00; CurCMap < PreHdr->ChnMapSize; CurCMap ++)
+			{
+				if (PreHdr->ChnMap[CurCMap].from == ChnBitsMapped)
+				{
+					ChnBitsMapped = PreHdr->ChnMap[CurCMap].to;
+					break;
+				}
+			}
+			TrkID = GetTrackIDFromChnBits(SmpsSet, ChnBitsMapped);
+		}
+		if (TrkID == 0xFF)
+			continue;
+		
+		TempTrk = &SmpsRAM.MusicTrks[TrkID];
+		if (TempTrk->SmpsSet != NULL)
+			TempTrk->SmpsSet->UsageCounter --;	// just in case
+		memset(TempTrk, 0x00, sizeof(TRK_RAM));
+		TempTrk->SmpsSet = SmpsSet;
+		SmpsSet->UsageCounter ++;
+		TempTrk->PlaybkFlags = PBKFLG_ACTIVE;
+		TempTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SmpsSet);
+		TempTrk->Transpose = Data[CurPos + 0x02];
+		TempTrk->Volume = Data[CurPos + 0x03];
+		TempTrk->StackPtr = TRK_STACK_SIZE;
+		TempTrk->PanAFMS = 0xC0;
+		TempTrk->RemTicks = 0x01;
+#ifdef ENABLE_LOOP_DETECTION
+		if (SmpsSet->LoopPtrs != NULL)
+			TempTrk->LoopOfs = SmpsSet->LoopPtrs[CurTrk];
+		else
+			TempTrk->LoopOfs.Ptr = 0x0000;
+#endif
+		
+		if ((TempTrk->ChannelMask & 0xF8) == 0x10)	// DAC drum channels
+			TempTrk->SpcDacMode = SmpsSet->Cfg->DrumChnMode;
+		
+		if (TrkID == TRACK_MUS_DRUM && ! (TempTrk->ChannelMask & 0x09))
+			WriteFMMain(TempTrk, 0xB4, TempTrk->PanAFMS);	// force Pan bits to LR
+		
+		for (THdrOfs = 0x00; THdrOfs < PreHdr->TrkHdrSize; THdrOfs ++)
+		{
+			switch(PreHdr->TrkHdrMap[THdrOfs] & 0x7F)
+			{
+			case TRKHDR_PBFLAGS:
+				TempTrk->PlaybkFlags = 0x00;
+				for (PbBit = 0; PbBit < 8; PbBit ++)
+				{
+					if (Data[CurPos + THdrOfs] & (1 << PbBit))
+					{
+						if (PreHdr->PbFlagMap[PbBit] & 0x80)
+						{
+							switch(PreHdr->PbFlagMap[PbBit])
+							{
+							case HDR_PBBIT_PAN_ANI:
+								if (SmpsCfg->PanAnims.AniCount == 0)
+									break;
+								TempTrk->PanAni.Type = 0x01;
+								TempTrk->PanAni.Anim = 0x00;
+								TempTrk->PanAni.AniIdx = 0x01;
+								TempTrk->PanAni.AniLen = 0x04;	// TODO: actually detect
+								TempTrk->PanAni.ToutInit = 0x01;
+								TempTrk->PanAni.Timeout = 0x01;
+								break;
+							}
+						}
+						else
+						{
+							TempTrk->PlaybkFlags |= (1 << PreHdr->PbFlagMap[PbBit]);
+						}
+					}
+				}
+				break;
+			case TRKHDR_PTR:
+				if (PreHdr->TrkHdrMap[THdrOfs] & 0x80)
+				{
+					TempTrk->Pos &= ~0xFF00;
+					TempTrk->Pos |= Data[CurPos + THdrOfs] << 8;
+				}
+				else
+				{
+					TempTrk->Pos &= ~0x00FF;
+					TempTrk->Pos |= Data[CurPos + THdrOfs] << 0;
+				}
+				break;
+			case TRKHDR_CHNBITS:
+				TempTrk->ChannelMask = ChnBitsMapped;
+				break;
+			case TRKHDR_TICKMULT:
+				TempTrk->TickMult = Data[CurPos + THdrOfs];
+				break;
+			case TRKHDR_TRANSP:
+				TempTrk->Transpose = Data[CurPos + THdrOfs];
+				break;
+			case TRKHDR_MODENV:
+				TempTrk->ModEnv = Data[CurPos + THdrOfs];
+				break;
+			case TRKHDR_VOLENV:
+				TempTrk->Instrument = Data[CurPos + THdrOfs];
+				break;
+			case TRKHDR_VOLUME:
+				TempTrk->Volume = Data[CurPos + THdrOfs];
+				break;
+			case TRKHDR_PANAFMS:
+				TempTrk->PanAFMS = Data[CurPos + THdrOfs];
+				break;
+			}
+		}
+		TempTrk->Pos -= SmpsSet->SeqBase;
+		if (TempTrk->Pos >= SmpsSet->Seq.Len)
+		{
+			TempTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
+			//printf("Track XX points after EOF!\n");
+		}
+	}
+	
+	return;
+}
+
 static UINT8 CheckTrkRange(UINT8 TrkID, UINT8 BestTrkID, UINT8 FirstTrk, UINT8 TrkEnd)
 {
 	UINT8 CurTrk;
@@ -2473,6 +2724,13 @@ void PlayMusic(SMPS_SET* SmpsFileSet)
 	
 	SmpsRAM.MusSet = SmpsSet;
 	Data = SmpsSet->Seq.Data;
+	if (! memcmp(Data, "PSMP", 0x04))
+	{
+		PlayPreSMPS(SmpsSet);
+	}
+	else
+	{
+	
 	CurPos = 0x00;
 	
 	//InsLibPtr = ReadPtr(&Data[CurPos + 0x00], SmpsSet);	// done by the SMPS preparser
@@ -2482,40 +2740,7 @@ void PlayMusic(SMPS_SET* SmpsFileSet)
 		return;	// invalid file
 	
 	TickMult = Data[CurPos + 0x04];
-	SmpsRAM.TempoInit = Data[CurPos + 0x05];
-	SmpsRAM.TempoCntr = SmpsRAM.TempoInit;
-	if (SmpsCfg->Tempo1Tick == T1TICK_NOTEMPO)
-	{
-		// DoTempo is called before PlayMusic and thus isn't executed during the first tick.
-		// So we undo one DoTempo.
-		switch(SmpsCfg->TempoMode)
-		{
-		case TEMPO_TIMEOUT:
-			SmpsRAM.TempoCntr ++;
-			break;
-		case TEMPO_OVERFLOW:
-			SmpsRAM.TempoCntr -= SmpsRAM.TempoInit;	// prevent overflow
-			break;
-		case TEMPO_OVERFLOW2:
-			// This is not 100% correct, but all games with this algorithm execute PlayMusic first anyway.
-			SmpsRAM.TempoCntr = (UINT8)(0x100 - SmpsRAM.TempoInit);
-			break;
-		case TEMPO_TOUT_OFLW:
-			if (! (SmpsRAM.TempoInit & 0x80))
-				SmpsRAM.TempoCntr ++;
-			else
-				SmpsRAM.TempoCntr -= (SmpsRAM.TempoInit & 0x7F);	// prevent overflow
-			break;
-		case TEMPO_OFLW_MULT:
-			SmpsRAM.TempoCntr -= SmpsRAM.TempoInit;	// prevent overflow
-			if (SmpsRAM.TempoInit & 0x80)
-				SmpsRAM.MusMultUpdate --;	// The first tick won't overflow and add 1 to the counter.
-			break;
-		case TEMPO_TOUT_REV:
-			SmpsRAM.TempoCntr = 1;
-			break;
-		}
-	}
+	InitTempo(Data[CurPos + 0x05]);
 	CurPos += 0x06;
 	
 	Extra_SongStart(0);
@@ -2539,6 +2764,7 @@ void PlayMusic(SMPS_SET* SmpsFileSet)
 					SmpsCfg->AddChnCnt, SmpsCfg->AddChnList, TickMult, TrkBase);
 	TrkBase += SmpsCfg->AddChnCnt;
 	
+	}	// preSMPS/SMPS loader end
 	Extra_LoopInit();
 	
 	//SetSFXOverrideBits();

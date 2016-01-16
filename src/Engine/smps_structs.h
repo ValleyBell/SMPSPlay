@@ -98,6 +98,33 @@ typedef struct _file_data
 #define DRMTYPE_NECPCM	0x06	// Sega Pico NEC ADPCM drums
 #define DRMTYPE_NONE	0x00
 
+#define TRKHDR_PBFLAGS	0x00
+#define TRKHDR_CHNBITS	0x01
+#define TRKHDR_TICKMULT	0x02
+#define TRKHDR_PTR		0x03
+#define TRKHDR_PTR_LSB	(TRKHDR_PTR | 0x00)
+#define TRKHDR_PTR_MSB	(TRKHDR_PTR | 0x80)
+#define TRKHDR_TRANSP	0x05
+#define TRKHDR_MODENV	0x06
+#define TRKHDR_VOLENV	0x07
+#define TRKHDR_VOLUME	0x08
+#define TRKHDR_PANAFMS	0x0A
+
+// Note: Those need to be synchronized with PBKFLG_ constants from smps_structs_int.h
+#define HDR_PBBIT_SPCMODE		0
+#define HDR_PBBIT_HOLD			1
+#define HDR_PBBIT_OVERRIDDEN	2
+#define HDR_PBBIT_RAWFREQ		3
+#define HDR_PBBIT_ATREST		4
+#define HDR_PBBIT_PITCHSLIDE	5
+#define HDR_PBBIT_LOCKFREQ		6
+#define HDR_PBBIT_ACTIVE		7
+#define HDR_PBBIT_PAUSED		8
+#define HDR_PBBIT_HOLD_LOCK		9
+// Additionally, there are a few ones with a special meaning.
+#define HDR_PBBIT_PAN_ANI		0x80	// enables Pan Animation
+
+
 // Music:
 #define SEQFLG_NEED_SAVE	0x01
 // SFX:
@@ -183,6 +210,19 @@ typedef struct _smps_initial_configuration
 	UINT16 Timing_TimerA;
 	UINT8 Timing_TimerB;
 } SMPS_CFG_INIT;
+typedef struct _channel_bits_mapping
+{
+	UINT8 from;
+	UINT8 to;
+} CHNBITS_MAP;
+typedef struct _presmps_header_config
+{
+	UINT8 TrkHdrSize;
+	UINT8 ChnMapSize;
+	UINT8* TrkHdrMap;
+	CHNBITS_MAP* ChnMap;
+	UINT16 PbFlagMap[8];
+} SMPS_CFG_PREHDR;
 typedef struct _drum_track_library
 {
 	//UINT16 DataLen;
@@ -206,6 +246,7 @@ typedef struct _pan_animation_library
 typedef struct _smps_configuration	// global SMPS driver configuration
 {
 	SMPS_CFG_INIT InitCfg;
+	SMPS_CFG_PREHDR PreHdr;
 	
 	UINT8 PtrFmt;
 	UINT8 InsMode;

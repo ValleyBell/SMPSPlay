@@ -49,6 +49,7 @@ typedef struct _adsr_volume_data
 } ADSR_DATA;
 
 #define TRK_STACK_SIZE		8
+// Note: Those need to be synchronized with HDR_PBBIT_ constants from smps_structs.h
 #define PBKFLG_SPCMODE		0x01	// Bit 0 - Special Mode (Special FM 3 or Noise) [Z80 only]
 #define PBKFLG_HOLD			0x02	// Bit 1 - Hold Note [SMPS 68k: 0x10]
 #define PBKFLG_OVERRIDDEN	0x04	// Bit 2 - overridden by SFX
