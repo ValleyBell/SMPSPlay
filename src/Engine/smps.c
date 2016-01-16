@@ -2198,11 +2198,14 @@ void RefreshFMVolume(TRK_RAM* Trk)
 	}
 	else
 	{
+		VolPtr = Trk->VolOpPtr;
+		if (VolPtr == NULL)
+			return;
+		
 		// interleaved mode - VolPtr has Reg, Data, Reg, Data, ...
 		// Note that it the registers can be in a random order or, like for drum instruments, partly missing.
 		// (preSMPS uses the Special FM3 mode to play 2x 2op drums)
 		// So I iterate through the whole instrument and search for the volume data.
-		VolPtr = Trk->VolOpPtr;
 		while(*VolPtr && *VolPtr != 0x83)
 		{
 			CurOp = *VolPtr;	VolPtr ++;
