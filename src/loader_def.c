@@ -591,12 +591,42 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				if (! ChnCount || ChnCount > 8 || CurChn < ChnCount)	// invalid channels used?
 				{
 					SmpsCfg->FMChnCnt = sizeof(FMCHN_ORDER);
-					memcpy(SmpsCfg->FMChnList, FMCHN_ORDER, 7);
+					memcpy(SmpsCfg->FMChnList, FMCHN_ORDER, SmpsCfg->FMChnCnt);
 				}
 				else
 				{
 					SmpsCfg->FMChnCnt = ChnCount;
 					memcpy(SmpsCfg->FMChnList, ChnIDs, ChnCount);
+				}
+				
+				free(ChnIDs);
+			}
+			else if (! stricmp(LToken, "PSGChnOrder"))
+			{
+				UINT32 ChnCount;
+				UINT8* ChnIDs;
+				UINT8 CurChn;
+				
+				RevertTokenTrim(RToken1, RToken2);
+				ChnCount = ReadHexData(RToken1, &ChnIDs);
+				
+				for (CurChn = 0; CurChn < ChnCount; CurChn ++)
+				{
+					// check for valid channel IDs
+					if (! (ChnIDs[CurChn] & 0x80))
+						break;
+					if (ChnIDs[CurChn] & 0x0F)
+						break;
+				}
+				if (! ChnCount || ChnCount > 4 || CurChn < ChnCount)	// invalid channels used?
+				{
+					SmpsCfg->PSGChnCnt = sizeof(PSGCHN_ORDER);
+					memcpy(SmpsCfg->PSGChnList, PSGCHN_ORDER, SmpsCfg->PSGChnCnt);
+				}
+				else
+				{
+					SmpsCfg->PSGChnCnt = ChnCount;
+					memcpy(SmpsCfg->PSGChnList, ChnIDs, ChnCount);
 				}
 				
 				free(ChnIDs);
@@ -609,7 +639,7 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				RevertTokenTrim(RToken1, RToken2);
 				ChnCount = ReadHexData(RToken1, &ChnIDs);
 				
-				if (ChnCount < 0x10)
+				if (ChnCount <= 0x10)
 				{
 					SmpsCfg->AddChnCnt = ChnCount;
 					memcpy(SmpsCfg->AddChnList, ChnIDs, ChnCount);
