@@ -1390,6 +1390,8 @@ void LoadPSGDrumDefinition(const char* FileName, PSG_DRUM_LIB* DrumDef)
 	DrumDef->DrumCount = 0x60;
 	DrumDef->DrumData = (PSG_DRUM_DATA*)malloc(DrumDef->DrumCount * sizeof(PSG_DRUM_DATA));
 	memset(DrumDef->DrumData, 0x00, DrumDef->DrumCount * sizeof(PSG_DRUM_DATA));
+	for (DrumNote = 0x00; DrumNote < DrumDef->DrumCount; DrumNote ++)
+		DrumDef->DrumData[DrumNote].Volume = 0xFF;	// mark as 'unused'
 	
 	Group = 0x01;
 	while(! feof(hFile))

@@ -421,7 +421,6 @@ void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note)
 {
 	const PSG_DRUM_LIB* DrumLib = &Trk->SmpsSet->Cfg->PSGDrumLib;
 	const PSG_DRUM_DATA* TempDrum;
-	UINT8 TempVol;
 	
 	if (Note < Trk->SmpsSet->Cfg->NoteBase)
 		return;
@@ -437,7 +436,7 @@ void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note)
 	TempDrum = &DrumLib->DrumData[Note];
 	if (! TempDrum->NoiseMode)
 	{
-		if (TempDrum->NoiseMode && (DebugMsgs & 0x01))
+		if (TempDrum->Volume == 0xFF && (DebugMsgs & 0x01))
 			printf("Warning: Unmapped PSG drum %02X at %04X!\n", 0x80 | Note, Trk->Pos);
 		Trk->PlaybkFlags |= PBKFLG_ATREST;
 		DoNoteOff(Trk);
@@ -458,10 +457,8 @@ void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note)
 		Trk->Frequency = TempDrum->Ch3Freq;
 		Trk->Detune = TempDrum->Ch3Slide;
 		
-		TempVol = SmpsRAM.NoiseDrmVol + TempDrum->Ch3Vol;
-		if (TempVol > 0x0F)
-			TempVol = 0x0F;
-		WritePSG(0xD0 | TempVol);
+		Trk->PSG3AddVol = SmpsRAM.NoiseDrmVol + TempDrum->Ch3Vol;
+		//WritePSG(0xD0 | Trk->PSG3AddVol);	// done in UpdatePSGVolume
 	}
 	
 	return;

@@ -9,12 +9,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>		// for toupper()
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
 #include <direct.h>		// for _mkdir()
-#include <conio.h>
+#ifdef _WIN32
+#include <conio.h>		// for _getch() and _kbhit()
 #include <windows.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>	// for stat()
 #include "dirent.h"
@@ -110,10 +113,10 @@ int main(int argc, char* argv[])
 	
 	printf("SMPS Music Player v" SMPSPLAY_VER "\n");
 	printf("-----------------\n");
-#ifndef BETA
-	printf("by Valley Bell\n");
-#else
+#ifdef BETA
 	printf("by Valley Bell, beta version\n");
+#else
+	printf("by Valley Bell\n");
 #endif
 	
 	InitAudioOutput();
@@ -711,8 +714,8 @@ static void WaitTimeForKey(unsigned int MSec)
 {
 	DWORD CurTime;
 	
-	CurTime = timeGetTime() + MSec;
-	while(! ExitWait && timeGetTime() < CurTime)
+	CurTime = GetTickCount() + MSec;
+	while(! ExitWait && GetTickCount() < CurTime)
 	{
 		Sleep(20);
 		if (_kbhit())

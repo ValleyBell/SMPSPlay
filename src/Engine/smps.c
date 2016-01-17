@@ -639,6 +639,17 @@ static void UpdatePSGVolume(TRK_RAM* Trk, UINT8 WasNewNote)
 		FinalVol |= 0x20;
 	WritePSG(FinalVol);
 	
+	if ((Trk->ChannelMask & 0x10) && (Trk->PlaybkFlags & PBKFLG_SPCMODE))
+	{
+		// crazy Space Harrier II devs ....
+		FinalVol &= 0x0F;
+		FinalVol += Trk->PSG3AddVol;
+		if (FinalVol >= 0x10)
+			FinalVol = 0x0F;
+		FinalVol |= (Trk->ChannelMask & 0xC0) | 0x10;
+		WritePSG(FinalVol);
+	}
+	
 	return;
 }
 

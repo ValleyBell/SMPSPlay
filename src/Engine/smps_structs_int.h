@@ -117,6 +117,7 @@ typedef struct _track_ram
 	INT16 ModEnvCache;	// [not in driver]
 	
 	UINT8 SpcDacMode;
+	UINT8 PSG3AddVol;
 	INT8 PS4_DacMode;	// DAC On/Off, Volume Control On/Off
 	UINT8 PS4_AltTrkMode;
 	UINT8 GA3_DacMode;	// 2-note DAC mode on/off
