@@ -450,6 +450,7 @@ void DAC_Reset(void)
 		//DACChn->Volume = 0x100;
 		DACChn->SmplLast = DACChn->SmplNext = 0x0000;
 		DACChn->DACAlgo = NULL;
+		DACChn->BaseSmpl = 0x00;
 	}
 	
 	DAC_ResetOverride();
@@ -477,7 +478,7 @@ void DAC_ResetOverride(void)
 		DACChn->PbBaseFlags = 0x00;
 		//DACChn->PbFlags = 0x00;
 		DACChn->Volume = 0x100;
-		DACChn->BaseSmpl = 0x00;
+		//DACChn->BaseSmpl = 0x00;
 	}
 	
 	return;

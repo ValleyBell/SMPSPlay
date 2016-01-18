@@ -335,16 +335,17 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 			return 0x81;
 		
 		TrkCount = 0x00;
-		for (CurTrk = 0x00; CurTrk < FMTrkCnt; CurTrk ++, TrkCount ++, CurPos += PreHdr->TrkHdrSize)
+		for (CurTrk = 0x00; CurTrk < FMTrkCnt; CurTrk ++, CurPos += PreHdr->TrkHdrSize)
 		{
 			if (maskPbActive)
 			{
 				if (! (FileData[CurPos + ofsPbFlg] & maskPbActive))
 					continue;	// skip disabled channels
 			}
-			TrkOfs[CurTrk] =	(FileData[CurPos + ofsPtrMSB] << 8) |
+			TrkOfs[TrkCount] =	(FileData[CurPos + ofsPtrMSB] << 8) |
 								(FileData[CurPos + ofsPtrLSB] << 0);
-			TrkOfs[CurTrk] -= SmpsSet->SeqBase;
+			TrkOfs[TrkCount] -= SmpsSet->SeqBase;
+			TrkCount ++;
 		}
 	}
 	else

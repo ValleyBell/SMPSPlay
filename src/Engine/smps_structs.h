@@ -17,6 +17,7 @@ typedef struct _file_data
 #define PTRFMT_LE		0x10	// Little Endian
 #define PTRFMT_EMASK	0x10	// Endianess mask
 
+#define PTRFMT_PRE68K	(PTRFMT_BE | 0x00)	// preSMPS 68k, absolute
 //#define PTRFMT_		(PTRFMT_BE | 0x01)	// 68k, relative to (ptr+0)
 #define PTRFMT_68K		(PTRFMT_BE | 0x02)	// 68k, relative to (ptr+1)
 #define PTRFMT_RST		(PTRFMT_BE | 0x03)	// 68k, relative to (ptr+2)

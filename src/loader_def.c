@@ -49,7 +49,8 @@ static UINT8 GetShiftFromMask(UINT8 Mask);
 
 
 static const OPT_LIST OPT_PTRFMT[] =
-{	{"68K", PTRFMT_68K},
+{	{"PRE68K", PTRFMT_PRE68K},
+	{"68K", PTRFMT_68K},
 	{"RST", PTRFMT_RST},
 	{"Z80", PTRFMT_Z80},
 	{NULL, 0}};

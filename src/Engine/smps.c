@@ -515,7 +515,7 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 		
 		FreqUpdate = DoModulation(Trk, &Freq);
 		if ((Trk->PlaybkFlags & PBKFLG_PITCHSLIDE) ||
-			! (Trk->CinoP_Speed & 0x80) || FreqUpdate == 0x01)
+			(Trk->CinoP_Speed & 0x80) || FreqUpdate == 0x01)
 			SendFMFrequency(Trk, Freq);
 	}
 	
@@ -588,7 +588,7 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 		return;
 	
 	if (WasNewNote || (Trk->PlaybkFlags & PBKFLG_PITCHSLIDE) ||
-		! (Trk->CinoP_Speed & 0x80) || FreqUpdate == 0x01)
+		(Trk->CinoP_Speed & 0x80) || FreqUpdate == 0x01)
 		SendPSGFrequency(Trk, Freq);
 	
 	UpdatePSGVolume(Trk, WasNewNote);
@@ -2474,9 +2474,6 @@ static void PlayPreSMPS(SMPS_SET* SmpsSet)
 		TempTrk->SmpsSet = SmpsSet;
 		SmpsSet->UsageCounter ++;
 		TempTrk->PlaybkFlags = PBKFLG_ACTIVE;
-		TempTrk->Pos = ReadPtr(&Data[CurPos + 0x00], SmpsSet);
-		TempTrk->Transpose = Data[CurPos + 0x02];
-		TempTrk->Volume = Data[CurPos + 0x03];
 		TempTrk->StackPtr = TRK_STACK_SIZE;
 		TempTrk->PanAFMS = 0xC0;
 		TempTrk->RemTicks = 0x01;

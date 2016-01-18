@@ -946,7 +946,7 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 	InsBase = ReadPtr16(&FileData[0x08], Flags);
 	// For now I'll ignore the Register array. It is specified in DefDrv.txt.
 	if (! InsOfs)
-		return 0xC1;	// invalid drum offset
+		return 0xC1;	// invalid instrument list offset
 	
 	if (FileLen > 0xFFFF)
 		FileLen = 0xFFFF;
