@@ -425,6 +425,7 @@ INLINE void UpdateTrack(TRK_RAM* Trk)
 	if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
 		return;
 	
+UpdTrk_Reproc:	// It occours so rarely a loop is just not worth it.
 	if (Trk->ChannelMask & 0x80)
 	{
 		if (Trk->ChannelMask & 0x10)
@@ -442,7 +443,24 @@ INLINE void UpdateTrack(TRK_RAM* Trk)
 	else
 		UpdateFMTrack(Trk);
 	
+	if (SmpsRAM.ReprocTrack)
+	{
+		Trk->RemTicks ++;	// will be decremented by Update##Track again
+		goto UpdTrk_Reproc;
+	}
+	
 	return;
+}
+
+INLINE UINT8 ReprocTrackCheck(TRK_RAM* Trk, UINT8 ExecMode)
+{
+	if (SmpsRAM.ReprocTrack & 0x80)
+	{
+		SmpsRAM.ReprocTrack = (Trk->ChannelMask ^ ExecMode) & 0x10;
+		return SmpsRAM.ReprocTrack;
+	}
+	
+	return 0x00;
 }
 
 static void UpdateFMTrack(TRK_RAM* Trk)
@@ -455,6 +473,8 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 	if (! Trk->RemTicks)
 	{
 		TrkUpdate_Proc(Trk);
+		if (SmpsRAM.ReprocTrack)
+			return;
 		if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
 			return;	// return after TRK_END command (the driver POPs some addresses from the stack instead)
 		if (Trk->PlaybkFlags & PBKFLG_ATREST)
@@ -536,6 +556,8 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 		if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
 			return;	// return after TRK_END command (the driver POPs some addresses from the stack instead)
 		if (Trk->PlaybkFlags & PBKFLG_ATREST)
+			return;
+		if (ReprocTrackCheck(Trk, 0x00))
 			return;
 		
 		PrepareModulat(Trk);
@@ -669,13 +691,18 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 			return;
 		}
 		
-		Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
+		if (! SmpsRAM.ReprocTrack)
+			Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
+		else
+			SmpsRAM.ReprocTrack = 0x00;
 		
 		while(Data[Trk->Pos] >= SmpsCfg->CmdList.FlagBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			cfHandler(Trk, Data[Trk->Pos]);
 			if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
+				return;
+			if (ReprocTrackCheck(Trk, 0x10))
 				return;
 		}
 		
@@ -876,13 +903,18 @@ static void UpdatePWMTrack(TRK_RAM* Trk)
 			return;
 		}
 		
-		Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
+		if (! SmpsRAM.ReprocTrack)
+			Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
+		else
+			SmpsRAM.ReprocTrack = 0x00;
 		
 		while(Data[Trk->Pos] >= SmpsCfg->CmdList.FlagBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			cfHandler(Trk, Data[Trk->Pos]);
 			if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
+				return;
+			if (ReprocTrackCheck(Trk, 0x00))
 				return;
 		}
 		
@@ -938,13 +970,18 @@ static void UpdatePSGNoiseTrack(TRK_RAM* Trk)
 			return;
 		}
 		
-		Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
+		if (! SmpsRAM.ReprocTrack)
+			Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
+		else
+			SmpsRAM.ReprocTrack = 0x00;
 		
 		while(Data[Trk->Pos] >= SmpsCfg->CmdList.FlagBase)
 		{
 			Extra_LoopStartCheck(Trk);
 			cfHandler(Trk, Data[Trk->Pos]);
 			if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
+				return;
+			if (ReprocTrackCheck(Trk, 0x00))
 				return;
 		}
 		
@@ -1072,15 +1109,22 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 		return;
 	}
 	
-	Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
-	if (Trk->PlaybkFlags & PBKFLG_HOLD_LOCK)
-		Trk->PlaybkFlags |= PBKFLG_HOLD;
+	if (! SmpsRAM.ReprocTrack)
+	{
+		Trk->PlaybkFlags &= ~(PBKFLG_HOLD | PBKFLG_ATREST);
+		if (Trk->PlaybkFlags & PBKFLG_HOLD_LOCK)
+			Trk->PlaybkFlags |= PBKFLG_HOLD;
+	}
+	else
+		SmpsRAM.ReprocTrack = 0x00;
 	
 	while(Data[Trk->Pos] >= /*0xE0*/SmpsCfg->CmdList.FlagBase)
 	{
 		Extra_LoopStartCheck(Trk);
 		cfHandler(Trk, Data[Trk->Pos]);
 		if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
+			return;
+		if (ReprocTrackCheck(Trk, 0x00))
 			return;
 	}
 	

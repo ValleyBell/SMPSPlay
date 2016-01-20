@@ -894,24 +894,68 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		if (Trk->ChannelMask != 0x02)
 			break;
 		
-		if (CmdLen == 0x05)
+		switch(CFlag->SubType)
 		{
-			UINT16* FM3FrqRAM;
-			UINT8 CurOp;
-			
-			// TODO: This is probably different on other drivers.
-			Trk->PlaybkFlags |= PBKFLG_SPCMODE;
-			FM3FrqRAM = GetFM3FreqPtr();
-			
-			for (CurOp = 0x00; CurOp < 0x04; CurOp ++)
+		case CFS_SFM3_ON_NOTES:
+			if (CmdLen == 0x05)
 			{
-				if (Data[CurOp] < SmpsCfg->FM3FreqCnt)
-					FM3FrqRAM[CurOp] = SmpsCfg->FM3Freqs[Data[CurOp]];
-				else
-					FM3FrqRAM[CurOp] = 0x0000;
+				UINT16* FM3FrqRAM;
+				UINT8 CurOp;
+				
+				// TODO: This is probably different on other drivers.
+				Trk->PlaybkFlags |= PBKFLG_SPCMODE;
+				FM3FrqRAM = GetFM3FreqPtr();
+				
+				for (CurOp = 0x00; CurOp < 0x04; CurOp ++)
+				{
+					if (Data[CurOp] < SmpsCfg->FM3FreqCnt)
+						FM3FrqRAM[CurOp] = SmpsCfg->FM3Freqs[Data[CurOp]];
+					else
+						FM3FrqRAM[CurOp] = 0x0000;
+				}
+				SmpsRAM.SpcFM3Mode = 0x4F;
+				WriteFMI(0x27, SmpsRAM.SpcFM3Mode);
 			}
-			SmpsRAM.SpcFM3Mode = 0x4F;
+			else if (CmdLen == 0x09)
+			{
+				UINT16* FM3FrqRAM;
+				UINT8 CurOp;
+				
+				printf("68k/Type 1 Special FM3 Write: please report!\n");
+				Trk->PlaybkFlags |= PBKFLG_SPCMODE;
+				FM3FrqRAM = GetFM3FreqPtr();
+				
+				for (CurOp = 0x00; CurOp < 0x04; CurOp ++)
+					FM3FrqRAM[CurOp] = ReadRawPtr(&Data[CurOp * 0x02], SmpsCfg);
+				SmpsRAM.SpcFM3Mode = 0x4F;
+				WriteFMI(0x27, SmpsRAM.SpcFM3Mode);
+			}
+			else
+			{
+				printf("Special FM3 Write with unhandled command size!\n");
+			}
+			break;
+		case CFS_SFM3_ON:
+			Trk->PlaybkFlags |= PBKFLG_SPCMODE;
+			SmpsRAM.SpcFM3Mode &= 0x3F;
+			SmpsRAM.SpcFM3Mode |= 0x40;
 			WriteFMI(0x27, SmpsRAM.SpcFM3Mode);
+			break;
+		case CFS_SFM3_OFF:
+			Trk->PlaybkFlags &= ~PBKFLG_SPCMODE;
+			SmpsRAM.SpcFM3Mode &= 0x3F;
+			WriteFMI(0x27, SmpsRAM.SpcFM3Mode);
+			break;
+		case CFS_SFM3_ONOFF:
+			{
+				CMD_FLAGS FM3Flag;
+				
+				FM3Flag.Type = CF_SPC_FM3;
+				FM3Flag.SubType = Data[0x00] ? CFS_SFM3_ON : CFS_SFM3_OFF;
+				FM3Flag.Len = 0x00;
+				DoCoordinationFlag(Trk, &FM3Flag);
+			}
+			break;
 		}
 		break;
 	case CF_SSG_EG:			// FF 06 SSG-EG
@@ -924,6 +968,30 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			Trk->SSGEG.Type = 0x80;
 		Trk->SSGEG.DataPtr = Trk->Pos + 0x01;
 		SendSSGEG(Trk, Data, Trk->SSGEG.Type & 0x01);
+		break;
+	case CF_DRUM_MODE:
+		SmpsRAM.ReprocTrack = 0x80;	// enforce check
+		switch(CFlag->SubType)
+		{
+		case CFS_DM_ON:
+			Trk->ChannelMask |= 0x10;	// put channel into Drum mode
+			break;
+		case CFS_DM_OFF:
+			Trk->ChannelMask &= ~0x10;	// put channel into Melody mode
+			break;
+		case CFS_DM_OFF_FM3ONN:
+			Trk->ChannelMask &= ~0x10;	// put channel into Melody mode
+			{
+				CMD_FLAGS FM3Flag;
+				
+				FM3Flag.Type = CF_SPC_FM3;
+				FM3Flag.SubType = CFS_SFM3_ON_NOTES;
+				FM3Flag.Len = CmdLen;
+				CmdLen = 0x00;	// apply command size only once
+				DoCoordinationFlag(Trk, &FM3Flag);
+			}
+			break;
+		}
 		break;
 	// Tempo Flags
 	// -----------

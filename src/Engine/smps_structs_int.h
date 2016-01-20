@@ -265,6 +265,7 @@ typedef struct _sound_ram
 	// 1C17 - unknown (set to a random value (Z80 register R) when executing DoSoundQueue
 	UINT8 CurSFXPrio;		// 1C18 - current SFX Priority
 	UINT8 TrkMode;			// 1C19 - Music/SFX Mode
+	UINT8 ReprocTrack;		// force re-execution of track processing routine
 	
 	UINT16 FM3Freqs_SpcSFX[4];	// 1C1A - Special FM3 Frequencies: Special SFX
 	UINT16 FM3Freqs_SFX[4];		// 1C22 - Special FM3 Frequencies: SFX

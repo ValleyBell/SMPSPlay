@@ -117,10 +117,18 @@
 #define CF_SET_LFO_SPD			0x2A	// E9 [preSMPS] (set LFO Speed)
 #define CF_PITCH_SLIDE			0x2B	// FC [SMPS Z80] (enable Portamento)
 #define CF_RAW_FREQ				0x2C	// FD [SMPS Z80] (Raw Frequency Mode)
-#define CF_SPC_FM3				0x2D	// FE [SMPS 68k/Z80] (enable Special FM3 Mode)
+#define CF_SPC_FM3				0x2D	// FE [SMPS 68k/Z80] (enable Special FM3 Mode + set FM3 notes)
+	#define CFS_SFM3_ON_NOTES		0x00	// FE
+	#define CFS_SFM3_ON				0x10	// EC [preSMPS Z80]
+	#define CFS_SFM3_OFF			0x11	// ED [preSMPS Z80]
+	#define CFS_SFM3_ONOFF			0x12
 #define CF_SSG_EG				0x2E	// FF 06 [SMPS Z80] (set SSG-EG)
 	#define CFS_SEG_NORMAL			0x00	// SMPS Z80
 	#define CFS_SEG_FULLATK			0x01	// SMPS 68k
+#define CF_DRUM_MODE			0x2F	// [preSMPS 68k/Z80] (enable/disable Drum Mode)
+	#define CFS_DM_ON				0x00	// F1 [preSMPS Z80] / E5 [preSMPS 68k Type 2]
+	#define CFS_DM_OFF				0x01	// E5 [preSMPS 68k Type 2]
+	#define CFS_DM_OFF_FM3ONN		0x02	// E8 [preSMPS Z80]
 
 // Tempo Flags
 // -----------

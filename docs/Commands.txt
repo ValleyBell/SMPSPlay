@@ -89,17 +89,16 @@ VOLUME - change or set channel volume
 	command E4, size 02, Master System SMPS
 
 HOLD - prevent next note from being retriggered, effectively holding it
-	command E7, size 01
-    Note: A blank sub-type equals the default behaviour: HOLD_ON.
+    Note: A blank sub-type equals the default behaviour: HOLD_ON
   HOLD_ON - set "hold" bit (default behaviour)
 	command E7, size 01
   HOLD_OFF - clear "hold" bit
 	size 01
   HOLD_LOCK - set (parameter == 1) or clear (else) "hold" and "hold lock" bits
 	The "hold lock" bit caused the "hold" bit to be set for all future notes.
-	command ED, size 02, Castle of Illusion
+	command ED, size 02, preSMPS Z80, Castle of Illusion
   HOLD_LOCK_NEXT - like HOLD_LOCK, but (parameter == 1) takes affect after the next note
-	command EE, size 02, preSMPS
+	command EE, size 02, Space Harrier II
 
 NOTE_STOP - stop notes after x frames (disabled if x == 0)
 	command E8, size 02
@@ -143,7 +142,7 @@ PSG_NOISE
   PNOIS_SET - put channel in "PSG noise" mode (set)
 	command F3, size 02, SMPS 68k
   PNOIS_SET2 - put channel in "PSG noise" mode (set), force parameter into Noise Type range (ORs with E0h)
-	command F3, size 02, early SMPS Z80
+	command F3, size 02, pre-SMPS, early SMPS Z80
   PNOIS_SRES - put channel in "PSG noise" mode (set) or revert it back (reset)
 	command F3, size 02, SMPS Z80
 
@@ -226,16 +225,32 @@ RAW_FREQ - enable/disable Raw Frequency mode (01 = enable, disable else)
 	command FD, size 02, SMPS Z80
 
 SPC_FM3 - enable Special FM3 Mode
+    Note: A blank sub-type equals the default behaviour: SFM3_ON_NOTES
+  SFM3_ON_NOTES - set "hold" bit (default behaviour)
 	command FE, size 05, SMPS Z80, SMPS 68k Type 2
 	command FE, size 09, SMPS 68k Type 1
 	Note: size 05 causes the FM3 frequencies to be read from a global FM3Freq table
 	      size 09 means that the raw frequencies are part of the command (4 frequencies x 2-byte)
+  SFM3_ON - set track to "Special" mode and enable Special FM3 Mode
+	command EC, size 01, pre-SMPS Z80
+  SFM3_OFF - set track to "Normal" mode and disable Special FM3 Mode
+	command ED, size 01, pre-SMPS Z80
+  SFM3_ONOFF - act like SFM3_SET_ON (parameter == 1) or SFM3_SET_OFF (else)
 
 SSG_EG - set SSG-EG registers (4 parameters for one operator each)
   SEG_NORMAL - do the above and nothing else
 	command FF 06/05, size 05, SMPS Z80
   SEG_FULLATK - also force the Attack Rate of all operators to MAX (1Fh)
 	command FF 00/01, size 05, SMPS 68k
+
+DRUM_MODE - enable/disable Drum Mode on the current channel
+  DM_ON - set channel to Drum Mode
+	command F1, size 01, preSMPS Z80
+	command E5, size 01, preSMPS 68k/Type 2
+  DM_OFF - set channel to Melody Mode
+	command E6, size 01, preSMPS 68k/Type 2
+  DM_OFF_FM3ONN - set channel to Melody Mode + do SPC_FM3/SFM3_ON_NOTES
+	command E8, size 05, preSMPS Z80
 
 
 Tempo Flags

@@ -168,7 +168,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 			if (IniSection & 0x80)
 				LoadDACSample(DACDrv, CurDrumID, DACFile, &DSmpl);
 			
-			if (RToken1[0] == '$')
+			if (RToken1[0] == '$')	// define algorithm
 			{
 				CurAlgoID = (UINT8)strtoul(RToken1 + 1, &RToken2, 0x10);
 				if (CurAlgoID == DACDrv->Cfg.AlgoCount)
@@ -243,7 +243,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 		}
 		
 		RToken2 = TrimToken(RToken1);
-		if (IniSection == 0x01)
+		if (IniSection == 0x01)	// [$] section - algorithm definition
 		{
 			if (! stricmp(LToken, "BaseRate"))
 				DAlgo->BaseRate = (UINT32)strtoul(RToken1, NULL, 0);
@@ -258,7 +258,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 			else if (! stricmp(LToken, "RateMode"))
 				DAlgo->RateMode = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "RateOverflow"))
-				DAlgo->RateOverflow = (UINT32)(strtol(RToken1, NULL, 0));
+				DAlgo->RateOverflow = (UINT32)(strtoul(RToken1, NULL, 0));
 			else if (! stricmp(LToken, "DefCompr"))
 			{
 				if (! stricmp(RToken1, "All"))
@@ -275,7 +275,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 			else if (! stricmp(LToken, "DrumIDBase"))
 				DrumIDBase = (UINT16)strtoul(RToken1, NULL, 0x10);
 		}
-		else if (IniSection == 0x02)
+		else if (IniSection == 0x02)	// [Banks] section
 		{
 			CurDrumID = (UINT8)strtoul(LToken, &RToken2, 0x10);
 			if (DACDrv->BankAlloc <= CurDrumID)
@@ -316,9 +316,9 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 					DSmpl.Compr = strtol(RToken1, NULL, 0) ? 0x01 : 0x00;
 			}
 			else if (! stricmp(LToken, "Rate"))
-				DSmpl.Rate = (UINT32)strtol(RToken1, NULL, 0);
+				DSmpl.Rate = (UINT32)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "Pan"))
-				DSmpl.Pan = (UINT8)strtol(RToken1, NULL, 0);
+				DSmpl.Pan = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "Looping"))
 			{
 				DSmpl.Flags &= ~DACFLAG_LOOP;
@@ -328,6 +328,10 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 			{
 				DSmpl.Flags &= ~DACFLAG_REVERSE;
 				DSmpl.Flags |= GetBoolValue(RToken1, "True", "False") << 1;
+			}
+			else if (0)	// (! stricmp(LToken, "??"))
+			{
+				DSmpl.Algo = (UINT8)strtoul(RToken1, NULL, 0);
 			}
 		}
 	}

@@ -26,6 +26,7 @@ void UpdateMusic(void);
 void UpdateSFX(void);
 
 INLINE void UpdateTrack(TRK_RAM* Trk);
+INLINE UINT8 ReprocTrackCheck(TRK_RAM* Trk, UINT8 ExecMode);
 static void UpdateFMTrack(TRK_RAM* Trk);
 static void UpdatePSGTrack(TRK_RAM* Trk);
 static void UpdatePSGVolume(TRK_RAM* Trk, UINT8 WasNewNote);
