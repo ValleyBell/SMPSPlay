@@ -278,7 +278,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		{
 			SmpsRAM.SpcFM3Mode |= 0x40;
 			WriteFMI(0x27, SmpsRAM.SpcFM3Mode);
-			Trk->Volume = 0x00;
+			//Trk->Volume = 0x00;
 		}
 		
 		// Initialize configuration structures

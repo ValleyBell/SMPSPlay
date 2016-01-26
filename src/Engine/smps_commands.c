@@ -889,7 +889,9 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			Trk->PlaybkFlags &= ~PBKFLG_RAWFREQ;
 		break;
 	case CF_SPC_FM3:		// FE FM3 Special Mode
-		if (Trk->SmpsSet->Seq.Data != SmpsCfg->FMDrums.File.Data && (DebugMsgs & 0x02))
+		if ((DebugMsgs & 0x02) &&
+			Trk->SmpsSet->Seq.Data != SmpsCfg->FMDrums.File.Data &&	// don't print for FM drum lib.
+			! SmpsRAM.ReprocTrack)	// don't print for DrumMode change command
 			print_msg(Trk, CmdLen, "Special FM3 mode");
 		if (Trk->ChannelMask != 0x02)
 			break;

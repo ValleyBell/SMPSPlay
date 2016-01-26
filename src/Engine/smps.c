@@ -2528,12 +2528,6 @@ static void PlayPreSMPS(SMPS_SET* SmpsSet)
 			TempTrk->LoopOfs.Ptr = 0x0000;
 #endif
 		
-		if ((TempTrk->ChannelMask & 0xF8) == 0x10)	// DAC drum channels
-			TempTrk->SpcDacMode = SmpsSet->Cfg->DrumChnMode;
-		
-		if (TrkID == TRACK_MUS_DRUM && ! (TempTrk->ChannelMask & 0x09))
-			WriteFMMain(TempTrk, 0xB4, TempTrk->PanAFMS);	// force Pan bits to LR
-		
 		for (THdrOfs = 0x00; THdrOfs < PreHdr->TrkHdrSize; THdrOfs ++)
 		{
 			switch(PreHdr->TrkHdrMap[THdrOfs] & 0x7F)
@@ -2608,6 +2602,11 @@ static void PlayPreSMPS(SMPS_SET* SmpsSet)
 			TempTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 			//printf("Track XX points after EOF!\n");
 		}
+		
+		if ((TempTrk->ChannelMask & 0xF8) == 0x10)	// DAC drum channels
+			TempTrk->SpcDacMode = SmpsSet->Cfg->DrumChnMode;
+		if (TrkID == TRACK_MUS_DRUM && ! (TempTrk->ChannelMask & 0x09))
+			WriteFMMain(TempTrk, 0xB4, TempTrk->PanAFMS);	// force Pan bits to LR
 	}
 	
 	return;
