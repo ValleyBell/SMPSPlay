@@ -1,3 +1,4 @@
+- add multiple DAC rates per DAC sound (used by preSMPS 68k Type 2/melodic DAC mode)
 - way to define Song IDs (for Wonder Boy 3, command EF 81 84)
 - read Chaotix 32x DAC/PWM.ini correctly
 - DAC test

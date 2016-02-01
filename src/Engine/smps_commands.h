@@ -228,6 +228,7 @@
 	#define CFS_GA3_2NOTE_PERM			0x01
 	#define CFS_GA3_2NOTE_OFF			0x02
 #define CF_DAC_PLAY_MODE		0x93	// FA [Sonic 2 Recreation]
+#define CF_DAC_MEL_MODE			0x94	// E8 [preSMPS 68k Type 2]
 
 
 //#define CF_			0x00

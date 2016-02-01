@@ -763,7 +763,20 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 			case DCHNMODE_NORMAL:
 			case DCHNMODE_VRDLX:
 				if (Trk->DAC.Snd >= SmpsCfg->NoteBase)
-					PlayDrumNote(Trk, Trk->DAC.Snd);
+				{
+					if (! (Trk->PlaybkFlags & PBKFLG_SPCMODE))
+					{
+						// normal mode
+						PlayDrumNote(Trk, Trk->DAC.Snd);
+					}
+					else
+					{
+						// melodic mode (preSMPS 68k Type 2)
+						if (Trk->DAC.Snd > SmpsCfg->NoteBase)
+							DAC_SetRate(0x00, Trk->DAC.Snd - SmpsCfg->NoteBase, 0x00);
+						PlayDrumNote(Trk, Trk->Instrument);
+					}
+				}
 				break;
 			case DCHNMODE_PS4:
 				if (Trk->DAC.Snd >= SmpsCfg->NoteBase)
@@ -1277,6 +1290,7 @@ static UINT8 DoNoteStop(TRK_RAM* Trk)
 UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 {
 	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	UINT16 Freq;
 	INT16 Note;
 	UINT8 Octave;
 	
@@ -1295,7 +1309,10 @@ UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 			Note = 0;
 		else if (Note >= SmpsCfg->PSGFreqCnt)
 			Note = SmpsCfg->PSGFreqCnt - 1;
-		return SmpsCfg->PSGFreqs[Note];
+		Freq = SmpsCfg->PSGFreqs[Note];
+		if (Note < 12 && Freq == 0)
+			Freq = 0xFFFF;	// fix preSMPS 68k "delays" (Sword of Vermilion: 02 Title)
+		return Freq;
 	}
 	else //if (! (Trk->ChannelMask & 0x70))
 	{
@@ -1311,7 +1328,7 @@ UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 				Note &= 0x7F;	// SMPS 68k strips the sign bit, too
 			Octave = SmpsCfg->FMBaseOct + Note / 12;
 			Note %= 12;
-			return SmpsCfg->FMFreqs[Note] | (Octave << 11);
+			Freq = (SmpsCfg->FMFreqs[Note] & 0x7FF) | (Octave << 11);
 		}
 		else
 		{
@@ -1319,9 +1336,11 @@ UINT16 GetNote(TRK_RAM* Trk, UINT8 NoteCmd)
 				Note = 0;
 			else if (Note >= SmpsCfg->FMFreqCnt)
 				Note = SmpsCfg->FMFreqCnt - 1;
-			return SmpsCfg->FMFreqs[Note];
+			Freq = SmpsCfg->FMFreqs[Note];
 		}
 	}
+	
+	return Freq;
 }
 
 

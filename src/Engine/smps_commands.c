@@ -1421,6 +1421,19 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	case CF_DAC_PLAY_MODE:
 		Trk->DAC.Unused = Data[0x00];
 		break;
+	case CF_DAC_MEL_MODE:
+		if (Data[0x00] == 0x01)
+		{
+			Trk->PlaybkFlags |= PBKFLG_SPCMODE;
+		}
+		else
+		{
+			Trk->PlaybkFlags &= ~PBKFLG_SPCMODE;
+			// When switching back, reset DAC override frequency.
+			// (preSMPS 68k Type 2 sets it to 0 for every DAC note played in normal mode.)
+			DAC_SetRate(0x00, 0x00, 0x00);
+		}
+		break;
 	}
 	
 	CmdLen &= 0x7F;	// strip the 0x80 bit off, in case the routine above didn't.

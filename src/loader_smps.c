@@ -756,6 +756,11 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				if (DebugMsgs & 0x04)
 					printf("Special DAC command (Pos 0x%04X)\n", CurPos);
 				break;
+			case CF_DAC_MEL_MODE:
+				if (FileData[CurPos + 0x01] && (DebugMsgs & 0x04))
+					printf("Melodic DAC Enable (Pos 0x%04X, value %02X, track %02X)\n",
+							CurPos, FileData[CurPos + 0x01], CurTrk);
+				break;
 			case CF_IGNORE:
 				if (CmdLstCur->CmdData[CurCmd].JumpOfs && (DebugMsgs & 0x04))
 					printf("Unknown Conditional Jump (Pos 0x%04X)\n", CurPos);
