@@ -109,9 +109,6 @@ UINT8 GuessSMPSOffset(SMPS_SET* SmpsSet)
 	UINT16 TrkOfs[0x10];
 	UINT16 TempOfs;
 	
-	if ((SmpsCfg->PtrFmt & PTRFMT_OFSMASK) != 0x00)
-		return 0x00;
-	
 	FileLen = SmpsSet->Seq.Len;
 	FileData = SmpsSet->Seq.Data;
 	if (! FileLen || FileData == NULL)
@@ -125,6 +122,9 @@ UINT8 GuessSMPSOffset(SMPS_SET* SmpsSet)
 			SmpsSet->SeqBase = ReadLE16(&FileData[0x06]);
 		return 0x00;
 	}
+	
+	if ((SmpsCfg->PtrFmt & PTRFMT_OFSMASK) != 0x00)
+		return 0x00;
 	
 	CurPos = 0x00;
 	InsPtr = ReadRawPtr(&FileData[CurPos + 0x00], SmpsCfg);

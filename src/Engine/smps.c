@@ -553,11 +553,11 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 	if (! Trk->RemTicks)
 	{
 		TrkUpdate_Proc(Trk);
+		if (SmpsRAM.ReprocTrack)
+			return;
 		if (! (Trk->PlaybkFlags & PBKFLG_ACTIVE))
 			return;	// return after TRK_END command (the driver POPs some addresses from the stack instead)
 		if (Trk->PlaybkFlags & PBKFLG_ATREST)
-			return;
-		if (ReprocTrackCheck(Trk, 0x00))
 			return;
 		
 		PrepareModulat(Trk);
@@ -1155,9 +1155,10 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 		if (Note >= SmpsCfg->NoteBase)
 		{
 			Extra_LoopStartCheck(Trk);
-			Trk->Pos ++;
+			
 			if (Note == SmpsCfg->NoteBase)
 			{
+				Trk->Pos ++;
 				DoPSGNoteOff(Trk, 0x00);
 				if (SmpsCfg->DelayFreq == DLYFREQ_RESET)
 				{
@@ -1168,6 +1169,14 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			else
 			{
 				UINT16 Freq;
+				
+				if (! Trk->ChordMode)
+					Trk->Pos ++;
+				else
+				{
+					Note = Data[Trk->Pos + Trk->ChordChn];
+					Trk->Pos += Trk->ChordMode;
+				}
 				
 				Trk->ADSR.State &= 0x7F;
 				Freq = GetNote(Trk, Note);
@@ -1243,6 +1252,8 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 				break;
 			case 0x11:
 				NewTout = Trk->NStopInit;
+				if (Data[Trk->Pos] == 0xE6)	// Phantasy Star 2 !! TODO: do properly - this is going to break with normal SMPS
+					NewTout = 0;
 				break;
 			case 0x12:
 				NewTout = Trk->NoteLen - (Trk->NoteLen * Trk->NStopInit / 0x80);
@@ -2468,6 +2479,30 @@ static UINT8 GetTrackIDFromChnBits(SMPS_SET* SmpsSet, UINT8 ChnBits)
 	return 0xFF;
 }
 
+static void SetupMusicChnMasks(const SMPS_CFG* SmpsCfg)
+{
+	UINT8 CurChn;
+	UINT8 CurTrk;
+	
+	CurTrk = TRACK_MUS_DRUM;
+	for (CurChn = 0x00; CurChn < SmpsCfg->FMChnCnt; CurChn ++, CurTrk ++)
+	{
+		while(CurTrk < TRACK_MUS_FM1 && ! (SmpsCfg->FMChnList[CurChn] & 0x10))
+			CurTrk ++;
+		SmpsRAM.MusicTrks[CurTrk].ChannelMask = SmpsCfg->FMChnList[CurChn];
+	}
+	
+	CurTrk = TRACK_MUS_PSG1;
+	for (CurChn = 0x00; CurChn < SmpsCfg->PSGChnCnt; CurChn ++, CurTrk ++)
+		SmpsRAM.MusicTrks[CurTrk].ChannelMask = SmpsCfg->PSGChnList[CurChn];
+	
+	CurTrk = TRACK_MUS_PWM1;
+	for (CurChn = 0x00; CurChn < SmpsCfg->AddChnCnt; CurChn ++, CurTrk ++)
+		SmpsRAM.MusicTrks[CurTrk].ChannelMask = SmpsCfg->AddChnList[CurChn];
+	
+	return;
+}
+
 static void PlayPreSMPS(SMPS_SET* SmpsSet)
 {
 	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
@@ -2540,6 +2575,12 @@ static void PlayPreSMPS(SMPS_SET* SmpsSet)
 		TempTrk->StackPtr = TRK_STACK_SIZE;
 		TempTrk->PanAFMS = 0xC0;
 		TempTrk->RemTicks = 0x01;
+		if (SmpsCfg->PtrFmt == PTRFMT_Z80REL)
+		{
+			// temporary patch for preSMPS 68k Type 1 (TODO: do a proper implementation)
+			TempTrk->NStopRevMode = 0x11;
+			TempTrk->NStopInit = 3;
+		}
 #ifdef ENABLE_LOOP_DETECTION
 		if (SmpsSet->LoopPtrs != NULL)
 			TempTrk->LoopOfs = SmpsSet->LoopPtrs[CurTrk];
@@ -2796,6 +2837,8 @@ void PlayMusic(SMPS_SET* SmpsFileSet)
 	SmpsSet->UsageCounter = 0;
 	
 	SmpsRAM.MusSet = SmpsSet;
+	SetupMusicChnMasks(SmpsCfg);
+	
 	Data = SmpsSet->Seq.Data;
 	if (! memcmp(Data, "PSMP", 0x04))
 	{

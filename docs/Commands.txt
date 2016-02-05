@@ -421,6 +421,14 @@ CINO_PORTAMNT - Cinossu's Portamento
   CPTM_NOTE - set portamento source note
 	command FB, size 02
 
+CHORD_MODE - Chord Mode
+  CHRD_ENABLE - enable/disable Chord Mode
+	command E5, size 02, preSMPS 68k Type 1
+  CHRD_HOLD - hold note while in Chord mode
+	command E6, size 01, preSMPS 68k Type 1 (holds only if look-ahead-byte is < 80h)
+  CHRD_STOP - stop note while in Chord mode
+	command E7, size 01, preSMPS 68k Type 1 (stops only if look-ahead-byte is < 80h)
+
 DAC_PS4 - special DAC flags for Phantasy Star IV
 	Note: DAC_VOLCTRL is present in every song and is used to trigger PS4's special mode for the DAC channel.
   DAC_VOLCTRL - set Volume Control mode

@@ -71,7 +71,11 @@ void RefreshFMVolume(TRK_RAM* Trk);
 void SendSSGEG(TRK_RAM* Trk, const UINT8* Data, UINT8 ForceMaxAtk);
 
 static void InitMusicPlay(const SMPS_CFG* SmpsFileConfig);
-static UINT8 CheckTrkRange(UINT8 TrkID, UINT8 BestTrkID, UINT8 FirstTrk, UINT8 TrkEnd);
+static void InitTempo(UINT8 TempoVal);
+static UINT8 GetTrackIDFromChnBits(SMPS_SET* SmpsSet, UINT8 ChnBits);
+static void SetupMusicChnMasks(const SMPS_CFG* SmpsCfg);
+static void PlayPreSMPS(SMPS_SET* SmpsSet);
+static UINT8 CheckTrkRange(UINT8 TrkID, UINT8 BestTrkID, UINT8 FirstTrk, UINT8 TrkEnd);;
 static UINT8 CheckTrkID(UINT8 TrkID, UINT8 ChnBits);
 static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UINT8 Mode,
 						   UINT8 ChnListSize, const UINT8* ChnList, UINT8 TickMult, UINT8 TrkBase);

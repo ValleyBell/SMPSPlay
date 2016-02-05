@@ -17,11 +17,12 @@ typedef struct _file_data
 #define PTRFMT_LE		0x10	// Little Endian
 #define PTRFMT_EMASK	0x10	// Endianess mask
 
-#define PTRFMT_PRE68K	(PTRFMT_BE | 0x00)	// preSMPS 68k, absolute
+#define PTRFMT_PRE68K	(PTRFMT_BE | 0x00)	// preSMPS 68k Type 2, absolute
 //#define PTRFMT_		(PTRFMT_BE | 0x01)	// 68k, relative to (ptr+0)
 #define PTRFMT_68K		(PTRFMT_BE | 0x02)	// 68k, relative to (ptr+1)
 #define PTRFMT_RST		(PTRFMT_BE | 0x03)	// 68k, relative to (ptr+2)
 #define PTRFMT_Z80		(PTRFMT_LE | 0x00)	// Z80, absolute
+#define PTRFMT_Z80REL	(PTRFMT_LE | 0x02)	// preSMPS 68k Type 1, LE pointers with jumps relative to (ptr+1)
 #define PTRFMT_OFSMASK	0x0F	// relative pointer Offset Mask
 
 #define INSMODE_DEF		0x00	// default: x0 x8 x4 xC

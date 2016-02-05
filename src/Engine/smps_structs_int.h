@@ -125,6 +125,9 @@ typedef struct _track_ram
 	UINT8 CinoP_Speed;
 	UINT16 CinoP_DstFreq;
 	
+	UINT8 ChordMode;	// 00 - disabled, 01+ - number of notes/channels per chord
+	UINT8 ChordChn;		// channel ID within chord
+	
 	UINT8 LoopStack[TRK_STACK_SIZE];	// 28-2F - Loop Data and GoSub Stack
 	
 #ifdef ENABLE_LOOP_DETECTION

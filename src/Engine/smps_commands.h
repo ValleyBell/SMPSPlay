@@ -53,8 +53,9 @@
 #define CF_HOLD					0x05	// E7 (known as "no attack")
 	#define CFS_HOLD_ON				0x00	// E7
 	#define CFS_HOLD_OFF			0x01
-	#define CFS_HOLD_LOCK			0x10	// ED [Castle of Illusion]
-	#define CFS_HOLD_LOCK_NEXT		0x11	// EE [preSMPS Z80]
+	#define CFS_HOLD_ONOFF			0x02	// EE [preSMPS 68k Type 1]
+	#define CFS_HOLD_LOCK			0x10	// ED [Castle of Illusion, preSMPS Z80]
+	#define CFS_HOLD_LOCK_NEXT		0x11	// EE [Space Harrier II]
 #define CF_NOTE_STOP			0x06	// E8
 	#define CFS_NSTOP_NORMAL		0x00	// SMPS 68k
 	#define CFS_NSTOP_MULT			0x01	// SMPS Z80 (value gets multiplied with the track's Tick Multiplier)
@@ -210,8 +211,12 @@
 #define CF_CINO_PORTAMNT		0x88	// Cinossu's Portamento for Sonic 1
 	#define CFS_CPTM_SPEED			0x00
 	#define CFS_CPTM_NOTE			0x01
+#define CF_CHORD_MODE			0x89	// preSMPS 68k Type 1
+	#define CFS_CHRD_ENABLE			0x00	// E5
+	#define CFS_CHRD_HOLD			0x01	// E6
+	#define CFS_CHRD_STOP			0x02	// E7
 
-#define CF_DAC_PS4				0x90
+#define CF_DAC_PS4				0xB0
 	#define CFS_PS4_VOLCTRL			0x00
 	#define CFS_PS4_VOLUME			0x01
 	#define CFS_PS4_SET_SND			0x02
@@ -219,16 +224,16 @@
 	#define CFS_PS4_REVERSE			0x04
 	#define CFS_PS4_TRKMODE			0x0F
 
-#define CF_DAC_CYMN				0x91
-	#define CFS_CYMN_CHG_CH		0x00
-	#define CFS_CYMN_SET_CH		0x10
+#define CF_DAC_CYMN				0xB1
+	#define CFS_CYMN_CHG_CH			0x00
+	#define CFS_CYMN_SET_CH			0x10
 
-#define CF_DAC_GAXE3			0x92
+#define CF_DAC_GAXE3			0xB2
 	#define CFS_GA3_2NOTE_TEMP			0x00
 	#define CFS_GA3_2NOTE_PERM			0x01
 	#define CFS_GA3_2NOTE_OFF			0x02
-#define CF_DAC_PLAY_MODE		0x93	// FA [Sonic 2 Recreation]
-#define CF_DAC_MEL_MODE			0x94	// E8 [preSMPS 68k Type 2]
+#define CF_DAC_PLAY_MODE		0xB3	// FA [Sonic 2 Recreation]
+#define CF_DAC_MEL_MODE			0xB4	// E8 [preSMPS 68k Type 2]
 
 
 //#define CF_			0x00

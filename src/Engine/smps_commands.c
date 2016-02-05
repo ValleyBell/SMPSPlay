@@ -315,6 +315,12 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		case CFS_HOLD_OFF:
 			Trk->PlaybkFlags &= ~PBKFLG_HOLD;
 			break;
+		case CFS_HOLD_ONOFF:
+			if (Data[0x00])
+				Trk->PlaybkFlags |= PBKFLG_HOLD;
+			else
+				Trk->PlaybkFlags &= ~PBKFLG_HOLD;
+			break;
 		case CFS_HOLD_LOCK:
 			if (Data[0x00] == 0x01)
 				Trk->PlaybkFlags |= (PBKFLG_HOLD_LOCK | PBKFLG_HOLD);
@@ -1410,6 +1416,73 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 				Trk->Frequency = GetNote(Trk, Data[0x00]);
 				Trk->CinoP_DstFreq = Trk->Frequency;	// make it use the frequency
 			}
+			break;
+		}
+		break;
+	case CF_CHORD_MODE:
+		switch(CFlag->SubType)
+		{
+		case CFS_CHRD_ENABLE:
+			if (Trk->ChordChn > 0x00)
+			{
+				// Chord Mode Enable can not happen on a "linked" channel unless
+				// the previous track disabled Chord Mode.
+				// So we need to terminate the track here.
+				CMD_FLAGS EndFlag;
+				
+				Trk->ChordChn = 0x00;
+				EndFlag.Type = CF_TRK_END;
+				EndFlag.SubType = CFS_TEND_STD;
+				EndFlag.Len = 0x00;
+				DoCoordinationFlag(Trk, &EndFlag);
+				break;
+			}
+			
+			Trk->ChordMode = Data[0x00];
+			if (Trk->ChordMode >= 0x01)
+			{
+				UINT8 NextChn;
+				UINT8 ChnMask;
+				TRK_RAM* NextTrk;
+				
+				// The original preSMPS 68k Type 1 driver sort of links the current
+				// track together with the next ones.
+				// Only the "main" track is active. The other tracks store instrument/volume/frequency
+				// information and are updated by the main track.
+				// SMPSPlay instead keeps all tracks active and processes them separately.
+				// There is just some tiny code block that make it read different notes.
+				Trk->ChordChn = 0x00;
+				for (NextChn = 0x01; NextChn < Trk->ChordMode; NextChn ++)
+				{
+					NextTrk = Trk + NextChn;
+					
+					FreeSMPSFile(NextTrk->SmpsSet);
+					ChnMask = NextTrk->ChannelMask;
+					
+					*NextTrk = *Trk;	// copy whole track RAM
+					if (NextTrk->SmpsSet != NULL)
+						NextTrk->SmpsSet->UsageCounter ++;
+					NextTrk->ChannelMask = ChnMask;
+					NextTrk->RemTicks = 0x01;	// process track immediately
+#ifdef ENABLE_LOOP_DETECTION
+					NextTrk->LoopOfs.Ptr = 0x0000;	//
+#endif
+					
+					NextTrk->Pos = Trk->Pos + CmdLen;
+					NextTrk->ChordChn = NextChn;
+				}
+			}
+			break;
+		case CFS_CHRD_HOLD:
+			if (Data[0x00] >= SmpsCfg->NoteBase)	// < 0x80
+				break;
+			Trk->PlaybkFlags |= PBKFLG_HOLD;	// prevent "note on" events from happening
+			break;
+		case CFS_CHRD_STOP:
+			if (Data[0x00] >= SmpsCfg->NoteBase)	// < 0x80
+				break;
+			DoNoteOff(Trk);
+			Trk->PlaybkFlags |= PBKFLG_HOLD;	// prevent "note on" events from happening
 			break;
 		}
 		break;
