@@ -983,10 +983,14 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		{
 		case CFS_DM_ON:
 			Trk->ChannelMask |= 0x10;	// put channel into Drum mode
-			Trk->PlaybkFlags &= ~PBKFLG_SPCMODE;	// for preSMPS Z80
 			break;
 		case CFS_DM_OFF:
 			Trk->ChannelMask &= ~0x10;	// put channel into Melody mode
+			break;
+		case CFS_DM_ON_LATE:
+			SmpsRAM.ReprocTrack = 0x00;	// mode change takes effect with the next note
+			Trk->ChannelMask |= 0x10;	// put channel into Drum mode
+			Trk->PlaybkFlags &= ~PBKFLG_SPCMODE;	// for preSMPS Z80
 			break;
 		case CFS_DM_OFF_FM3ONN:
 			Trk->ChannelMask &= ~0x10;	// put channel into Melody mode
@@ -1914,6 +1918,16 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 		case CFS_VOL_CHG_PDRM:
 			SmpsRAM.NoiseDrmVol += Params[0x00];
 			//SmpsRAM.NoiseDrmVol &= 0x0F;	// done by the actual driver, but causes bugs with Fading
+			break;
+		case CFS_VOL_ABS_2OPDRM:
+			SmpsRAM.FM3DrmVol[0x00] = Params[0x00];
+			SmpsRAM.FM3DrmVol[0x01] = Params[0x01];
+			SmpsRAM.FM3DrmVol[0x02] = Params[0x02];
+			break;
+		case CFS_VOL_CHG_2OPDRM:
+			SmpsRAM.FM3DrmVol[0x00] += Params[0x00];
+			SmpsRAM.FM3DrmVol[0x01] += Params[0x01];
+			SmpsRAM.FM3DrmVol[0x02] += Params[0x02];
 			break;
 		}
 //		break;

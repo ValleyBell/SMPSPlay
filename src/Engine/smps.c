@@ -1193,8 +1193,21 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 			}
 			else
 			{
-				Trk->Detune = (INT8)Data[Trk->Pos];
-				Trk->Pos ++;
+				if (! SmpsCfg->PreHdr.TrkHdrSize)	// TODO: make option for "PSG/FM Pitch Slide"
+				{
+					Trk->Detune = (INT8)Data[Trk->Pos];
+					Trk->Pos ++;
+				}
+				else
+				{
+					// preSMPS Z80: If not in "raw freq. mode", the 1st byte is PSG slide speed
+					//              and the 2nd byte is FM slide speed.
+					if (Trk->ChannelMask & 0x80)
+						Trk->Detune = (INT8)Data[Trk->Pos + 0x00];
+					else
+						Trk->Detune = (INT8)Data[Trk->Pos + 0x01];
+					Trk->Pos += 0x02;
+				}
 			}
 		}
 	}
@@ -1206,6 +1219,12 @@ static void TrkUpdate_Proc(TRK_RAM* Trk)
 		Trk->Pos += 2;
 		if (Trk->Frequency)
 			Trk->Frequency += Trk->Transpose;
+		
+		if (Trk->PlaybkFlags & PBKFLG_PITCHSLIDE)
+		{
+			Trk->Detune = (INT8)Data[Trk->Pos];
+			Trk->Pos ++;
+		}
 	}
 	
 	FinishTrkUpdate(Trk, ! ReuseDelay);
@@ -2153,7 +2172,14 @@ void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
 				HadB4 = 0x01;
 			}
 			else if (*OpPtr == 0x40)
+			{
 				Trk->VolOpPtr = InsPtr;
+				Trk->VolOpTLs[0x00] = *InsPtr;
+			}
+			else if ((*OpPtr & 0xF0) == 0x40)
+			{
+				Trk->VolOpTLs[(*OpPtr & 0x0C) >> 2] = *InsPtr;
+			}
 			
 			if ((*OpPtr & 0xF0) != 0x40)	// exclude the TL operators - RefreshFMVolume will do them
 			{
@@ -2183,8 +2209,12 @@ void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
 				Trk->PanAFMS = InsPtr[0x01];
 				HadB4 = 0x01;
 			}
-			else if ((*InsPtr & 0xF0) == 0x40 && Trk->VolOpPtr == NULL)
-				Trk->VolOpPtr = InsPtr;
+			else if ((*InsPtr & 0xF0) == 0x40)
+			{
+				Trk->VolOpTLs[(*InsPtr & 0x0C) >> 2] = InsPtr[0x01];
+				if (Trk->VolOpPtr == NULL)
+					Trk->VolOpPtr = InsPtr;
+			}
 			
 			if ((*InsPtr & 0xF0) != 0x40)	// exclude the TL operators - RefreshFMVolume will do them
 			{
@@ -2229,6 +2259,14 @@ void RefreshVolume(TRK_RAM* Trk)
 	}
 	
 	return;
+}
+
+const UINT8* GetOperatorOrder(const SMPS_CFG* SmpsCfg)
+{
+	if ((SmpsCfg->InsMode & 0x01) == INSMODE_DEF)
+		return OpList_DEF;
+	else //if ((SmpsCfg->InsMode & 0x01) == INSMODE_HW)
+		return OpList_HW;
 }
 
 static UINT8 ApplyOutOperatorVol(TRK_RAM* Trk, UINT8 AlgoMask, UINT8 Reg, UINT8 CurTL)
@@ -2309,13 +2347,8 @@ void RefreshFMVolume(TRK_RAM* Trk)
 
 void SendSSGEG(TRK_RAM* Trk, const UINT8* Data, UINT8 ForceMaxAtk)
 {
-	const UINT8* OpPtr;
+	const UINT8* OpPtr = GetOperatorOrder(Trk->SmpsSet->Cfg);
 	UINT8 CurOp;
-	
-	if ((Trk->SmpsSet->Cfg->InsMode & 0x01) == INSMODE_DEF)
-		OpPtr = OpList_DEF;
-	else //if ((Trk->SmpsSet->Cfg->InsMode & 0x01) == INSMODE_HW)
-		OpPtr = OpList_HW;
 	
 	for (CurOp = 0x00; CurOp < 0x04; CurOp ++)
 	{
@@ -2351,6 +2384,7 @@ static void InitMusicPlay(const SMPS_CFG* SmpsCfg)
 	for (CurTrk = 0; CurTrk < 2; CurTrk ++)
 		SmpsRAM.MusDrmTrks[CurTrk].PlaybkFlags &= ~PBKFLG_ACTIVE;
 	SmpsRAM.NoiseDrmVol = 0x00;
+	memset(SmpsRAM.FM3DrmVol, 0x00, 3);
 	ResetSpcFM3Mode();
 	SmpsRAM.FadeOut.Steps = 0x00;
 	if (SmpsRAM.FadeIn.Steps)
@@ -3711,6 +3745,7 @@ void BackupMusic(MUS_STATE* MusState)
 	MusState->MusicPaused = SmpsRAM.MusicPaused;
 	MusState->SpcFM3Mode = SmpsRAM.SpcFM3Mode;
 	MusState->NoiseDrmVol = SmpsRAM.NoiseDrmVol;
+	memcpy(MusState->FM3DrmVol, SmpsRAM.FM3DrmVol, 3);
 	MusState->TempoCntr = SmpsRAM.TempoCntr;
 	MusState->TempoInit = SmpsRAM.TempoInit;
 	memcpy(MusState->FM3Freqs_Mus, SmpsRAM.FM3Freqs_Mus, sizeof(UINT16) * 4);
@@ -3760,6 +3795,7 @@ void RestoreMusic(MUS_STATE* MusState)
 	SmpsRAM.MusicPaused = MusState->MusicPaused;
 	SmpsRAM.SpcFM3Mode = MusState->SpcFM3Mode;
 	SmpsRAM.NoiseDrmVol = MusState->NoiseDrmVol;
+	memcpy(SmpsRAM.FM3DrmVol, MusState->FM3DrmVol, 3);
 	SmpsRAM.TempoCntr = MusState->TempoCntr;
 	SmpsRAM.TempoInit = MusState->TempoInit;
 	memcpy(SmpsRAM.FM3Freqs_Mus, MusState->FM3Freqs_Mus, sizeof(UINT16) * 4);

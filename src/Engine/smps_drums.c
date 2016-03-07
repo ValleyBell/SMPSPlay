@@ -287,7 +287,10 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		
 		memset(DrumTrk2Op, 0x00, sizeof(DRUM_TRK_RAM));
 		DrumTrk2Op->Trk = Trk;
-		DrumTrk2Op->PlaybkFlags = DTrkData[0x00];
+		// Note: Space Harrier II has bit 0 set for drums playing on the 2nd drum track.
+		//       Later preSMPS Z80 games don't do this, so I set and clear it explicitly.
+		DrumTrk2Op->PlaybkFlags = DTrkData[0x00] & ~0x01;
+		DrumTrk2Op->PlaybkFlags |= DrumData->ChnMask;
 		DrumTrk2Op->Freq1MSB = DTrkData[0x03];
 		DrumTrk2Op->Freq1LSB = DTrkData[0x04];
 		DrumTrk2Op->Freq2MSB = DTrkData[0x05];
@@ -300,6 +303,36 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DrumOfs = ReadDrumPtr(&DTrkData[0x01], DTrkLib);
 		if (DrumOfs < DTrkLib->File.Len)
 			SendFMIns(Trk, &DTrkLib->File.Data[DrumOfs]);
+		if (Trk->VolOpPtr != NULL && DrumData->PitchOvr)
+		{
+			const UINT8* OpPtr = GetOperatorOrder(SmpsCfg);
+			UINT8 AlgoMask;
+			UINT8 DrumVol;
+			UINT8 CurOp;
+			UINT8 CurTL;
+			
+			if (DrumData->PitchOvr & 0xF0)
+			{
+				AlgoMask = (DrumData->PitchOvr & 0xF0) >> 4;
+				DrumVol = SmpsRAM.FM3DrmVol[DrumData->PitchOvr & 0x03];
+			}
+			else
+			{
+				AlgoMask = (DrumData->PitchOvr & 0x0F) >> 0;
+				DrumVol = 0xFF;
+			}
+			for (CurOp = 0; CurOp < 4; CurOp ++)
+			{
+				if (AlgoMask & (1 << CurOp))
+				{
+					if (DrumVol == 0xFF)
+						CurTL = Trk->VolOpTLs[OpPtr[CurOp] / 0x04] + Trk->Volume;
+					else
+						CurTL = DrumVol;
+					WriteFMMain(Trk, 0x40 | OpPtr[CurOp], CurTL);
+				}
+			}
+		}
 		Do2OpNote();
 		break;
 	}

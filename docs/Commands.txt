@@ -247,10 +247,11 @@ SSG_EG - set SSG-EG registers (4 parameters for one operator each)
 
 DRUM_MODE - enable/disable Drum Mode on the current channel
   DM_ON - set channel to Drum Mode
-	command F1, size 01, preSMPS Z80
-	command E5, size 01, preSMPS 68k/Type 2
+	command E5, size 01, preSMPS 68k Type 2
   DM_OFF - set channel to Melody Mode
-	command E6, size 01, preSMPS 68k/Type 2
+	command E6, size 01, preSMPS 68k Type 2
+  DM_ON_LATE - set channel to Drum Mode, has affect for next note
+	command F1, size 01, preSMPS Z80
   DM_OFF_FM3ONN - set channel to Melody Mode + do SPC_FM3/SFM3_ON_NOTES
 	command E8, size 05, preSMPS Z80
 

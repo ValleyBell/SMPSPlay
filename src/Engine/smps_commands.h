@@ -51,6 +51,8 @@
 	#define CFS_VOL_ACC				0x88	// F0 [preSMPS] (absolute Volume, added to TL levels)
 	#define CFS_VOL_ABS_PDRM		0xC0
 	#define CFS_VOL_CHG_PDRM		0xC1	// E4 [Master System SMPS]
+	#define CFS_VOL_ABS_2OPDRM		0xC2	// E7 [preSMPS Z80 Type 1]
+	#define CFS_VOL_CHG_2OPDRM		0xC3
 #define CF_HOLD					0x05	// E7 (known as "no attack")
 	#define CFS_HOLD_ON				0x00	// E7
 	#define CFS_HOLD_OFF			0x01
@@ -128,9 +130,10 @@
 	#define CFS_SEG_NORMAL			0x00	// SMPS Z80
 	#define CFS_SEG_FULLATK			0x01	// SMPS 68k
 #define CF_DRUM_MODE			0x2F	// [preSMPS 68k/Z80] (enable/disable Drum Mode)
-	#define CFS_DM_ON				0x00	// F1 [preSMPS Z80] / E5 [preSMPS 68k Type 2]
-	#define CFS_DM_OFF				0x01	// E5 [preSMPS 68k Type 2]
-	#define CFS_DM_OFF_FM3ONN		0x02	// E8 [preSMPS Z80]
+	#define CFS_DM_ON				0x00	// E5 [preSMPS 68k Type 2]
+	#define CFS_DM_OFF				0x01	// E6 [preSMPS 68k Type 2]
+	#define CFS_DM_ON_LATE			0x02	// F1 [preSMPS Z80]
+	#define CFS_DM_OFF_FM3ONN		0x03	// E8 [preSMPS Z80]
 
 // Tempo Flags
 // -----------

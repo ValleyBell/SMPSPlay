@@ -1,0 +1,38 @@
+; --- SMPS 2-op FM Drum Definition ---
+
+[Main]
+DrumMode = Dual
+; 2-operator FM Drum Mask
+Mask1 = 29	; bits 0, 3, 5
+Mask2 = 14	; bits 2, 4
+DrumIDBase = 00
+
+; Chn: Identifies the sub-channel the drum is playing on.
+;      00 plays on operator 1/2, 01 plays on operator 3/4.
+; VolOps: Bitmask of the operators affected by channel/global volume.
+;         Values 00-0F: add Channel Volume
+;             bit 0 = Op1, bit 1 = Op2, etc.
+;         Values 10-FF: set to Global Volume
+;             bit 4 = Op1, bit 5 = Op2, etc.
+;             bits 0-3 define the volume slot to use. (available are 0 to 2)
+[Drums]
+;Note	Type	DrumID	VolOps	Chn
+; Note & 08 [BIT 3] - Operator 1/2, primary drum set
+88	2opFM	02	00	00	; Drum3_Op12
+89	2opFM	02	00	00	; Drum3_Op12
+A8	2opFM	03	00	00	; Drum4_Op12
+A9	2opFM	03	00	00	; Drum4_Op12
+; Note & 01 [BIT 0] - Operator 1/2, secondary drum set
+81	2opFM	04	22	00	; Drum5_Op12
+A1	2opFM	05	22	00	; Drum6_Op12
+; Note & 04 [BIT 2] - Operator 3/4
+84	2opFM	00	81	01	; Drum1_Op34
+94	2opFM	01	E0	01	; Drum2_Op34
+
+; Drum Order:
+; 00	Drum1_Op34
+; 01	Drum2_Op34
+; 02	Drum3_Op12
+; 03	Drum4_Op12
+; 04	Drum5_Op12
+; 05	Drum6_Op12

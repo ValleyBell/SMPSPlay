@@ -109,6 +109,7 @@ typedef struct _track_ram
 	UINT8 NoiseMode;	// 1A - PSG Noise Mode
 	UINT8 FMAlgo;		// 1B - FM Algorithm (unused on SMPS Z80)
 	const UINT8* VolOpPtr;	// 1C/1D - Volume Operator Data Pointer (a real pointer this time)
+	UINT8 VolOpTLs[0x04];	// Total Level operator values
 	UINT8 NStopTout;	// 1E - Note Stop Timeout
 	UINT8 NStopInit;	// 1F - Note Stop Initial value
 	UINT8 NStopRevMode;	// 2C - Reversed Note Stop Mode
@@ -259,6 +260,7 @@ typedef struct _sound_ram
 	// 1C11 - Music is paused via in-sequence commands
 	UINT8 SpcFM3Mode;		// 1C12 - Special FM3 Mode Bits (YM2612 Register 027)
 	UINT8 NoiseDrmVol;		// DD16 - Base Volume for Noise Drums [Master System SMPS only]
+	UINT8 FM3DrmVol[3];		// preSMPS Z80 Type 1 only
 	UINT8 NecPcmOverride;	// SMPS Pico only
 	UINT8 MusMultUpdate;	// Music Multi-Update (number of times the music will get processed)
 	UINT8 TempoCntr;		// 1C13 - Tempo Counter/Tempo Timeout
@@ -310,6 +312,7 @@ typedef struct _music_save_state
 	UINT8 MusicPaused;
 	UINT8 SpcFM3Mode;
 	UINT8 NoiseDrmVol;
+	UINT8 FM3DrmVol[3];
 	UINT8 TempoCntr;
 	UINT8 TempoInit;
 	UINT16 FM3Freqs_Mus[4];
