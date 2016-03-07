@@ -48,6 +48,7 @@
 	#define CFS_VOL_ABS_COI			0x85	// F1 [Castle of Illusion]
 	#define CFS_VOL_SET_BASE		0x86	// FF [Castle of Illusion]
 	#define CFS_VOL_ABS_PERC		0x87	// (absolute Volume, 00..63 min...max scale for FM and PSG)
+	#define CFS_VOL_ACC				0x88	// F0 [preSMPS] (absolute Volume, added to TL levels)
 	#define CFS_VOL_ABS_PDRM		0xC0
 	#define CFS_VOL_CHG_PDRM		0xC1	// E4 [Master System SMPS]
 #define CF_HOLD					0x05	// E7 (known as "no attack")

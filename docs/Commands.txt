@@ -66,7 +66,7 @@ VOLUME - change or set channel volume
 
       Additional commands:
   VOL_ABS - set volume
-	command F0, size 02, preSMPS (
+	command F0, size 02, preSMPS
   VOL_ABS_S3K - set volume, range is 00 (min) .. 7F (max) and is scaled to match the FM/PSG volume range
 	command E4, size 02, Sonic 3K
   VOL_ABS_HF - set volume
@@ -79,8 +79,10 @@ VOLUME - change or set channel volume
 	command E6, size 02, Tempo 32x
   VOL_ABS_COI - set volume
 	command F1, size 02, Castle of Illusion
-  VOL_ABS_PERC - set volume, range is 00 (min) .. 63 (max, decimal) and is scaled to match the FM/PSG volume range
+  VOL_ABS_PERC - set volume percent, range is 00 (min) .. 63 (max, decimal) and is scaled to match the FM/PSG volume range
 	size 02
+  VOL_ACC - set volume with TL operator accumulation
+	command F0, size 02, preSMPS Z80
   VOL_SET_BASE - set volume base value (this value is added to the volume set by VOL_ABS_COI)
 	command FF, size 02, Castle of Illusion, World of Illusion
   VOL_ABS_PDRM - set volume of PSG Noise drums

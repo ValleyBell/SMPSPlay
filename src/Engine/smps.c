@@ -2196,6 +2196,7 @@ void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
 	}
 	if (! HadB4)	// if it was in the list already, skip it
 		WriteFMMain(Trk, 0xB4, Trk->PanAFMS);
+	Trk->VolumeAcc = 0x00;
 	RefreshFMVolume(Trk);
 	
 	return;
@@ -2249,7 +2250,7 @@ static UINT8 ApplyOutOperatorVol(TRK_RAM* Trk, UINT8 AlgoMask, UINT8 Reg, UINT8 
 	if (Trk->SmpsSet->Cfg->VolMode & VOLMODE_SETVOL)
 		CurTL = Trk->Volume;
 	else
-		CurTL += Trk->Volume;
+		CurTL += Trk->Volume + Trk->VolumeAcc;
 	CurTL &= 0x7F;
 	
 	return CurTL;

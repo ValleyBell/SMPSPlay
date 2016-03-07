@@ -70,6 +70,7 @@ typedef struct _track_ram
 	UINT16 Pos;			// 03/04 - Track Pointer
 	INT8 Transpose;		// 05 - move all notes up/down by this value
 	UINT8 Volume;		// 06 - Track Volume
+	UINT8 VolumeAcc;	// Volume Accumulator - helper value for broken preSMPS Z80 SetVolume command
 	UINT8 ModEnv;		// 07 - Modulation Envelope
 	UINT8 Instrument;	// 08 - FM/PSG Instrument
 	UINT8 StackPtr;		// 09 - GoSub Stack Pointer

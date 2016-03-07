@@ -983,6 +983,7 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		{
 		case CFS_DM_ON:
 			Trk->ChannelMask |= 0x10;	// put channel into Drum mode
+			Trk->PlaybkFlags &= ~PBKFLG_SPCMODE;	// for preSMPS Z80
 			break;
 		case CFS_DM_OFF:
 			Trk->ChannelMask &= ~0x10;	// put channel into Melody mode
@@ -1888,6 +1889,21 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 				Trk->Volume = TempByt;
 				RefreshFMVolume(Trk);
 			}
+			break;
+		case CFS_VOL_ACC:
+			// In preSMPS Z80, SetVolume sets Trk->Volume to the parameter and
+			// then adds Trk->Volume to the cached "Total Level" operator values.
+			// So it is a relative volume change until the next instrument change.
+			Trk->VolumeAcc += Trk->Volume;
+			Trk->Volume = Params[0x00];
+			if (Trk->SpcDacMode == DCHNMODE_VRDLX)
+			{
+				RefreshDACVolume(Trk, Trk->SpcDacMode, 0x00, Trk->Volume);
+				break;
+			}
+			if (Trk->ChannelMask & 0xF8)
+				break;	// Drum/PWM/PSG channel - return
+			RefreshFMVolume(Trk);
 			break;
 		case CFS_VOL_SET_BASE:
 			Trk->CoI_VolBase = Params[0x00];
