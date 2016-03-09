@@ -117,6 +117,10 @@ void RefreshDACVolume(TRK_RAM* Trk, UINT8 DacMode, UINT8 DacChn, UINT8 Volume);
 
 // smps_drum.c
 void PlayDrumNote(TRK_RAM* Trk, UINT8 Note);
+static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData);
+static UINT8 LoadDrumMD(TRK_RAM* BaseTrk, TRK_RAM* DrumTrk, const DRUM_DATA* DrumData, UINT8 Mode,
+						const UINT8** RetDTrkData);
+static UINT8 LoadDrumMD2Op(TRK_RAM* Trk, DRUM_TRK_RAM* DrumTrk2Op, const DRUM_DATA* DrumData);
 void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note);
 void PlaySMGP2DACNote(TRK_RAM* Trk, UINT8 Note);
 void PlayPSGDrumNote(TRK_RAM* Trk, UINT8 Note);

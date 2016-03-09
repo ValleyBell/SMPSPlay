@@ -38,10 +38,6 @@ INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
 INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet);
 INLINE UINT16 ReadDrumPtr(const UINT8* Data, const DRUM_TRK_LIB* DTrkLib);
 
-//void PlayDrumNote(TRK_RAM* Trk, UINT8 Note);
-static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData);
-//void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note)
-
 
 INLINE UINT16 ReadBE16(const UINT8* Data)
 {
@@ -115,11 +111,8 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 {
 	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
 	TRK_RAM* DrumTrk;
-	DRUM_TRK_RAM* DrumTrk2Op;
-	const DRUM_TRK_LIB* DTrkLib;
-	SMPS_SET* DTrkSet;
 	const UINT8* DTrkData;
-	UINT16 DrumOfs;
+	UINT8 RetVal;
 	
 	switch(DrumData->Type)
 	{
@@ -131,8 +124,6 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 			DAC_SetRateOverride(DrumData->DrumID, DrumData->PitchOvr);
 		if (! DrumData->ChnMask)
 		{
-			UINT8 RetVal;
-			
 			RetVal = DAC_Play(Trk->ChannelMask & 0x01, DrumData->DrumID);
 			if ((RetVal & 0xF0) == 0x10 && (DebugMsgs & 0x01))
 				printf("Warning: Unmapped DAC drum %02X at %04X!\n", DrumData->DrumID, Trk->Pos);
@@ -166,40 +157,19 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		DoNoteOff(DrumTrk);
 		FreeSMPSFile(DrumTrk->SmpsSet);
 		
-		DTrkLib = &SmpsCfg->FMDrums;
-		if (DrumData->DrumID >= DTrkLib->DrumCount)
+		RetVal = LoadDrumMD(Trk, DrumTrk, DrumData, 0x00, &DTrkData);
+		if (RetVal)
 			return;
 		
-		// Initialize configuration structures
-		DTrkSet = &SmpsRAM.DrumSet[0x00];	// 0x00 - FM drums
-		*DTrkSet = *Trk->SmpsSet;
-		DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
-		DTrkData = &DTrkLib->File.Data[DrumOfs];
-		DTrkSet->SeqBase = DTrkLib->DrumBase;
-		DTrkSet->Seq = DTrkLib->File;
-		DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
-		DTrkSet->InsLib = DTrkLib->InsLib;
-#ifdef ENABLE_LOOP_DETECTION
-		DTrkSet->LoopPtrs = NULL;
-#endif
-		
-		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
-		DrumTrk->SmpsSet = DTrkSet;
-		DrumTrk->PlaybkFlags = PBKFLG_ACTIVE;
 		DrumTrk->ChannelMask = Trk->ChannelMask & 0x0F;	// make it FM6 or FM3
-		DrumTrk->TickMult = DTrkLib->TickMult ? DTrkLib->TickMult : 1;
-		DrumTrk->Pos = ReadDrumPtr(&DTrkData[0x00], DTrkLib);
-		DrumTrk->Transpose = DTrkData[0x02] + Trk->Transpose;
-		DrumTrk->Volume = DTrkData[0x03] + Trk->Volume;
-		DrumTrk->ModEnv = DTrkData[0x04];
-		DrumTrk->Instrument = DTrkData[0x05];
-		//FinishTrkInit:
-		DrumTrk->StackPtr = TRK_STACK_SIZE;
-		DrumTrk->PanAFMS = 0xC0;
-		DrumTrk->RemTicks = 0x01;
-		
 		if (DrumData->Type == DRMTYPE_FM)
 		{
+			const DRUM_TRK_LIB* DTrkLib;
+			
+			DrumTrk->Transpose += Trk->Transpose;
+			DrumTrk->Volume += Trk->Volume;
+			
+			DTrkLib = &SmpsCfg->FMDrums;
 			if (DrumTrk->Instrument < DTrkLib->InsLib.InsCount)
 				SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument]);
 			
@@ -213,9 +183,6 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 			WriteFMII(0xB6, DTrkData[0x07]);
 			DAC_Play(Trk->ChannelMask & 0x01, DrumTrk->Instrument - 0x01);
 		}
-		
-		if (DrumTrk->Pos >= DTrkSet->Seq.Len)
-			DrumTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 		break;
 	case DRMTYPE_PSG:
 		DrumTrk = &SmpsRAM.MusicTrks[TRACK_MUS_PSG3];
@@ -225,117 +192,193 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 			DoNoteOff(DrumTrk);
 		FreeSMPSFile(DrumTrk->SmpsSet);
 		
-		DTrkLib = &SmpsCfg->PSGDrums;
-		if (DrumData->DrumID >= DTrkLib->DrumCount)
+		RetVal = LoadDrumMD(Trk, DrumTrk, DrumData, 0x01, NULL);
+		if (RetVal)
 			return;
 		
-		// Initialize configuration structures
-		DTrkSet = &SmpsRAM.DrumSet[0x01];	// 0x01 - PSG drums
-		*DTrkSet = *Trk->SmpsSet;
-		DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
-		DTrkData = &DTrkLib->File.Data[DrumOfs];
-		DTrkSet->SeqBase = DTrkLib->DrumBase;
-		DTrkSet->Seq = DTrkLib->File;
-		DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
-		DTrkSet->InsLib = DTrkLib->InsLib;
-#ifdef ENABLE_LOOP_DETECTION
-		DTrkSet->LoopPtrs = NULL;
-#endif
-		
-		memset(DrumTrk, 0x00, sizeof(TRK_RAM));
-		DrumTrk->SmpsSet = DTrkSet;
-		DrumTrk->PlaybkFlags = PBKFLG_ACTIVE;
 		DrumTrk->ChannelMask = 0xC0;
-		DrumTrk->TickMult = DTrkLib->TickMult ? DTrkLib->TickMult : 1;
-		DrumTrk->Pos = ReadDrumPtr(&DTrkData[0x00], DTrkLib);
-		DrumTrk->Transpose = DTrkData[0x02];
-		DrumTrk->Volume = DTrkData[0x03];
-		DrumTrk->ModEnv = DTrkData[0x04];
-		DrumTrk->Instrument = DTrkData[0x05];
-		//FinishTrkInit:
-		DrumTrk->StackPtr = TRK_STACK_SIZE;
-		DrumTrk->PanAFMS = 0xC0;
-		DrumTrk->RemTicks = 0x01;
-		
-		if (DrumTrk->Pos >= DTrkSet->Seq.Len)
-			DrumTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 		break;
 	case DRMTYPE_FM2OP:
 		if (Trk->PlaybkFlags & PBKFLG_OVERRIDDEN)
-			return;
-		
-		if (DrumData->ChnMask >= 0x02)
-			return;
-		DrumTrk2Op = &SmpsRAM.MusDrmTrks[DrumData->ChnMask];
-		DrumTrk2Op->PlaybkFlags &= 0x01;	// mask all bits but the Channel Select out
-		Do2OpNote();						// refresh Note State
-		
-		DTrkLib = &SmpsCfg->FMDrums;
-		if (DrumData->DrumID >= DTrkLib->DrumCount)
 			return;
 		
 		if (! (SmpsRAM.SpcFM3Mode & 0x40))
 		{
 			SmpsRAM.SpcFM3Mode |= 0x40;
 			WriteFMI(0x27, SmpsRAM.SpcFM3Mode);
-			//Trk->Volume = 0x00;
 		}
 		
-		// Initialize configuration structures
-		DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
-		DTrkData = &DTrkLib->File.Data[DrumOfs];
-		
-		memset(DrumTrk2Op, 0x00, sizeof(DRUM_TRK_RAM));
-		DrumTrk2Op->Trk = Trk;
-		// Note: Space Harrier II has bit 0 set for drums playing on the 2nd drum track.
-		//       Later preSMPS Z80 games don't do this, so I set and clear it explicitly.
-		DrumTrk2Op->PlaybkFlags = DTrkData[0x00] & ~0x01;
-		DrumTrk2Op->PlaybkFlags |= DrumData->ChnMask;
-		DrumTrk2Op->Freq1MSB = DTrkData[0x03];
-		DrumTrk2Op->Freq1LSB = DTrkData[0x04];
-		DrumTrk2Op->Freq2MSB = DTrkData[0x05];
-		DrumTrk2Op->Freq2LSB = DTrkData[0x06];
-		DrumTrk2Op->Freq1Inc = DTrkData[0x07];
-		DrumTrk2Op->Freq2Inc = DTrkData[0x08];
-		DrumTrk2Op->RemTicks = DTrkData[0x09];
-		
-		//DrumOfs = ReadLE16(&DTrkData[0x01]) - DTrkLib->DrumBase;
-		DrumOfs = ReadDrumPtr(&DTrkData[0x01], DTrkLib);
-		if (DrumOfs < DTrkLib->File.Len)
-			SendFMIns(Trk, &DTrkLib->File.Data[DrumOfs]);
-		if (Trk->VolOpPtr != NULL && DrumData->PitchOvr)
+		if (DrumData->ChnMask < 0x02)
 		{
-			const UINT8* OpPtr = GetOperatorOrder(SmpsCfg);
-			UINT8 AlgoMask;
-			UINT8 DrumVol;
-			UINT8 CurOp;
-			UINT8 CurTL;
+			DRUM_TRK_RAM* DrumTrk2Op;
 			
-			if (DrumData->PitchOvr & 0xF0)
-			{
-				AlgoMask = (DrumData->PitchOvr & 0xF0) >> 4;
-				DrumVol = SmpsRAM.FM3DrmVol[DrumData->PitchOvr & 0x03];
-			}
-			else
-			{
-				AlgoMask = (DrumData->PitchOvr & 0x0F) >> 0;
-				DrumVol = 0xFF;
-			}
-			for (CurOp = 0; CurOp < 4; CurOp ++)
-			{
-				if (AlgoMask & (1 << CurOp))
-				{
-					if (DrumVol == 0xFF)
-						CurTL = Trk->VolOpTLs[OpPtr[CurOp] / 0x04] + Trk->Volume;
-					else
-						CurTL = DrumVol;
-					WriteFMMain(Trk, 0x40 | OpPtr[CurOp], CurTL);
-				}
-			}
+			DrumTrk2Op = &SmpsRAM.MusDrmTrks[DrumData->ChnMask];
+			DrumTrk2Op->PlaybkFlags &= 0x01;	// mask all bits but the Channel Select out
+			Do2OpNote();						// refresh Note State (note off)
+			
+			RetVal = LoadDrumMD2Op(Trk, DrumTrk2Op, DrumData);
+			if (! RetVal)
+				Do2OpNote();					// refresh Note State (note on)
 		}
-		Do2OpNote();
+		else if (DrumData->ChnMask == 0x02)
+		{
+			// This is a bit hackish, but neede for Super Thunder Blade.
+			DRUM_DATA TempDrum;
+			
+			SmpsRAM.MusDrmTrks[0x00].PlaybkFlags &= 0x01;	// turn note 1 off
+			SmpsRAM.MusDrmTrks[0x01].PlaybkFlags &= 0x01;	// turn note 2 off
+			Do2OpNote();	// refresh Note State (both off)
+			
+			TempDrum.Type = DrumData->Type;
+			TempDrum.ChnMask = 0x00;
+			TempDrum.DrumID = (DrumData->DrumID >> 0) & 0xFF;
+			TempDrum.PitchOvr = 0x00;
+			RetVal  = LoadDrumMD2Op(Trk, &SmpsRAM.MusDrmTrks[0x00], &TempDrum);
+			
+			TempDrum.ChnMask = 0x01;
+			TempDrum.DrumID = (DrumData->DrumID >> 8) & 0xFF;
+			TempDrum.PitchOvr = DrumData->PitchOvr;
+			RetVal |= LoadDrumMD2Op(Trk, &SmpsRAM.MusDrmTrks[0x01], &TempDrum);
+			
+			if (! RetVal)
+				Do2OpNote();	// refresh Note State (both on)
+		}
 		break;
 	}
+	
+	return;
+}
+
+static UINT8 LoadDrumMD(TRK_RAM* BaseTrk, TRK_RAM* DrumTrk, const DRUM_DATA* DrumData, UINT8 Mode,
+						const UINT8** RetDTrkData)
+{
+	const SMPS_CFG* SmpsCfg = BaseTrk->SmpsSet->Cfg;
+	const DRUM_TRK_LIB* DTrkLib;
+	SMPS_SET* DTrkSet;
+	const UINT8* DTrkData;
+	UINT16 DrumOfs;
+	
+	switch(Mode)
+	{
+	case 0x00:
+		DTrkLib = &SmpsCfg->FMDrums;
+		DTrkSet = &SmpsRAM.DrumSet[0x00];	// 0x00 - FM drums
+		break;
+	case 0x01:
+		DTrkLib = &SmpsCfg->PSGDrums;
+		DTrkSet = &SmpsRAM.DrumSet[0x01];	// 0x01 - PSG drums
+		break;
+	default:
+		return 0xFF;
+	}
+	if (DrumData->DrumID >= DTrkLib->DrumCount)
+		return 0x01;
+	
+	// Initialize configuration structures
+	*DTrkSet = *BaseTrk->SmpsSet;
+	DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
+	DTrkData = &DTrkLib->File.Data[DrumOfs];
+	DTrkSet->SeqBase = DTrkLib->DrumBase;
+	DTrkSet->Seq = DTrkLib->File;
+	DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
+	DTrkSet->InsLib = DTrkLib->InsLib;
+#ifdef ENABLE_LOOP_DETECTION
+	DTrkSet->LoopPtrs = NULL;
+#endif
+	
+	memset(DrumTrk, 0x00, sizeof(TRK_RAM));
+	DrumTrk->SmpsSet = DTrkSet;
+	DrumTrk->PlaybkFlags = PBKFLG_ACTIVE;
+	DrumTrk->ChannelMask = BaseTrk->ChannelMask;
+	DrumTrk->TickMult = DTrkLib->TickMult ? DTrkLib->TickMult : 1;
+	DrumTrk->Pos = ReadDrumPtr(&DTrkData[0x00], DTrkLib);
+	DrumTrk->Transpose = DTrkData[0x02];
+	DrumTrk->Volume = DTrkData[0x03];
+	DrumTrk->ModEnv = DTrkData[0x04];
+	DrumTrk->Instrument = DTrkData[0x05];
+	//FinishTrkInit:
+	DrumTrk->StackPtr = TRK_STACK_SIZE;
+	DrumTrk->PanAFMS = 0xC0;
+	DrumTrk->RemTicks = 0x01;
+	
+	if (DrumTrk->Pos >= DTrkSet->Seq.Len)
+		DrumTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
+	
+	// return DTrkData pointer, in case the caller needs additional parameters
+	if (RetDTrkData != NULL)
+		*RetDTrkData = DTrkData;
+	return 0x00;
+}
+
+static UINT8 LoadDrumMD2Op(TRK_RAM* Trk, DRUM_TRK_RAM* DrumTrk2Op, const DRUM_DATA* DrumData)
+{
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	const DRUM_TRK_LIB* DTrkLib;
+	const UINT8* DTrkData;
+	UINT16 DrumOfs;
+	
+	// Initialize configuration structures
+	DTrkLib = &SmpsCfg->FMDrums;
+	if (DrumData->DrumID >= DTrkLib->DrumCount)
+		return 0x01;
+	
+	DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
+	DTrkData = &DTrkLib->File.Data[DrumOfs];
+	
+	memset(DrumTrk2Op, 0x00, sizeof(DRUM_TRK_RAM));
+	DrumTrk2Op->Trk = Trk;
+	// Note: Space Harrier II has bit 0 set for drums playing on the 2nd drum track.
+	//       Later preSMPS Z80 games don't do this, so I set and clear it explicitly.
+	DrumTrk2Op->PlaybkFlags = DTrkData[0x00] & ~0x01;
+	DrumTrk2Op->PlaybkFlags |= DrumData->ChnMask;
+	DrumTrk2Op->Freq1MSB = DTrkData[0x03];
+	DrumTrk2Op->Freq1LSB = DTrkData[0x04];
+	DrumTrk2Op->Freq2MSB = DTrkData[0x05];
+	DrumTrk2Op->Freq2LSB = DTrkData[0x06];
+	DrumTrk2Op->Freq1Inc = DTrkData[0x07];
+	DrumTrk2Op->Freq2Inc = DTrkData[0x08];
+	DrumTrk2Op->RemTicks = DTrkData[0x09];
+	
+	//DrumOfs = ReadLE16(&DTrkData[0x01]) - DTrkLib->DrumBase;
+	DrumOfs = ReadDrumPtr(&DTrkData[0x01], DTrkLib);
+	if (DrumOfs < DTrkLib->File.Len)
+	{
+		Trk->VolumeAcc = 0 - Trk->Volume;
+		SendFMIns(Trk, &DTrkLib->File.Data[DrumOfs]);
+	}
+	
+	if (Trk->VolOpPtr != NULL && DrumData->PitchOvr)
+	{
+		const UINT8* OpPtr = GetOperatorOrder(SmpsCfg);
+		UINT8 AlgoMask;
+		UINT8 DrumVol;
+		UINT8 CurOp;
+		UINT8 CurTL;
+		
+		if (DrumData->PitchOvr & 0xF0)
+		{
+			AlgoMask = (DrumData->PitchOvr & 0xF0) >> 4;
+			DrumVol = SmpsRAM.FM3DrmVol[DrumData->PitchOvr & 0x03];
+		}
+		else
+		{
+			AlgoMask = (DrumData->PitchOvr & 0x0F) >> 0;
+			DrumVol = 0xFF;
+		}
+		for (CurOp = 0; CurOp < 4; CurOp ++)
+		{
+			if (AlgoMask & (1 << CurOp))
+			{
+				if (DrumVol == 0xFF)
+					CurTL = Trk->VolOpTLs[OpPtr[CurOp] / 0x04] + Trk->Volume;
+				else
+					CurTL = DrumVol;
+				WriteFMMain(Trk, 0x40 | OpPtr[CurOp], CurTL);
+			}
+		}
+	}
+	
+	return 0x00;
 }
 
 static const UINT32 PS4_Rates[0x1D] =
