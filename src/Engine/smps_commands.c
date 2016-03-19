@@ -81,17 +81,6 @@ INLINE UINT16 ReadRawPtr(const UINT8* Data, const SMPS_CFG* SmpsCfg);
 INLINE UINT16 ReadPtr(const UINT8* Data, const SMPS_SET* SmpsSet);
 INLINE UINT16 ReadJumpPtr(const UINT8* Data, const UINT16 PtrPos, const SMPS_SET* SmpsSet);
 
-//void cfHandler(TRK_RAM* Trk, UINT8 Command)
-static void cfMetaHandler(TRK_RAM* Trk, UINT8 Command);
-static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag);
-static UINT8 GetInsRegPtrs(TRK_RAM* Trk, const UINT8** RetRegPtr, const UINT8** RetInsPtr, UINT8 Register);
-static void cfSetIns_PSG(TRK_RAM* Trk, UINT8 InsID);
-static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params);
-static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params);
-static UINT8 cfSpecialDAC(TRK_RAM* Trk, const CMD_FLAGS* CFlag);
-INLINE UINT16* GetFM3FreqPtr(void);
-static void print_msg(TRK_RAM* Trk, UINT8 CmdLen, const char* DescStr);
-
 
 INLINE UINT16 ReadBE16(const UINT8* Data)
 {
@@ -176,6 +165,35 @@ static void cfMetaHandler(TRK_RAM* Trk, UINT8 Command)
 	DoCoordinationFlag(Trk, &CmdLib->CmdData[Command - CmdLib->FlagBase]);
 	
 	return;
+}
+
+UINT8 IsHoldCFNext(TRK_RAM* Trk)
+{
+	const UINT8* Data = Trk->SmpsSet->Seq.Data;
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	const CMD_LIB* CmdLib = &SmpsCfg->CmdList;
+	const CMD_FLAGS* CmdFlag;
+	UINT16 TrkPos = Trk->Pos;
+	UINT8 Command;
+	
+	Command = Data[TrkPos];
+	if (Command < CmdLib->FlagBase || Command - CmdLib->FlagBase >= CmdLib->FlagCount)
+		return 0x00;
+	while(CmdLib->CmdData[Command - CmdLib->FlagBase].Type == CF_META_CF)
+	{
+		CmdLib = &Trk->SmpsSet->Cfg->CmdMetaList;
+		TrkPos ++;
+		Command = Data[TrkPos];
+		if (Command < CmdLib->FlagBase || Command - CmdLib->FlagBase >= CmdLib->FlagCount)
+			return 0x00;
+	}
+	CmdFlag = &CmdLib->CmdData[Command - CmdLib->FlagBase];
+	
+	if (CmdFlag->Type == CF_HOLD)
+		return 0x01;	// SMPS E7 - Hold
+	if (CmdFlag->Type == CF_CHORD_MODE && CmdFlag->SubType == CFS_CHRD_HOLD)
+		return 0x01;	// preSMPS 68k/T1 E6 - Chord Hold
+	return 0x00;
 }
 
 static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)

@@ -119,6 +119,12 @@ static const OPT_LIST OPT_DRMCHNMODE[] =
 	{"S2R", DCHNMODE_S2R},
 	{"SMGP2", DCHNMODE_SMGP2},
 	{NULL, 0}};
+static const OPT_LIST OPT_NTSTOPMODE[] =
+{	{"NORMAL", 0x00},
+	{"REMTICKS", 0x11},
+	{"REVCYMN", 0x01},
+	{"REVRISTAR", 0x02 | 0x80},
+	{NULL, 0}};
 static const OPT_LIST OPT_FREQVALS_FM[] =
 {	{"DEF_68K", 1},
 	{"DEF_Z80", 2},
@@ -784,6 +790,12 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				SmpsCfg->DACDrv.Cfg.Channels = (UINT8)strtoul(RToken1, NULL, 0);
 			else if (! stricmp(LToken, "DACVolDiv"))
 				SmpsCfg->DACDrv.Cfg.VolDiv = (INT8)strtol(RToken1, NULL, 0);
+			else if (! stricmp(LToken, "NoteStopMode"))
+				SmpsCfg->NStopMode = GetOptionValue(OPT_NTSTOPMODE, RToken1);
+			else if (! stricmp(LToken, "NoteStopTimeout"))
+				SmpsCfg->NStopTimeout = (UINT8)ParseNumber(RToken1, NULL, NULL);
+			else if (! stricmp(LToken, "Tick16Bits"))
+				SmpsCfg->TickBits = GetBoolValue(RToken1, "True", "False") ? TICKSIZE_16BIT : TICKSIZE_8BIT;
 		}
 		else if (Group == 0x10)	// [EnvelopeCmds] group
 		{

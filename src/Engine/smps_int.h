@@ -109,10 +109,17 @@ void RestoreMusic(MUS_STATE* MusState);
 
 // smps_commands.c
 void cfHandler(TRK_RAM* Trk, UINT8 Command);
-//static void cfMetaHandler(TRK_RAM* Trk, UINT8 Command);
-//static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag);
-//static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params);
+static void cfMetaHandler(TRK_RAM* Trk, UINT8 Command);
+UINT8 IsHoldCFNext(TRK_RAM* Trk);
+static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag);
+static UINT8 GetInsRegPtrs(TRK_RAM* Trk, const UINT8** RetRegPtr, const UINT8** RetInsPtr, UINT8 Register);
+static void cfSetIns_PSG(TRK_RAM* Trk, UINT8 InsID);
+static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params);
+static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params);
+static UINT8 cfSpecialDAC(TRK_RAM* Trk, const CMD_FLAGS* CFlag);
 void RefreshDACVolume(TRK_RAM* Trk, UINT8 DacMode, UINT8 DacChn, UINT8 Volume);
+INLINE UINT16* GetFM3FreqPtr(void);
+static void print_msg(TRK_RAM* Trk, UINT8 CmdLen, const char* DescStr);
 
 
 // smps_drum.c

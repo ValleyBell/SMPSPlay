@@ -1240,6 +1240,8 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 		//SetDuration:
 		Extra_LoopStartCheck(Trk);
 		Trk->NoteLen = Data[Trk->Pos] * Trk->TickMult;
+		if (Trk->SmpsSet->Cfg->TickBits == TICKSIZE_8BIT)
+			Trk->NoteLen &= 0x00FF;	// clip to 8-Bit for all but preSMPS 68k
 		Trk->Pos ++;
 	}
 	
@@ -1265,13 +1267,12 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 					NewTout = 1;	// Chou Yakyuu Miracle Nine - make a lower limit of 1
 				break;
 			case 0x02:
-				if (Data[Trk->Pos] == 0xE7)
+				if (IsHoldCFNext(Trk))
 					NewTout = 0;	// Ristar - the E7 flag disables the effect temporarily.
-				// maybe TODO: improve this and check for CFlag[Data[Trk->Pos]].Type == CF_HOLD
 				break;
 			case 0x11:
 				NewTout = Trk->NStopInit;
-				if (Data[Trk->Pos] == 0xE6)	// Phantasy Star 2 !! TODO: do properly - this is going to break with normal SMPS
+				if (IsHoldCFNext(Trk))
 					NewTout = 0;
 				break;
 			case 0x12:
@@ -1291,7 +1292,7 @@ static void FinishTrkUpdate(TRK_RAM* Trk, UINT8 ReadDuration)
 		Trk->VolEnvIdx = 0x00;
 		Trk->VolEnvCache = 0x00;
 		if (0)	// if (BuggySmpsZ80)
-			Trk->VolEnvIdx = Trk->NStopTout;
+			Trk->VolEnvIdx = (UINT8)Trk->NStopTout;
 	}
 	
 	return;
@@ -2610,12 +2611,8 @@ static void PlayPreSMPS(SMPS_SET* SmpsSet)
 		TempTrk->StackPtr = TRK_STACK_SIZE;
 		TempTrk->PanAFMS = 0xC0;
 		TempTrk->RemTicks = 0x01;
-		if (SmpsCfg->PtrFmt == PTRFMT_Z80REL)
-		{
-			// temporary patch for preSMPS 68k Type 1 (TODO: do a proper implementation)
-			TempTrk->NStopRevMode = 0x11;
-			TempTrk->NStopInit = 3;
-		}
+		TempTrk->NStopRevMode = SmpsCfg->NStopMode;
+		TempTrk->NStopInit = SmpsCfg->NStopTimeout;
 #ifdef ENABLE_LOOP_DETECTION
 		if (SmpsSet->LoopPtrs != NULL)
 			TempTrk->LoopOfs = SmpsSet->LoopPtrs[CurTrk];
@@ -2809,6 +2806,8 @@ static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UI
 		TempTrk->StackPtr = TRK_STACK_SIZE;
 		TempTrk->PanAFMS = 0xC0;
 		TempTrk->RemTicks = 0x01;
+		TempTrk->NStopRevMode = SmpsSet->Cfg->NStopMode;
+		TempTrk->NStopInit = SmpsSet->Cfg->NStopTimeout;
 #ifdef ENABLE_LOOP_DETECTION
 		if (SmpsSet->LoopPtrs != NULL)
 			TempTrk->LoopOfs = SmpsSet->LoopPtrs[TrkBase + CurTrk];
@@ -3020,6 +3019,8 @@ void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX)
 		SFXTrk->StackPtr = TRK_STACK_SIZE;
 		SFXTrk->PanAFMS = 0xC0;
 		SFXTrk->RemTicks = 0x01;
+		SFXTrk->NStopRevMode = SmpsCfg->NStopMode;
+		SFXTrk->NStopInit = SmpsCfg->NStopTimeout;
 		
 		if (SFXTrk->Pos >= SFXTrk->SmpsSet->Seq.Len)
 			SFXTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;

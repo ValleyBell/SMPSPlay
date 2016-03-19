@@ -48,7 +48,9 @@ typedef struct _adsr_volume_data
 	UINT8 RelRate;		// 24 - Release Rate
 } ADSR_DATA;
 
-#define TRK_STACK_SIZE		8
+//#define TRK_STACK_SIZE		8
+// believe it or not - Mahjong Cop Ryuu does 4 nested GoSubs + loops in its title track
+#define TRK_STACK_SIZE		0x0C
 // Note: Those need to be synchronized with HDR_PBBIT_ constants from smps_structs.h
 #define PBKFLG_SPCMODE		0x01	// Bit 0 - Special Mode (Special FM 3 or Noise) [Z80 only]
 #define PBKFLG_HOLD			0x02	// Bit 1 - Hold Note [SMPS 68k: 0x10]
@@ -75,8 +77,8 @@ typedef struct _track_ram
 	UINT8 Instrument;	// 08 - FM/PSG Instrument
 	UINT8 StackPtr;		// 09 - GoSub Stack Pointer
 	UINT8 PanAFMS;		// 0A - Pan/AMS/FMS bits (YM2612 Register B4)
-	UINT8 RemTicks;		// 0B - current Note Timeout
-	UINT8 NoteLen;		// 0C - last Note Length (Timeout gets set to NoteLen when playing a note)
+	UINT16 RemTicks;	// 0B - current Note Timeout (16-Bit for preSMPS 68k)
+	UINT16 NoteLen;		// 0C - last Note Length (Timeout gets set to NoteLen when playing a note)
 	union
 	{
 		UINT16 Frequency;	// 0D/0E - current Frequency value
@@ -110,7 +112,7 @@ typedef struct _track_ram
 	UINT8 FMAlgo;		// 1B - FM Algorithm (unused on SMPS Z80)
 	const UINT8* VolOpPtr;	// 1C/1D - Volume Operator Data Pointer (a real pointer this time)
 	UINT8 VolOpTLs[0x04];	// Total Level operator values
-	UINT8 NStopTout;	// 1E - Note Stop Timeout
+	UINT16 NStopTout;	// 1E - Note Stop Timeout
 	UINT8 NStopInit;	// 1F - Note Stop Initial value
 	UINT8 NStopRevMode;	// 2C - Reversed Note Stop Mode
 	CUSTOM_MOD CstMod;	// 20-27 - Custom Modulation

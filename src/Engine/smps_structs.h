@@ -41,6 +41,9 @@ typedef struct _file_data
 #define T1TICK_NOTEMPO	0x00	// DoTempo before PlayMusic (not executed during first tick after PlayMusic) (most SMPS 68k/Z80)
 #define T1TICK_DOTEMPO	0x01	// PlayMusic before DoTempo
 
+#define TICKSIZE_8BIT	0x00	// 8-bit RemTick/NoteLen
+#define TICKSIZE_16BIT	0x01	// 16-bit RemTick/NoteLen [preSMPS 68k]
+
 #define FMBASEN_B		+1		// table starts with B (note 81 is still a C)
 #define FMBASEN_C		 0		// table starts with C
 
@@ -254,6 +257,7 @@ typedef struct _smps_configuration	// global SMPS driver configuration
 	UINT8 InsMode;
 	UINT8 TempoMode;
 	UINT8 Tempo1Tick;	// order of PlayMusic and DoTempo in the first tick
+	UINT8 TickBits;		// 8-Bit or 16-Bit tick counters
 	INT8 FMBaseNote;
 	UINT8 FMBaseOct;
 	UINT8 FMOctWrap;
@@ -264,6 +268,8 @@ typedef struct _smps_configuration	// global SMPS driver configuration
 	UINT8 ModAlgo;
 	UINT8 EnvMult;
 	UINT8 VolMode;
+	UINT8 NStopMode;
+	UINT8 NStopTimeout;
 	UINT8 DrumChnMode;
 	
 	DRUM_LIB DrumLib;

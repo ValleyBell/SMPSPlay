@@ -1,7 +1,5 @@
 - add PitchSlide options (separate FM/PSG for preSMPS Z80/early SMPS Z80, customizable FM octave range)
-- do proper implementations of all those preSMPS 68k T1 hacks (NStopRevMode etc.)
-- add option for 16-bit NoteLen/RemTicks (for preSMPS 68k)
 - add multiple DAC rates per DAC sound (used by preSMPS 68k Type 2/melodic DAC mode)
+- DAC test (play individual DAC sounds directly in SMPSPlay)
 - way to define Song IDs (for Wonder Boy 3, command EF 81 84)
 - read Chaotix 32x DAC/PWM.ini correctly
-- DAC test (play individual DAC sounds directly in SMPSPlay)
