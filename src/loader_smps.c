@@ -245,6 +245,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	UINT8 CurTrk;
 	UINT16 CurPos;
 	UINT16 TrkOfs[0x10];
+	UINT8 TrkChnBits[0x10];
 	UINT16 TempOfs;
 	UINT16 OldPos;
 	UINT8 TrkMode;
@@ -276,6 +277,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		UINT8 foundMask;
 		UINT16 maskPbActive;
 		UINT16 ofsPbFlg;
+		UINT16 ofsChnBits;
 		UINT16 ofsPtrLSB;
 		UINT16 ofsPtrMSB;
 		
@@ -307,6 +309,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 			else if (PreHdr->TrkHdrMap[CurPos] == TRKHDR_CHNBITS)
 			{
 				foundMask |= 0x04;
+				ofsChnBits = CurPos;
 			}
 		}
 		if (~foundMask & 0x07)	// Pointer MSB+LSB/ChnBits must be found, PbFlags are optional
@@ -325,27 +328,27 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		}
 		
 		CurPos = 0x08;
-		FMTrkCnt = FileData[CurPos];
+		TrkCount = FileData[CurPos];
 		CurPos ++;
-		if (FMTrkCnt > SmpsCfg->FMChnCnt + SmpsCfg->PSGChnCnt + SmpsCfg->AddChnCnt)
+		if (TrkCount > SmpsCfg->FMChnCnt + SmpsCfg->PSGChnCnt + SmpsCfg->AddChnCnt)
 			return 0x80;
 		
-		TempOfs = CurPos + FMTrkCnt * PreHdr->TrkHdrSize;
+		TempOfs = CurPos + TrkCount * PreHdr->TrkHdrSize;
 		if (FileLen < TempOfs)
 			return 0x81;
 		
-		TrkCount = 0x00;
-		for (CurTrk = 0x00; CurTrk < FMTrkCnt; CurTrk ++, CurPos += PreHdr->TrkHdrSize)
+		for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++, CurPos += PreHdr->TrkHdrSize)
 		{
+			TrkOfs[CurTrk] =	(FileData[CurPos + ofsPtrMSB] << 8) |
+								(FileData[CurPos + ofsPtrLSB] << 0);
+			TrkOfs[CurTrk] -= SmpsSet->SeqBase;
+			TrkChnBits[CurTrk] = FileData[CurPos + ofsChnBits];
+			
 			if (maskPbActive)
 			{
 				if (! (FileData[CurPos + ofsPbFlg] & maskPbActive))
-					continue;	// skip disabled channels
+					TrkOfs[CurTrk] = 0x0000;	// invalid pointer for disabled channels
 			}
-			TrkOfs[TrkCount] =	(FileData[CurPos + ofsPtrMSB] << 8) |
-								(FileData[CurPos + ofsPtrLSB] << 0);
-			TrkOfs[TrkCount] -= SmpsSet->SeqBase;
-			TrkCount ++;
 		}
 	}
 	else
@@ -367,11 +370,20 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		
 		TrkCount = 0x00;
 		for (CurTrk = 0x00; CurTrk < FMTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
+		{
 			TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
+			TrkChnBits[TrkCount] = SmpsCfg->FMChnList[CurTrk];
+		}
 		for (CurTrk = 0x00; CurTrk < PSGTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x06)
+		{
 			TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
+			TrkChnBits[TrkCount] = SmpsCfg->PSGChnList[CurTrk];
+		}
 		for (CurTrk = 0x00; CurTrk < SmpsCfg->AddChnCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
+		{
 			TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
+			TrkChnBits[TrkCount] = SmpsCfg->AddChnList[CurTrk];
+		}
 	}
 	
 	if (SmpsCfg->InsMode & INSMODE_INT)
@@ -438,6 +450,8 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 #ifdef ENABLE_LOOP_DETECTION
 		SmpsSet->LoopPtrs[CurTrk].Ptr = 0x0000;
 #endif
+		if (! CurPos)
+			continue;	// disabled preSMPS channel
 		if (CurPos >= FileLen)
 		{
 			if (DebugMsgs & 0x04)
@@ -448,12 +462,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 			continue;
 		}
 		
-		if (CurTrk < FMTrkCnt)
-			CurCmd = SmpsCfg->FMChnList[CurTrk];
-		else if (CurTrk < FMTrkCnt + PSGTrkCnt)
-			CurCmd = SmpsCfg->PSGChnList[CurTrk - FMTrkCnt];
-		else
-			CurCmd = 0x00;
+		CurCmd = TrkChnBits[CurTrk];
 		IsDacTrk = ((CurCmd & 0xF0) == 0x10) ? 0x01 : 0x00;
 		DACBank = 0xFF;
 		

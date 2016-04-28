@@ -212,11 +212,13 @@ void Extra_StopCheck(void)
 void Extra_LoopInit(void)
 {
 	UINT8 CurTrk;
+	TRK_RAM* TempTrk;
 	
 	LoopState.Activated = 0xFF;
 	for (CurTrk = 0; CurTrk < MUS_TRKCNT; CurTrk ++)
 	{
-		if (SmpsRAM.MusicTrks[CurTrk].LoopOfs.Ptr)
+		TempTrk = &SmpsRAM.MusicTrks[CurTrk];
+		if ((TempTrk->PlaybkFlags & PBKFLG_ACTIVE) && TempTrk->LoopOfs.Ptr)
 		{
 			LoopState.Activated = 0x00;
 			break;
