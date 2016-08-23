@@ -125,6 +125,7 @@ int main(int argc, char* argv[])
 #endif
 	memset(&Config, 0x00, sizeof(CONFIG_DATA));
 	Config.AudioCfg = &AudioCfg;
+	Config.CompressVGMs = 0x01;
 	Config.FM6DACOff = 0xFF;
 	Config.ResmplForce = 0xFF;
 	
@@ -141,6 +142,7 @@ int main(int argc, char* argv[])
 	}
 	
 #ifdef ENABLE_VGM_LOGGING
+	VGM_DataBlkCompress = Config.CompressVGMs;
 	VGM_NoLooping = Config.DisableVGMLoop;
 #endif
 	if (Config.FM6DACOff != 0xFF)
