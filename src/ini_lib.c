@@ -31,7 +31,7 @@ UINT8 GetTextLine(UINT32 BufSize, char* Buffer, FILE* hFile)
 		{
 			// strip \n off of the current line
 			TempPtr = Buffer + strlen(Buffer) - 1;
-			while(*TempPtr < ' ')
+			while(TempPtr >= Buffer && *TempPtr < ' ')
 			{
 				*TempPtr = '\0';
 				TempPtr --;

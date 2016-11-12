@@ -10,17 +10,31 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>		// for toupper()
+#include <locale.h>		// for setlocale
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
-#include <direct.h>		// for _mkdir()
+
 #ifdef _WIN32
+#include <direct.h>		// for _mkdir()
 #include <conio.h>		// for _getch() and _kbhit()
 #include <windows.h>
+#else
+#include <unistd.h>
+#include <termios.h>
+#include <sys/time.h>	// for struct timeval in _kbhit()
 #endif
 #include <sys/types.h>
 #include <sys/stat.h>	// for stat()
+
+#ifdef _MSC_VER
 #include "dirent.h"
+#ifndef S_IFDIR
+#define S_IFDIR		_S_IFDIR
+#endif
+#else
+#include <dirent.h>
+#endif
 
 #include <common_def.h>
 
@@ -39,7 +53,19 @@
 #endif
 
 
+#ifdef _MSC_VER
+#ifndef strdup	// crtdbg.h redefines strdup, usually it throws a warning
+#define strdup		_strdup
+#endif
+#endif
+
+#ifndef _WIN32
+#define	Sleep(msec)	usleep(msec * 1000)
+#endif
+
+
 int main(int argc, char* argv[]);
+static int getch_special(void);
 static void InitSmpsFile(SMPS_SET* SmpsFile, UINT32 FileLen, UINT8* FileData, const SMPS_EXT_DEF* ExtDef);
 static void GetFileList(const char* DirPath);
 static void PrintFileList(void);
@@ -56,6 +82,11 @@ static void SmpsStopSignal(void);
 static void SmpsLoopSignal(void);
 static void SmpsCountdownSignal(void);
 static void CommVarChangeCallback(void);
+#ifndef WIN32
+static void changemode(bool);
+static int _kbhit(void);
+static int _getch(void);
+#endif
 
 
 typedef struct _file_name
@@ -99,6 +130,11 @@ static UINT8* CommunicationVar;
 CONFIG_DATA Config;
 extern AUDIO_CFG AudioCfg;
 
+#ifndef WIN32
+static struct termios oldterm;
+static bool termmode;
+#endif
+
 int main(int argc, char* argv[])
 {
 	UINT8 RetVal;
@@ -110,6 +146,14 @@ int main(int argc, char* argv[])
 	UINT8 NChannel;
 	UINT8 MuteToggleResult;
 	char* ChipName;
+	UINT8 quitPrgm;
+	
+	setlocale(LC_CTYPE, "");
+	
+#ifndef WIN32
+	tcgetattr(STDIN_FILENO, &oldterm);
+	termmode = false;
+#endif
 	
 	printf("SMPS Music Player v" SMPSPLAY_VER "\n");
 	printf("-----------------\n");
@@ -181,7 +225,11 @@ int main(int argc, char* argv[])
 	PALMode = false;
 	FrameDivider = PALMode ? 50 : 60;
 	
+#ifdef _WIN32
 	_mkdir("dumps");
+#else
+	mkdir("dumps", 0755);
+#endif
 	AudioCfg.WaveLogPath = "dumps/out.wav";
 	
 #ifdef _WIN32
@@ -191,6 +239,10 @@ int main(int argc, char* argv[])
 	SetAudioHWnd(GetDesktopWindow());	// not as nice, but works
 #endif
 #endif	// _WIN32
+	
+#ifndef WIN32
+	changemode(true);
+#endif
 	
 	RetVal = StartAudioOutput();
 	if (RetVal)
@@ -216,8 +268,9 @@ int main(int argc, char* argv[])
 	memset(&LastSmpsCfg, 0x00, sizeof(SMPS_SET));
 	LastLineState = 0xFF;
 	DisplayFileID(cursor);
+	quitPrgm = 0;
 	inkey = 0x00;
-	while(inkey != 0x1B)
+	while(! quitPrgm)
 	{
 		switch(inkey)
 		{
@@ -263,13 +316,20 @@ int main(int argc, char* argv[])
 			}
 			ClearLine();
 			printf("Channel %d of %s %s\r", NChannel + 1, ChipName, MuteToggleResult ? "enabled" : "disabled");
+			fflush(stdout);
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);
 			break;
+		case 0x1B:
+			quitPrgm = 1;
+			break;
 		case 0xE0:
-			inkey = _getch();
+			inkey = getch_special();
 			switch(inkey)
 			{
+			case 0x1B:
+				quitPrgm = 1;
+				break;
 			case 0x48:	// Cursor Up
 				if (cursor > 0)
 				{
@@ -293,6 +353,7 @@ int main(int argc, char* argv[])
 			cursor = smps_playing + 1;
 			// fall through
 		case 0x0D:
+		case 0x0A:
 			NewSmpsEDef = GetExtentionData(&Config.ExtList, FileList[cursor].Ext);
 			if (NewSmpsEDef == NULL && ! Config.ExtFilter)
 				NewSmpsEDef = &Config.ExtList.ExtData[0];
@@ -346,6 +407,7 @@ int main(int argc, char* argv[])
 			{
 				ClearLine();
 				printf("Error opening %s.\r", FileList[cursor].Title);
+				fflush(stdout);
 				WaitForKey();
 				DisplayFileID(cursor);
 			}
@@ -362,6 +424,7 @@ int main(int argc, char* argv[])
 			Enable_VGMDumping = ! Enable_VGMDumping;
 			ClearLine();
 			printf("VGM Logging %s.\r", Enable_VGMDumping ? "enabled" : "disabled");
+			fflush(stdout);
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);
 			break;
@@ -371,6 +434,7 @@ int main(int argc, char* argv[])
 			FrameDivider = PALMode ? 50 : 60;
 			ClearLine();
 			printf("%s Mode.\r", PALMode ? "PAL" : "NTSC");
+			fflush(stdout);
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);
 			break;
@@ -386,6 +450,7 @@ int main(int argc, char* argv[])
 			(*CondJumpVar) ^= 0x01;
 			ClearLine();
 			printf("Conditional Jump Variable: 0x%02X\r", *CondJumpVar);
+			fflush(stdout);
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);
 			break;
@@ -393,6 +458,7 @@ int main(int argc, char* argv[])
 			AutoProgress = ! AutoProgress;
 			ClearLine();
 			printf("Automatic Progressing %s.\r", AutoProgress ? "enabled" : "disabled");
+			fflush(stdout);
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);
 			break;
@@ -405,6 +471,7 @@ int main(int argc, char* argv[])
 			
 			ClearLine();
 			printf("Data reloaded.\r");
+			fflush(stdout);
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);*/
 			break;
@@ -413,10 +480,13 @@ int main(int argc, char* argv[])
 			SetSMPSExtra(0x00, UnderwMode);
 			ClearLine();
 			printf("Underwate Mode %s.\r", UnderwMode ? "enabled" : "disabled");
+			fflush(stdout);
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);*/
 			break;
 		}
+		if (quitPrgm)
+			break;
 		
 		WaitForKey();
 		inkey = 0x00;
@@ -425,6 +495,7 @@ int main(int argc, char* argv[])
 			CondVarChg = false;
 			ClearLine();
 			printf("Communication Variable changed: 0x%02X\r", *CommunicationVar);
+			fflush(stdout);
 			WaitTimeForKey(1000);
 			DisplayFileID(cursor);
 		}
@@ -439,7 +510,11 @@ int main(int argc, char* argv[])
 		else if (_kbhit())
 		{
 			inkey = _getch();
+#ifdef WIN32
 			if (inkey == 0x00 || inkey == 0xE0)
+#else
+			if (inkey == 0x1B)
+#endif
 				inkey = 0xE0;
 			else
 				inkey = toupper(inkey);
@@ -475,7 +550,111 @@ FinishProgram:
 		_getch();
 #endif
 	
+#ifndef WIN32
+	changemode(false);
+#endif
+	
 	return 0;
+}
+
+static int getch_special(void)
+{
+	int KeyCode;
+	
+#ifdef WIN32
+	// Cursor-Key Table
+	// Shift + Cursor results in the usual value for the Cursor Key
+	// Alt + Cursor results in 0x00 + (0x50 + CursorKey) (0x00 instead of 0xE0)
+	//	Key		None	Ctrl
+	//	Up		48		8D
+	//	Down	50		91
+	//	Left	4B		73
+	//	Right	4D		74
+	KeyCode = _getch();	// Get 2nd Key
+#else
+	KeyCode = _getch();
+	if (KeyCode == 0x1B || KeyCode == 0x00)
+		return 0x1B;	// ESC Key pressed
+	switch(KeyCode)
+	{
+	case 0x5B:
+		// Cursor-Key Table
+		//	Key		KeyCode
+		//	Up		41
+		//	Down	42
+		//	Left	44
+		//	Right	43
+		// Cursor only: CursorKey
+		// Ctrl: 0x31 + 0x3B + 0x35 + CursorKey
+		// Alt: 0x31 + 0x3B + 0x33 + CursorKey
+		
+		// Page-Keys: PageKey + 0x7E
+		//	PageUp		35
+		//	PageDown	36
+		KeyCode = _getch();	// Get 2nd Key
+		// Convert Cursor Key Code from Linux to Windows
+		switch(KeyCode)
+		{
+		case 0x31:	// Ctrl or Alt key
+			KeyCode = _getch();
+			if (KeyCode == 0x3B)
+			{
+				KeyCode = _getch();
+				if (KeyCode == 0x35)
+				{
+					KeyCode = _getch();
+					switch(KeyCode)
+					{
+					case 0x41:
+						KeyCode = 0x8D;
+						break;
+					case 0x42:
+						KeyCode = 0x91;
+						break;
+					case 0x43:
+						KeyCode = 0x74;
+						break;
+					case 0x44:
+						KeyCode = 0x73;
+						break;
+					default:
+						KeyCode = 0x00;
+						break;
+					}
+				}
+			}
+			
+			if ((KeyCode & 0xF0) == 0x30)
+				KeyCode = 0x00;
+			break;
+		case 0x35:
+			KeyCode = 0x49;
+			//_getch();
+			break;
+		case 0x36:
+			KeyCode = 0x51;
+			//_getch();
+			break;
+		case 0x41:
+			KeyCode = 0x48;
+			break;
+		case 0x42:
+			KeyCode = 0x50;
+			break;
+		case 0x43:
+			KeyCode = 0x4D;
+			break;
+		case 0x44:
+			KeyCode = 0x4B;
+			break;
+		default:
+			KeyCode = 0x00;
+			break;
+		}
+	}
+	// At this point I have Windows-style keys.
+#endif
+	return KeyCode;
 }
 
 static void InitSmpsFile(SMPS_SET* SmpsFile, UINT32 FileLen, UINT8* FileData, const SMPS_EXT_DEF* ExtDef)
@@ -539,7 +718,7 @@ static void GetFileList(const char* DirPath)
 		RetVal = stat(FileName, &statbuf);
 		if (RetVal != -1)
 		{
-			if (! (statbuf.st_mode & _S_IFDIR) && Config.ExtFilter)
+			if (! (statbuf.st_mode & S_IFDIR) && Config.ExtFilter)
 			{
 				char* ExtPtr;
 				SMPS_EXT_DEF* ExtDef;
@@ -547,10 +726,10 @@ static void GetFileList(const char* DirPath)
 				ExtPtr = GetFileExtention(FileName);
 				ExtDef = GetExtentionData(&Config.ExtList, ExtPtr);	// search for known extentions
 				if (ExtDef == NULL)
-					statbuf.st_mode |= _S_IFDIR;	// ignore this file
+					statbuf.st_mode |= S_IFDIR;	// ignore this file
 			}
 			
-			if (! (statbuf.st_mode & _S_IFDIR))
+			if (! (statbuf.st_mode & S_IFDIR))
 			{
 				if (FileCount >= FileAlloc)
 				{
@@ -559,7 +738,7 @@ static void GetFileList(const char* DirPath)
 				}
 				
 				TempFLst = &FileList[FileCount];
-				TempFLst->Full = _strdup(FileName);
+				TempFLst->Full = strdup(FileName);
 				TempFLst->Title = TempFLst->Full + FNBase;
 				TempFLst->Ext = GetFileExtention(TempFLst->Title);
 				TempFLst->SeqBase = 0x0000;
@@ -714,15 +893,31 @@ static void ReDisplayFileID(int FileID)
 
 static void WaitTimeForKey(unsigned int MSec)
 {
-	DWORD CurTime;
+#ifdef _WIN32
+	DWORD EndTime;
 	
-	CurTime = GetTickCount() + MSec;
-	while(! ExitWait && GetTickCount() < CurTime)
+	EndTime = GetTickCount() + MSec;
+	while(! ExitWait && GetTickCount() < EndTime)
 	{
 		Sleep(20);
 		if (_kbhit())
 			break;
 	}
+#else
+	// TODO: use clock_gettime
+	unsigned int CurTime;
+	unsigned int EndTime;
+	
+	CurTime = 0;
+	EndTime = CurTime + MSec;
+	while(! ExitWait && CurTime < EndTime)
+	{
+		Sleep(20);
+		CurTime += 20;
+		if (_kbhit())
+			break;
+	}
+#endif
 	// don't reset ExitWait to enforce skipping WaitForKey()
 	
 	return;
@@ -785,3 +980,67 @@ static void CommVarChangeCallback(void)
 	
 	return;
 }
+
+
+#ifndef WIN32
+static void changemode(bool dir)
+{
+	static struct termios newterm;
+	
+	if (termmode == dir)
+		return;
+	
+	if (dir)
+	{
+		newterm = oldterm;
+		newterm.c_lflag &= ~(ICANON | ECHO);
+		tcsetattr(STDIN_FILENO, TCSANOW, &newterm);
+	}
+	else
+	{
+		tcsetattr(STDIN_FILENO, TCSANOW, &oldterm);
+	}
+	termmode = dir;
+	
+	return;
+}
+
+static int _kbhit(void)
+{
+	struct timeval tv;
+	fd_set rdfs;
+	int kbret;
+	bool needchg;
+	
+	needchg = (! termmode);
+	if (needchg)
+		changemode(true);
+	tv.tv_sec = 0;
+	tv.tv_usec = 0;
+	
+	FD_ZERO(&rdfs);
+	FD_SET(STDIN_FILENO, &rdfs);
+	
+	select(STDIN_FILENO + 1, &rdfs, NULL, NULL, &tv);
+	kbret = FD_ISSET(STDIN_FILENO, &rdfs);
+	if (needchg)
+		changemode(false);
+	
+	return kbret;
+}
+
+static int _getch(void)
+{
+	int ch;
+	bool needchg;
+	
+	needchg = (! termmode);
+	if (needchg)
+		changemode(true);
+	ch = getchar();
+	if (needchg)
+		changemode(false);
+	
+	return ch;
+}
+#endif

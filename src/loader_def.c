@@ -766,7 +766,7 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				if (NewFreqData == NULL && FreqMode != 0xFF)
 				{
 					RevertTokenTrim(RToken1, RToken2);
-					NewFreqCnt = ReadMultilineArrayData(hFile, RToken1, &NewFreqData, 0x02);
+					NewFreqCnt = ReadMultilineArrayData(hFile, RToken1, (void**)&NewFreqData, 0x02);
 				}
 				
 				if (*FreqDataPtr != NULL)

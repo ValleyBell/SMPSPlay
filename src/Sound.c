@@ -157,7 +157,8 @@ extern SMPS_CB_SIGNAL CB_Signal;
 HANDLE hMutex = NULL;
 HWND hWndSnd = NULL;
 #else
-pthread_mutex_t hMutex = 0;
+UINT8 useMutex = 0;
+pthread_mutex_t hMutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
 static UINT8 lastMutexLockMode;
 
@@ -411,6 +412,7 @@ UINT8 StartAudioOutput(void)
 	hMutex = CreateMutex(NULL, FALSE, NULL);
 #else
 	pthread_mutex_init(&hMutex, NULL);
+	useMutex = 1;
 #endif
 	lastMutexLockMode = 0;
 	InitalizeChips();
@@ -437,11 +439,11 @@ UINT8 StopAudioOutput(void)
 		hMutex = NULL;
 	}
 #else
-	if (hMutex)
+	if (useMutex)
 	{
 		pthread_mutex_unlock(&hMutex);
 		pthread_mutex_destroy(&hMutex);
-		hMutex = 0;
+		useMutex = 0;
 	}
 #endif
 	
