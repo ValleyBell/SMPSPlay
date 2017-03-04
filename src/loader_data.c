@@ -107,12 +107,11 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 	
 	DACDrv->SmplAlloc = 0x100;
 	DACDrv->SmplCount = 0x00;
-	DACDrv->Smpls = (DAC_SAMPLE*)malloc(DACDrv->SmplAlloc * sizeof(DAC_SAMPLE));
+	DACDrv->Smpls = (DAC_SAMPLE*)calloc(DACDrv->SmplAlloc, sizeof(DAC_SAMPLE));
 	
 	DACDrv->TblAlloc = 0x100;
 	DACDrv->TblCount = 0x00;
-	DACDrv->SmplTbl = (DAC_TABLE*)malloc(DACDrv->TblAlloc * sizeof(DAC_TABLE));
-	memset(DACDrv->SmplTbl, 0x00, DACDrv->TblAlloc * sizeof(DAC_TABLE));
+	DACDrv->SmplTbl = (DAC_TABLE*)calloc(DACDrv->TblAlloc, sizeof(DAC_TABLE));
 	
 	DACDrv->BankAlloc = 0x00;
 	DACDrv->BankCount = 0x00;
@@ -120,8 +119,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 	
 	DACDrv->Cfg.AlgoAlloc = 0x10;
 	DACDrv->Cfg.AlgoCount = 0x01;
-	DACDrv->Cfg.Algos = (DAC_ALGO*)malloc(DACDrv->Cfg.AlgoAlloc * sizeof(DAC_ALGO));
-	memset(DACDrv->Cfg.Algos, 0x00, DACDrv->Cfg.AlgoAlloc * sizeof(DAC_ALGO));
+	DACDrv->Cfg.Algos = (DAC_ALGO*)calloc(DACDrv->Cfg.AlgoAlloc, sizeof(DAC_ALGO));
 	
 	
 	DAlgo = &DACDrv->Cfg.Algos[0x00];
@@ -489,6 +487,12 @@ void FreeDACData(DAC_CFG* DACDrv)
 		if (TempSmpl->DPCMArr != DefDPCMData)
 			free(TempSmpl->DPCMArr);
 		TempSmpl->DPCMArr = NULL;
+		
+#ifdef ENABLE_VGM_LOGGING
+		TempSmpl->UsedVolCount = 0x00;
+		TempSmpl->UsedVolAlloc = 0x00;
+		free(TempSmpl->UsedVols);	TempSmpl->UsedVols = NULL;
+#endif
 	}
 	DACDrv->SmplCount = 0x00;
 	DACDrv->TblCount = 0x00;

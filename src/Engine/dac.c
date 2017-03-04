@@ -42,6 +42,10 @@ typedef struct _dac_state
 	INT16 OutSmpl;		// needs to be 16-bit to allow volumes > 100%
 	UINT8 DPCMState;	// current DPCM sample value
 	UINT8 DPCMNibble;	// 00 - high nibble, 01 - low nibble
+	
+#ifdef ENABLE_VGM_LOGGING
+	UINT16 VgmSmplID;
+#endif
 } DAC_STATE;
 
 
@@ -244,9 +248,6 @@ static UINT8 GetNextSample(DAC_STATE* ChnState, INT16* RetSmpl)
 static UINT8 HandleSampleEnd(DAC_STATE* ChnState)
 {
 	UINT8 RestartSmpl;
-#ifdef ENABLE_VGM_LOGGING
-	UINT8 VgmSmplID;
-#endif
 	
 	RestartSmpl = (ChnState->PbFlags & DACFLAG_LOOP);
 	if (ChnState->PbFlags & DACFLAG_FLIP_FLOP)
@@ -261,6 +262,9 @@ static UINT8 HandleSampleEnd(DAC_STATE* ChnState)
 	{
 		ChnState->DACSmplPtr = NULL;
 		ChnState->SmplLast = ChnState->SmplNext = 0x0000;
+#ifdef ENABLE_VGM_LOGGING
+		ChnState->VgmSmplID = 0xFFFF;
+#endif
 		return 0x01;
 	}
 	
@@ -272,13 +276,12 @@ static UINT8 HandleSampleEnd(DAC_STATE* ChnState)
 	ChnState->DPCMState = 0x80;
 	
 #ifdef ENABLE_VGM_LOGGING
-	VgmSmplID = ChnState->DACSmplPtr->UsageID;
-	if (VgmSmplID < 0xFE)
+	if (ChnState->VgmSmplID != 0xFFFF)
 	{
 		if (ChnState->PbFlags & DACFLAG_REVERSE)
-			vgm_write_stream_data_command(0x00, 0x05, VgmSmplID | 0x100000);
+			vgm_write_stream_data_command(0x00, 0x05, ChnState->VgmSmplID | 0x100000);
 		else
-			vgm_write_stream_data_command(0x00, 0x05, VgmSmplID);
+			vgm_write_stream_data_command(0x00, 0x05, ChnState->VgmSmplID);
 	}
 #endif
 	
@@ -451,6 +454,9 @@ void DAC_Reset(void)
 		DACChn->SmplLast = DACChn->SmplNext = 0x0000;
 		DACChn->DACAlgo = NULL;
 		DACChn->BaseSmpl = 0x00;
+#ifdef ENABLE_VGM_LOGGING
+		DACChn->VgmSmplID = 0xFFFF;
+#endif
 	}
 	
 	DAC_ResetOverride();
@@ -524,6 +530,15 @@ void DAC_SetVolume(UINT8 Chn, UINT16 Volume)
 	return;
 }
 
+UINT16 DAC_GetVolume(UINT8 Chn)
+{
+	if (Chn >= MAX_DAC_CHNS)
+		return 0;
+	if (DACDrv != NULL && Chn >= DACDrv->Cfg.Channels)
+		return 0;
+	return DACChnState[Chn].Volume;
+}
+
 void DAC_Stop(UINT8 Chn)
 {
 	DAC_STATE* DACChn;
@@ -539,6 +554,7 @@ void DAC_Stop(UINT8 Chn)
 	DACChn->DACSmplPtr = NULL;
 	DACChn->SmplLast = DACChn->SmplNext = 0x0000;
 #ifdef ENABLE_VGM_LOGGING
+	DACChn->VgmSmplID = 0xFFFF;
 	vgm_write_stream_data_command(0x00, 0x04, 0x00);
 #endif
 	
@@ -638,13 +654,27 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 	if (TempEntry->Pan)
 		ym2612_fm_write(0x00, 0x01, 0xB6, TempEntry->Pan);
 #ifdef ENABLE_VGM_LOGGING
-	if (TempSmpl->UsageID < 0xFE)
+	DACChn->VgmSmplID = 0xFFFF;
+	if (TempSmpl->UsedVolCount)
+	{
+		UINT16 CurVol;
+		
+		for (CurVol = 0x00; CurVol < TempSmpl->UsedVolCount; CurVol ++)
+		{
+			if (TempSmpl->UsedVols[CurVol].Volume == DACChn->Volume)
+			{
+				DACChn->VgmSmplID = TempSmpl->UsedVols[CurVol].UsageID;
+				break;
+			}
+		}
+	}
+	if (DACChn->VgmSmplID != 0xFFFF)
 	{
 		vgm_write_stream_data_command(0x00, 0x02, FreqHz);
 		if (DACChn->PbFlags & DACFLAG_REVERSE)
-			vgm_write_stream_data_command(0x00, 0x05, TempSmpl->UsageID | 0x100000);
+			vgm_write_stream_data_command(0x00, 0x05, DACChn->VgmSmplID | 0x100000);
 		else
-			vgm_write_stream_data_command(0x00, 0x05, TempSmpl->UsageID);
+			vgm_write_stream_data_command(0x00, 0x05, DACChn->VgmSmplID);
 	}
 #endif
 	
@@ -695,7 +725,7 @@ void DAC_SetRate(UINT8 Chn, UINT32 Rate, UINT8 MidNote)
 	}
 	FreqHz = CalcDACFreq(DACChn->DACAlgo, Rate);
 #ifdef ENABLE_VGM_LOGGING
-	if (DACChn->DACSmplPtr->UsageID < 0xFE)
+	if (DACChn->VgmSmplID != 0xFFFF)
 		vgm_write_stream_data_command(0x00, 0x02, FreqHz);
 #endif
 	DACChn->DeltaFract = CalcDACDelta_Rate(DACChn->DACAlgo, Rate);
@@ -724,7 +754,7 @@ void DAC_SetFrequency(UINT8 Chn, UINT32 Freq, UINT8 MidNote)
 	else
 	{
 #ifdef ENABLE_VGM_LOGGING
-		if (DACChn->DACSmplPtr->UsageID < 0xFE)
+		if (DACChn->VgmSmplID != 0xFFFF)
 			vgm_write_stream_data_command(0x00, 0x02, Freq);
 #endif
 		DACChn->DeltaFract = CalcDACDelta_Hz(Freq);

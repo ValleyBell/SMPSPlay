@@ -18,6 +18,8 @@
 #include "loader_data.h"	// for FreeFileData()
 #include "loader_smps.h"
 
+#include "Engine/smps_int.h"	// for RefreshDACVolume()
+
 
 #ifndef DISABLE_DEBUG_MSGS
 void ClearLine(void);			// from main.c
@@ -46,6 +48,9 @@ static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, const UINT8
 static void MarkDrumNote(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_LIB* DrumLib, UINT8 Note);
 static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData);
 static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Bank, UINT8 Note);
+static void MarkDrum_DACSound(DAC_CFG* DACDrv, UINT16 SndID);
+static void MarkDrum_SetDACVol(const DAC_SETTINGS* DACCfg, UINT8 DrumChnMode, UINT8 Volume);
+static void MarkDrum_AddDACVol(DAC_SAMPLE* DACSmpl, UINT16 Volume);
 static void MarkDrumTrack(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DATA* DrumData, UINT8 Mode);
 #endif
 //void FreeSMPSFile(SMPS_CFG* SmpsCfg);
@@ -225,6 +230,12 @@ static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, const UINT8
 	return;
 }
 
+typedef struct
+{
+	UINT16 Ofs;
+	UINT8 Chn;
+	UINT8 Vol;
+} PREP_TRK_HDR;
 UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 {
 	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
@@ -244,8 +255,8 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	UINT8 TrkCount;
 	UINT8 CurTrk;
 	UINT16 CurPos;
-	UINT16 TrkOfs[0x10];
-	UINT8 TrkChnBits[0x10];
+	PREP_TRK_HDR TrkHdrs[0x10];
+	PREP_TRK_HDR* TempTH;
 	UINT16 TempOfs;
 	UINT16 OldPos;
 	UINT8 TrkMode;
@@ -259,6 +270,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	UINT8 UsageMask;
 	UINT8 IsDacTrk;
 	UINT8 DACBank;
+	UINT8 TrkVol;
 	
 	FileLen = SmpsSet->Seq.Len;
 	FileData = SmpsSet->Seq.Data;
@@ -278,6 +290,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		UINT16 maskPbActive;
 		UINT16 ofsPbFlg;
 		UINT16 ofsChnBits;
+		UINT16 ofsVol;
 		UINT16 ofsPtrLSB;
 		UINT16 ofsPtrMSB;
 		
@@ -311,6 +324,11 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				foundMask |= 0x04;
 				ofsChnBits = CurPos;
 			}
+			else if (PreHdr->TrkHdrMap[CurPos] == TRKHDR_CHNBITS)
+			{
+				foundMask |= 0x20;
+				ofsVol = CurPos;
+			}
 		}
 		if (~foundMask & 0x07)	// Pointer MSB+LSB/ChnBits must be found, PbFlags are optional
 			return 0xFF;
@@ -339,15 +357,20 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		
 		for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++, CurPos += PreHdr->TrkHdrSize)
 		{
-			TrkOfs[CurTrk] =	(FileData[CurPos + ofsPtrMSB] << 8) |
+			TempTH = &TrkHdrs[CurTrk];
+			TempTH->Ofs =		(FileData[CurPos + ofsPtrMSB] << 8) |
 								(FileData[CurPos + ofsPtrLSB] << 0);
-			TrkOfs[CurTrk] -= SmpsSet->SeqBase;
-			TrkChnBits[CurTrk] = FileData[CurPos + ofsChnBits];
+			TempTH->Ofs -= SmpsSet->SeqBase;
+			TempTH->Chn = FileData[CurPos + ofsChnBits];
+			if (foundMask & 0x20)
+				TempTH->Vol = FileData[CurPos + ofsVol];
+			else
+				TempTH->Vol = 0x00;
 			
 			if (maskPbActive)
 			{
 				if (! (FileData[CurPos + ofsPbFlg] & maskPbActive))
-					TrkOfs[CurTrk] = 0x0000;	// invalid pointer for disabled channels
+					TempTH->Ofs = 0x0000;	// invalid pointer for disabled channels
 			}
 		}
 	}
@@ -371,18 +394,21 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		TrkCount = 0x00;
 		for (CurTrk = 0x00; CurTrk < FMTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
 		{
-			TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
-			TrkChnBits[TrkCount] = SmpsCfg->FMChnList[CurTrk];
+			TrkHdrs[TrkCount].Ofs = ReadPtr(&FileData[CurPos + 0x00], SmpsSet);
+			TrkHdrs[TrkCount].Chn = SmpsCfg->FMChnList[CurTrk];
+			TrkHdrs[TrkCount].Vol = FileData[CurPos + 0x03];
 		}
 		for (CurTrk = 0x00; CurTrk < PSGTrkCnt; CurTrk ++, TrkCount ++, CurPos += 0x06)
 		{
-			TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
-			TrkChnBits[TrkCount] = SmpsCfg->PSGChnList[CurTrk];
+			TrkHdrs[TrkCount].Ofs = ReadPtr(&FileData[CurPos + 0x00], SmpsSet);
+			TrkHdrs[TrkCount].Chn = SmpsCfg->PSGChnList[CurTrk];
+			TrkHdrs[TrkCount].Vol = FileData[CurPos + 0x03];
 		}
 		for (CurTrk = 0x00; CurTrk < SmpsCfg->AddChnCnt; CurTrk ++, TrkCount ++, CurPos += 0x04)
 		{
-			TrkOfs[TrkCount] = ReadPtr(&FileData[CurPos], SmpsSet);
-			TrkChnBits[TrkCount] = SmpsCfg->AddChnList[CurTrk];
+			TrkHdrs[TrkCount].Ofs = ReadPtr(&FileData[CurPos + 0x00], SmpsSet);
+			TrkHdrs[TrkCount].Chn = SmpsCfg->AddChnList[CurTrk];
+			TrkHdrs[TrkCount].Vol = FileData[CurPos + 0x03];
 		}
 	}
 	
@@ -435,7 +461,8 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 #ifdef ENABLE_VGM_LOGGING
 	// reset DAC usage
 	for (TempOfs = 0x00; TempOfs < DACDrv->SmplCount; TempOfs ++)
-		DACDrv->Smpls[TempOfs].UsageID = 0xFF;
+		DACDrv->Smpls[TempOfs].UsedVolCount = 0x00;
+	DAC_SetVolume(0, 0x100);	// reset volume
 #endif
 	
 	// Note: Preparsing the SMPS file is required, because it doesn't only detect
@@ -446,7 +473,8 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	FileMask = (UINT8*)malloc(FileLen);
 	for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++)
 	{
-		CurPos = TrkOfs[CurTrk];
+		CurPos = TrkHdrs[CurTrk].Ofs;
+		TrkVol = TrkHdrs[CurTrk].Vol;
 #ifdef ENABLE_LOOP_DETECTION
 		SmpsSet->LoopPtrs[CurTrk].Ptr = 0x0000;
 #endif
@@ -462,9 +490,13 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 			continue;
 		}
 		
-		CurCmd = TrkChnBits[CurTrk];
+		CurCmd = TrkHdrs[CurTrk].Chn;
 		IsDacTrk = ((CurCmd & 0xF0) == 0x10) ? 0x01 : 0x00;
 		DACBank = 0xFF;
+#ifdef ENABLE_VGM_LOGGING
+		if (IsDacTrk)
+			MarkDrum_SetDACVol(&DACDrv->Cfg, SmpsCfg->DrumChnMode, TrkVol);
+#endif
 		
 		memset(FileMask, 0x00, FileLen);
 		memset(LoopExitPtrs, 0x00, sizeof(UINT16) * 0x08);
@@ -791,6 +823,101 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 					SmpsSet->SeqFlags |= SEQFLG_NEED_SAVE;
 				}
 				break;
+			case CF_VOLUME:
+				switch(CmdLstCur->CmdData[CurCmd].SubType)
+				{
+				case CFS_VOL_NN_FMP:
+					if (TrkHdrs[CurTrk].Chn & 0x80)
+						TrkVol += FileData[CurPos + 0x01];
+					else
+						TrkVol += FileData[CurPos + 0x02];
+					break;
+				case CFS_VOL_NN_FM:
+				case CFS_VOL_NN_FMP1:
+				case CFS_VOL_NN_PSG:
+				case CFS_VOL_CHG_PDRM:
+				case CFS_VOL_ACC:
+					TrkVol += FileData[CurPos + 0x01];
+					break;
+				case CFS_VOL_CN_FMP:
+				case CFS_VOL_CC_FMP:
+					TrkVol += FileData[CurPos + 0x01];
+				case CFS_VOL_CC_FMP2:
+					if (! (TrkHdrs[CurTrk].Chn & 0x80))
+						TrkVol += FileData[CurPos + 0x02];
+					break;
+				case CFS_VOL_CN_FM:
+				case CFS_VOL_CC_FM:
+					if (! (TrkHdrs[CurTrk].Chn & 0x80))
+						TrkVol += FileData[CurPos + 0x01];
+					break;
+				case CFS_VOL_CN_PSG:
+					if (TrkHdrs[CurTrk].Chn & 0x80)
+						TrkVol += FileData[CurPos + 0x01];
+					break;
+				case CFS_VOL_ABS:
+				case CFS_VOL_ABS_HF:
+				case CFS_VOL_ABS_TMP:
+				case CFS_VOL_ABS_PDRM:
+					TrkVol = FileData[CurPos + 0x01];
+					break;
+				case CFS_VOL_ABS_HF2:
+					TrkVol = FileData[CurPos + 0x02];
+					break;
+				case CFS_VOL_ABS_S3K:
+					if (TrkHdrs[CurTrk].Chn & 0x80)
+						TrkVol = (~FileData[CurPos + 0x01] >> 3) & 0x0F;
+					else
+						TrkVol = (~FileData[CurPos + 0x01] >> 0) & 0x7F;
+					break;
+				case CFS_VOL_SPC_TMP:
+					if (TrkHdrs[CurTrk].Chn & 0x80)
+						TrkVol = FileData[CurPos + 0x01];
+					else
+						TrkVol += FileData[CurPos + 0x01];
+					break;
+				case CFS_VOL_ABS_COI:
+					if (TrkHdrs[CurTrk].Chn & 0x80)
+						TrkVol = FileData[CurPos + 0x01];
+					else
+						TrkVol = FileData[CurPos + 0x01] >> 2;
+					break;
+				case CFS_VOL_ABS_PERC:	// scale 00 (min) .. 63 (max)
+					if (TrkHdrs[CurTrk].Chn & 0x80)
+					{
+						if (FileData[CurPos + 0x01] == 0)
+							TrkVol = 0x0F;
+						else
+							TrkVol = (99 - FileData[CurPos + 0x01]) >> 3;
+					}
+					else
+					{
+						if (FileData[CurPos + 0x01] == 0)
+							TrkVol = 0x7F;
+						else
+							TrkVol = 99 - FileData[CurPos + 0x01];
+					}
+					break;
+				}
+#ifdef ENABLE_VGM_LOGGING
+				if (IsDacTrk)
+					MarkDrum_SetDACVol(&DACDrv->Cfg, SmpsCfg->DrumChnMode, TrkVol);
+#endif
+				break;
+			case CF_VOL_QUICK:
+				switch(CmdLstCur->CmdData[CurCmd].SubType)
+				{
+				case CFS_VQ_SET_3B:
+					TrkVol = FileData[CurPos] & 0x07;
+					break;
+				case CFS_VQ_SET_4B:
+				case CFS_VQ_SET_4B_WOI:
+				case CFS_VQ_SET_4B_WOI2:
+				case CFS_VQ_SET_4B_QS:
+					TrkVol = FileData[CurPos] & 0x0F;
+					break;
+				}
+				break;
 			}
 			
 			CurPos += CmdLen;
@@ -833,7 +960,6 @@ static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DA
 {
 	const DRUM_TRK_LIB* DTrkLib;
 	UINT16 DrumID;
-	UINT16 SmplID;
 	UINT16 DrumOfs;
 	
 	switch(DrumData->Type)
@@ -858,21 +984,14 @@ static void MarkDrum_Sub(const SMPS_CFG* SmpsCfg, DAC_CFG* DACDrv, const DRUM_DA
 	default:
 		return;
 	}
-	if (DrumID >= DACDrv->TblCount)
-		return;
-	SmplID = DACDrv->SmplTbl[DrumID].Sample;
-	if (SmplID >= DACDrv->SmplCount)
-		return;
-	
-	DACDrv->Smpls[SmplID].UsageID = 0xFE;
+	MarkDrum_DACSound(DACDrv, DrumID);
 	
 	return;
 }
 
 static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Bank, UINT8 Note)
 {
-	UINT8 TblID;
-	UINT16 SmplID;
+	UINT16 TblID;
 	
 	Note &= 0x7F;
 	if (! Note)
@@ -881,13 +1000,57 @@ static void MarkDrum_DACNote(DAC_CFG* DACDrv, UINT8 Bank, UINT8 Note)
 	TblID = Note - 0x01;
 	if (Bank < DACDrv->BankCount)
 		TblID += DACDrv->BankTbl[Bank];	// do banked sounds
-	if (TblID >= DACDrv->TblCount)
+	MarkDrum_DACSound(DACDrv, TblID);
+	
+	return;
+}
+
+static UINT16 DACVolume = 0x100;
+static void MarkDrum_DACSound(DAC_CFG* DACDrv, UINT16 SndID)
+{
+	UINT16 SmplID;
+	
+	if (SndID >= DACDrv->TblCount)
 		return;
-	SmplID = DACDrv->SmplTbl[TblID].Sample;
+	SmplID = DACDrv->SmplTbl[SndID].Sample;
 	if (SmplID >= DACDrv->SmplCount)
 		return;
 	
-	DACDrv->Smpls[SmplID].UsageID = 0xFE;
+	MarkDrum_AddDACVol(&DACDrv->Smpls[SmplID], DACVolume);
+	
+	return;
+}
+
+static void MarkDrum_SetDACVol(const DAC_SETTINGS* DACCfg, UINT8 DrumChnMode, UINT8 Volume)
+{
+	if (DrumChnMode == DCHNMODE_PS4)
+		return;	// avoid dereferencing NULL pointer
+	
+	RefreshDACVolume(NULL, DrumChnMode, 0, Volume);
+	DACVolume = DAC_GetVolume(0);
+	
+	return;
+}
+
+static void MarkDrum_AddDACVol(DAC_SAMPLE* DACSmpl, UINT16 Volume)
+{
+	UINT16 CurVol;
+	
+	for (CurVol = 0x00; CurVol < DACSmpl->UsedVolCount; CurVol ++)
+	{
+		if (DACSmpl->UsedVols[CurVol].Volume == Volume)
+			return;
+	}
+	
+	if (DACSmpl->UsedVolCount >= DACSmpl->UsedVolAlloc)
+	{
+		DACSmpl->UsedVolAlloc += 0x10;
+		DACSmpl->UsedVols = (DAC_VOLSMPLS*)realloc(DACSmpl->UsedVols,
+							DACSmpl->UsedVolAlloc * sizeof(DAC_VOLSMPLS));
+	}
+	DACSmpl->UsedVols[DACSmpl->UsedVolCount].UsageID = 0xFFFF;
+	DACSmpl->UsedVols[DACSmpl->UsedVolCount].Volume = DACVolume;
+	DACSmpl->UsedVolCount ++;
 	
 	return;
 }

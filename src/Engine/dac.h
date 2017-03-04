@@ -4,6 +4,13 @@
 #define COMPR_PCM	0x00
 #define COMPR_DPCM	0x01
 
+#ifdef ENABLE_VGM_LOGGING
+typedef struct _dac_vol_sample_list
+{
+	UINT16 Volume;
+	UINT16 UsageID;
+} DAC_VOLSMPLS;
+#endif
 typedef struct _dac_sample
 {
 	char* File;
@@ -12,7 +19,9 @@ typedef struct _dac_sample
 	UINT32 Size;
 	UINT8 Compr;
 #ifdef ENABLE_VGM_LOGGING
-	UINT8 UsageID;
+	UINT16 UsedVolAlloc;
+	UINT16 UsedVolCount;
+	DAC_VOLSMPLS* UsedVols;
 #endif
 } DAC_SAMPLE;
 typedef struct _dac_table
@@ -89,6 +98,7 @@ void DAC_ResetOverride(void);
 void DAC_SetFeature(UINT8 Chn, UINT8 DacFlag, UINT8 Set);
 void DAC_SetRateOverride(UINT16 SmplID, UINT32 Rate);
 void DAC_SetVolume(UINT8 Chn, UINT16 Volume);
+UINT16 DAC_GetVolume(UINT8 Chn);
 
 void DAC_Stop(UINT8 Chn);
 UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID);

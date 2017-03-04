@@ -29,6 +29,10 @@ void Extra_LoopStartCheck(TRK_RAM* Trk);
 void Extra_LoopEndCheck(TRK_RAM* Trk);
 #endif
 #ifdef ENABLE_VGM_LOGGING
+static UINT32 GetDACSoundData(DAC_SAMPLE* DACSmpl, UINT8** RetBuffer);
+static INT32 GetActualDACVolume(const DAC_SETTINGS* DACCfg, UINT16 Volume);
+static void DACMultiplyVolume(UINT32 SndLen, UINT8* SndBuffer, INT32 Volume);
+static int dac_usevol_compare(const void* a, const void* b);
 static void DumpDACSounds(DAC_CFG* DACDrv);
 #endif
 
@@ -309,36 +313,116 @@ void Extra_LoopEndCheck(TRK_RAM* Trk)
 #endif	// ENABLE_LOOP_DETECTION
 
 #ifdef ENABLE_VGM_LOGGING
-static void DumpDACSounds(DAC_CFG* DACDrv)
+static UINT32 GetDACSoundData(DAC_SAMPLE* DACSmpl, UINT8** RetBuffer)
 {
-	UINT8 CurSnd;
-	UINT32 CurSmpl;
-	DAC_SAMPLE* TempSmpl;
-	const UINT8* SmplPnt;
 	UINT32 SndLen;
 	UINT8* SndBuffer;
+	UINT32 CurSmpl;
 	UINT8 NibbleData;
 	UINT8 DPCMState;
-	UINT8 SmplID;
+	
+	switch(DACSmpl->Compr)
+	{
+	case COMPR_PCM:
+		SndLen = DACSmpl->Size;
+		SndBuffer = (UINT8*)malloc(SndLen);
+		memcpy(SndBuffer, DACSmpl->Data, SndLen);
+		break;
+	case COMPR_DPCM:
+		SndLen = DACSmpl->Size << 1;
+		SndBuffer = (UINT8*)malloc(SndLen);
+		
+		DPCMState = 0x80;
+		for (CurSmpl = 0; CurSmpl < SndLen; CurSmpl += 0x02)
+		{
+			NibbleData = (DACSmpl->Data[CurSmpl >> 1] >> 4) & 0x0F;
+			DPCMState += DACSmpl->DPCMArr[NibbleData];
+			SndBuffer[CurSmpl + 0x00] = DPCMState;
+			
+			NibbleData = (DACSmpl->Data[CurSmpl >> 1] >> 0) & 0x0F;
+			DPCMState += DACSmpl->DPCMArr[NibbleData];
+			SndBuffer[CurSmpl + 0x01] = DPCMState;
+		}
+		break;
+	default:
+		SndLen = 0x00;
+		SndBuffer = NULL;
+		break;
+	}
+	
+	*RetBuffer = SndBuffer;
+	return SndLen;
+}
+
+static INT32 GetActualDACVolume(const DAC_SETTINGS* DACCfg, UINT16 Volume)
+{
+	if (DACCfg->VolDiv > 0)
+		return (Volume * 0x100 + DACCfg->VolDiv / 2) / DACCfg->VolDiv;
+	else
+		return Volume * 0x100 * -(INT16)DACCfg->VolDiv;
+}
+
+static void DACMultiplyVolume(UINT32 SndLen, UINT8* SndBuffer, INT32 Volume)
+{
+	UINT32 CurSmpl;
+	INT32 SmplVal;
+	
+	if (Volume == 0x10000)
+		return;
+	
+	for (CurSmpl = 0; CurSmpl < SndLen; CurSmpl ++)
+	{
+		SmplVal = (INT32)SndBuffer[CurSmpl] - 0x80;
+		SmplVal = (SmplVal * Volume) / 0x10000;
+		if (SmplVal < -0x80)
+			SmplVal = -0x80;
+		else if (SmplVal > 0x7F)
+			SmplVal = 0x7F;
+		SndBuffer[CurSmpl] = (UINT8)(0x80 + SmplVal);
+	}
+	
+	return;
+}
+
+static int dac_usevol_compare(const void* a, const void* b)
+{
+	const DAC_VOLSMPLS* volA = (DAC_VOLSMPLS*)a;
+	const DAC_VOLSMPLS* volB = (DAC_VOLSMPLS*)b;
+	
+	return (int)volB->Volume - (int)volA->Volume;	// sort with high volume first
+}
+
+static void DumpDACSounds(DAC_CFG* DACDrv)
+{
+	UINT16 CurSnd;
+	UINT16 CurVol;
+	DAC_SAMPLE* TempSmpl;
+	UINT32 SndLen;
+	UINT8* SndBuffer;
+	UINT16 SmplID;
 	const UINT8* OldDPCMTbl;
-	const UINT8* CurDPCMTbl;
+	UINT8 NeedSamplePatch;
+	INT32 SmplVol;
 	
 	if (! Enable_VGMDumping)
 		return;
 	
 	// Check, if there is a sample used
-	SmplID = 0x00;
 	for (CurSnd = 0; CurSnd < DACDrv->SmplCount; CurSnd ++)
 	{
 		TempSmpl = &DACDrv->Smpls[CurSnd];
-		if (TempSmpl->Size && DACDrv->Smpls[CurSnd].UsageID != 0xFF)
-		{
-			SmplID = 0x01;
+		if (TempSmpl->Size && TempSmpl->UsedVolCount)
 			break;
-		}
 	}
-	if (! SmplID)
+	if (CurSnd >= DACDrv->SmplCount)
 		return;
+	
+	for (CurSnd = 0; CurSnd < DACDrv->SmplCount; CurSnd ++)
+	{
+		TempSmpl = &DACDrv->Smpls[CurSnd];
+		if (TempSmpl->UsedVolCount)
+			qsort(TempSmpl->UsedVols, TempSmpl->UsedVolCount, sizeof(DAC_VOLSMPLS), dac_usevol_compare);
+	}
 	
 	OldDPCMTbl = NULL;
 	if (VGM_DataBlkCompress)
@@ -347,10 +431,16 @@ static void DumpDACSounds(DAC_CFG* DACDrv)
 		for (CurSnd = 0; CurSnd < DACDrv->SmplCount; CurSnd ++)
 		{
 			TempSmpl = &DACDrv->Smpls[CurSnd];
-			if (! TempSmpl->Size || DACDrv->Smpls[CurSnd].UsageID == 0xFF)
+			if (! TempSmpl->Size || ! TempSmpl->UsedVolCount)
 				continue;
 			
-			if (TempSmpl->Compr == COMPR_DPCM)
+			for (CurVol = 0x00; CurVol < TempSmpl->UsedVolCount; CurVol ++)
+			{
+				SmplVol = GetActualDACVolume(&DACDrv->Cfg, TempSmpl->UsedVols[CurVol].Volume);
+				if (SmplVol == 0x10000)
+					break;
+			}
+			if (TempSmpl->Compr == COMPR_DPCM && CurVol < TempSmpl->UsedVolCount)
 			{
 				// write DPCM Delta-Table
 				vgm_write_large_data(VGMC_YM2612, 0xFF, 0x10, 0, 0, TempSmpl->DPCMArr);
@@ -360,55 +450,51 @@ static void DumpDACSounds(DAC_CFG* DACDrv)
 		}
 	}
 	
-	SmplID = 0x00;
+	SmplID = 0x0000;
 	for (CurSnd = 0; CurSnd < DACDrv->SmplCount; CurSnd ++)
 	{
 		TempSmpl = &DACDrv->Smpls[CurSnd];
-		if (! TempSmpl->Size || DACDrv->Smpls[CurSnd].UsageID == 0xFF)
+		if (! TempSmpl->Size)
 			continue;
 		
-		if (DACDrv->Smpls[CurSnd].UsageID == 0xFE)
+		for (CurVol = 0x00; CurVol < TempSmpl->UsedVolCount; CurVol ++)
 		{
-			DACDrv->Smpls[CurSnd].UsageID = SmplID;
+			TempSmpl->UsedVols[CurVol].UsageID = SmplID;
 			SmplID ++;
-		}
-		
-		CurDPCMTbl = TempSmpl->DPCMArr;
-		if (TempSmpl->Compr == COMPR_PCM || VGM_DataBlkCompress)
-		{
-			if (TempSmpl->Compr == COMPR_PCM)
-				vgm_write_large_data(VGMC_YM2612, 0x00, TempSmpl->Size, 0, 0, TempSmpl->Data);
+			SmplVol = GetActualDACVolume(&DACDrv->Cfg, TempSmpl->UsedVols[CurVol].Volume);
+			
+			NeedSamplePatch = 0x00;
+			NeedSamplePatch |= (TempSmpl->Compr != COMPR_PCM && ! VGM_DataBlkCompress) << 0;
+			NeedSamplePatch |= (SmplVol != 0x10000) << 1;
+			
+			if (NeedSamplePatch)
+			{
+				SndLen = GetDACSoundData(TempSmpl, &SndBuffer);
+				DACMultiplyVolume(SndLen, SndBuffer, SmplVol);
+				vgm_write_large_data(VGMC_YM2612, 0x00, SndLen, 0, 0, SndBuffer);
+				free(SndBuffer);
+			}
 			else
 			{
-				if (OldDPCMTbl == NULL || memcmp(CurDPCMTbl, OldDPCMTbl, 0x10))
+				switch(TempSmpl->Compr)
 				{
-					// write new DPCM Delta-Table
-					vgm_write_large_data(VGMC_YM2612, 0xFF, 0x10, 0, 0, CurDPCMTbl);
-					OldDPCMTbl = CurDPCMTbl;
+				case COMPR_PCM:
+					vgm_write_large_data(VGMC_YM2612, 0x00, TempSmpl->Size, 0, 0, TempSmpl->Data);
+					break;
+				case COMPR_DPCM:
+					if (OldDPCMTbl == NULL || memcmp(TempSmpl->DPCMArr, OldDPCMTbl, 0x10))
+					{
+						// write new DPCM Delta-Table
+						OldDPCMTbl = TempSmpl->DPCMArr;
+						vgm_write_large_data(VGMC_YM2612, 0xFF, 0x10, 0, 0, OldDPCMTbl);
+					}
+					vgm_write_large_data(VGMC_YM2612, 0x01, TempSmpl->Size, TempSmpl->Size << 1, 0x80, TempSmpl->Data);
+					break;
+				default:
+					vgm_write_large_data(VGMC_YM2612, 0x00, 0x00, 0, 0, NULL);
+					break;
 				}
-				vgm_write_large_data(VGMC_YM2612, 0x01, TempSmpl->Size, TempSmpl->Size << 1, 0x80, TempSmpl->Data);
 			}
-		}
-		else
-		{
-			SndLen = TempSmpl->Size << 1;
-			SmplPnt = TempSmpl->Data;
-			SndBuffer = (UINT8*)malloc(SndLen);
-			
-			DPCMState = 0x80;
-			for (CurSmpl = 0; CurSmpl < SndLen; CurSmpl += 0x02)
-			{
-				NibbleData = (SmplPnt[CurSmpl >> 1] >> 4) & 0x0F;
-				DPCMState += CurDPCMTbl[NibbleData];
-				SndBuffer[CurSmpl + 0x00] = DPCMState;
-				
-				NibbleData = (SmplPnt[CurSmpl >> 1] >> 0) & 0x0F;
-				DPCMState += CurDPCMTbl[NibbleData];
-				SndBuffer[CurSmpl + 0x01] = DPCMState;
-			}
-			
-			vgm_write_large_data(VGMC_YM2612, 0x00, SndLen, 0, 0, SndBuffer);
-			free(SndBuffer);
 		}
 	}
 	

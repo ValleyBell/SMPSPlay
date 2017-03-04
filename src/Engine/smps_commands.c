@@ -1899,7 +1899,7 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 				if (Params[0x00] == 0)
 					TempByt = 0x0F;
 				else
-					TempByt = 99 - (Params[0x00] >> 3);
+					TempByt = (99 - Params[0x00]) >> 3;
 				Trk->Volume = TempByt;
 			}
 			else
