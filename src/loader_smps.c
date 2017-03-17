@@ -30,6 +30,10 @@ extern UINT8 DebugMsgs;
 #define DebugMsgs	0
 #endif
 
+#ifdef ENABLE_VGM_LOGGING
+extern UINT8 Enable_VGMDumping;
+#endif
+
 
 // Function Prototypes
 // -------------------
@@ -264,6 +268,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	UINT8 CmdLen;
 	UINT16 StackPtrs[0x08];
 	UINT16 LoopExitPtrs[0x08];
+	UINT8 LoopCount[0x08];
 	UINT16 StackPtrsE[0x08];	// GoSub Entry Pointer
 	UINT8 StackPos;
 	UINT8 LoopID;
@@ -271,6 +276,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	UINT8 IsDacTrk;
 	UINT8 DACBank;
 	UINT8 TrkVol;
+	UINT8 TrkNote;
 	
 	FileLen = SmpsSet->Seq.Len;
 	FileData = SmpsSet->Seq.Data;
@@ -500,7 +506,9 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		
 		memset(FileMask, 0x00, FileLen);
 		memset(LoopExitPtrs, 0x00, sizeof(UINT16) * 0x08);
+		memset(LoopCount, 0x00, sizeof(UINT8) * 0x08);
 		memset(StackPtrs, 0x00, sizeof(UINT16) * 0x08);
+		TrkNote = SmpsCfg->NoteBase;
 		StackPos = 0x08;
 		TrkMode = PBKFLG_ACTIVE;
 		while(CurPos < FileLen && (TrkMode & PBKFLG_ACTIVE))
@@ -511,6 +519,7 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				if (TrkMode & PBKFLG_RAWFREQ)
 				{
 					CurPos += 0x02 + 0x01;	// frequency + delay
+					continue;
 				}
 				else if (FileData[CurPos] < SmpsCfg->NoteBase)
 				{
@@ -518,34 +527,35 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				}
 				else
 				{
-#ifdef ENABLE_VGM_LOGGING
-					if (IsDacTrk)
-					{
-						if (! (TrkMode & PBKFLG_SPCMODE))	// if not Phantasy Star IV
-							MarkDrumNote(SmpsCfg, DACDrv, &SmpsCfg->DrumLib, FileData[CurPos]);
-						else if (TrkMode & PBKFLG_RAWFREQ)	// handle PS4 special mode
-							MarkDrum_DACNote(DACDrv, DACBank, FileData[CurPos]);
-					}
-					else if (SmpsCfg->DrumChnMode == DCHNMODE_SMGP2 && CurTrk == 1)
-					{
-						if (FileData[CurPos] != SmpsCfg->NoteBase)
-						{
-							//if (FileData[CurPos] + Trk->Transp < 0xB0)
-							//	MarkDrum_DACNote(DACDrv, DACBank, 0x86);
-							//else
-							//	MarkDrum_DACNote(DACDrv, DACBank, 0x87);
-							MarkDrum_DACNote(DACDrv, DACBank, 0x86);
-							MarkDrum_DACNote(DACDrv, DACBank, 0x87);
-						}
-					}
-#endif
-					
+					TrkNote = FileData[CurPos];
 					CurPos ++;	// note
 					if (TrkMode & PBKFLG_PITCHSLIDE)
 						CurPos += 0x01 + 0x01;	// slide speed + delay
 					else if (! (FileData[CurPos] & 0x80))
 						CurPos ++;	// delay
 				}
+#ifdef ENABLE_VGM_LOGGING
+				// trigger on "note only", "note + delay" and "delay only" for proper DAC volume detection
+				if (IsDacTrk)
+				{
+					if (! (TrkMode & PBKFLG_SPCMODE))	// if not Phantasy Star IV
+						MarkDrumNote(SmpsCfg, DACDrv, &SmpsCfg->DrumLib, TrkNote);
+					else if (TrkMode & PBKFLG_RAWFREQ)	// handle PS4 special mode
+						MarkDrum_DACNote(DACDrv, DACBank, TrkNote);
+				}
+				else if (SmpsCfg->DrumChnMode == DCHNMODE_SMGP2 && CurTrk == 1)
+				{
+					if (TrkNote != SmpsCfg->NoteBase)
+					{
+						//if (TrkNote + Trk->Transp < 0xB0)
+						//	MarkDrum_DACNote(DACDrv, DACBank, 0x86);
+						//else
+						//	MarkDrum_DACNote(DACDrv, DACBank, 0x87);
+						MarkDrum_DACNote(DACDrv, DACBank, 0x86);
+						MarkDrum_DACNote(DACDrv, DACBank, 0x87);
+					}
+				}
+#endif
 				continue;
 			}
 			
@@ -636,6 +646,27 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				break;
 			case CF_LOOP:
 				LoopID = FileData[CurPos + 0x01] & 0x07;
+#ifdef ENABLE_VGM_LOGGING
+				if (IsDacTrk && Enable_VGMDumping)	// && EnableDacVolLog
+				{
+					if (LoopCount[LoopID] == 0)
+						LoopCount[LoopID] = FileData[CurPos + 0x02];
+					LoopCount[LoopID] --;
+					if (LoopCount[LoopID] > 0)
+					{
+						OldPos = CurPos;
+						TempOfs = CurPos + CmdLstCur->CmdData[CurCmd].JumpOfs;
+						CurPos = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
+						if (CurPos >= FileLen)
+						{
+							CurPos = OldPos;
+							break;
+						}
+						CmdLen = 0x00;
+					}
+					break;
+				}
+#endif
 				if (LoopExitPtrs[LoopID])
 				{
 					// a Loop Exit command was found, so process its data now
@@ -671,6 +702,34 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 				LoopID = FileData[CurPos + 0x01] & 0x07;
 				TempOfs = CurPos + CmdLstCur->CmdData[CurCmd].JumpOfs;
 				LoopExitPtrs[LoopID] = ReadJumpPtr(&FileData[TempOfs], TempOfs, SmpsSet);
+#ifdef ENABLE_VGM_LOGGING
+				if (IsDacTrk && Enable_VGMDumping &&	// && EnableDacVolLog
+					LoopCount[LoopID] == 1)
+				{
+					// a Loop Exit command was found, so process its data now
+					OldPos = CurPos;
+					CurPos = LoopExitPtrs[LoopID];
+					LoopExitPtrs[LoopID] = 0x0000;
+					CmdLen = 0x00;
+					if (CurPos >= FileLen)
+					{
+						TrkMode = 0x00;
+						break;
+					}
+					
+					if (StackPos < 0x08 && CurPos < OldPos)	// jumping backwards?
+						StackPtrsE[StackPos] = 0x0000;	// mark as non-linear subroutine
+					UsageMask = (1 << (9 - StackPos)) - 1;
+					if (FileMask[CurPos] & UsageMask)
+					{
+#ifdef ENABLE_LOOP_DETECTION
+						SmpsSet->LoopPtrs[CurTrk].Ptr = CurPos;
+						SmpsSet->LoopPtrs[CurTrk].SrcOfs = OldPos;
+#endif
+						TrkMode = 0x00;
+					}
+				}
+#endif
 				break;
 			case CF_GOSUB:
 				if (! StackPos)
