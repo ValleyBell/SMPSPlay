@@ -4,13 +4,9 @@
 
 #include <stddef.h>	// for NULL
 #include <stdtype.h>
-#include "necpcm.h"
 #include "dac.h"	// for DAC_SAMPLE
-#include "../chips/mamedef.h"
-#include "../chips/upd7759.h"
-#ifdef ENABLE_VGM_LOGGING
-#include "../vgmwrite.h"
-#endif
+#include "../Sound.h"
+#include "necpcm.h"
 
 typedef struct _nec_state
 {
@@ -23,6 +19,11 @@ typedef struct _nec_state
 	
 	UINT16 ChipCtrlReg;
 } NEC_STATE;
+
+
+#define UPDFUNC_RESET	0x00	// reset line (0 - reset, 1 - default)
+#define UPDFUNC_START	0x01	// start line (0 - normal, 1 - start)
+#define UPDFUNC_DATA	0x02
 
 
 static DAC_CFG* DACDrv = NULL;
@@ -39,14 +40,14 @@ void SetNecPCMDriver(DAC_CFG* DACSet)
 
 static void WritePicoCtrlReg(UINT16 Data)
 {
-	NECPCM_SetReset((Data >> 8) & 0x08);
-	NECPCM_SetStart((Data >> 8) & 0x40);
+	upd7759_write(UPDFUNC_RESET, (Data >> 8) & 0x08);
+	upd7759_write(UPDFUNC_START, (Data >> 8) & 0x40);
 	if (Data & 0x4000)
 	{
-		NECPCM_WriteData(0xFF);	// "Last Sample" value (must be >= 0x10)
-		NECPCM_WriteData(0x00);	// Dummy 1
-		NECPCM_WriteData(0x00);	// Addr MSB
-		NECPCM_WriteData(0x00);	// Addr LSB
+		upd7759_write(UPDFUNC_DATA, 0xFF);	// "Last Sample" value (must be >= 0x10)
+		upd7759_write(UPDFUNC_DATA, 0x00);	// Dummy 1
+		upd7759_write(UPDFUNC_DATA, 0x00);	// Addr MSB
+		upd7759_write(UPDFUNC_DATA, 0x00);	// Addr LSB
 	}
 	
 	return;
@@ -138,7 +139,7 @@ void UpdateNECPCM(void)
 	if (NecState.SmplData == NULL)
 		return;
 	
-	RemFIFOBytes = upd7759_get_fifo_space(0x00);
+	RemFIFOBytes = upd7759_get_fifo_space();
 	if (RemFIFOBytes < 0x14)
 		return;
 	RemFIFOBytes -= 0x04;	// don't fill FIFO completely (safe for VGM logging)
@@ -148,7 +149,7 @@ void UpdateNECPCM(void)
 	
 	while(RemFIFOBytes)
 	{
-		NECPCM_WriteData(NecState.SmplData[NecState.Pos]);
+		upd7759_write(UPDFUNC_DATA, NecState.SmplData[NecState.Pos]);
 		NecState.Pos ++;
 		RemFIFOBytes --;
 	}
@@ -158,34 +159,5 @@ void UpdateNECPCM(void)
 		NecState.SmplData = NULL;
 	}
 	
-	return;
-}
-
-
-
-void NECPCM_SetReset(UINT8 State)
-{
-	upd7759_reset_w(0x00, State);
-#ifdef ENABLE_VGM_LOGGING
-	vgm_write(VGMC_UPD7759, 0, 0x00, State);
-#endif
-	return;
-}
-
-void NECPCM_SetStart(UINT8 State)
-{
-	upd7759_start_w(0x00, State);
-#ifdef ENABLE_VGM_LOGGING
-	vgm_write(VGMC_UPD7759, 0, 0x01, State);
-#endif
-	return;
-}
-
-void NECPCM_WriteData(UINT8 Data)
-{
-	upd7759_port_w(0x00, 0x00, Data);
-#ifdef ENABLE_VGM_LOGGING
-	vgm_write(VGMC_UPD7759, 0, 0x02, Data);
-#endif
 	return;
 }

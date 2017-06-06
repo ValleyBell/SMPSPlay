@@ -72,10 +72,16 @@ Thanks to Xeeynamo for contributing.
 
 History
 -------
-2015-xx-xx
+2017-xx-xx - 2.20
 	fixed bug where a "Communication Variable" event prevented automatically going to the next song until a key is pressed
-	replaced sound output system with libvgm's Audio Output Library
+	replaced sound output and emulation system with libvgm's Audio Output and Emulation libraries
 	added option to select audio API (previously only WinMM was supported)
+	fixed auto-advance after stopping by pressing 'S'
+	add .ini option to configure output volume
+	fixed various bugs regarding 1-up save states
+	add preSMPS support
+	make "CompressVGM" option work
+	add DAC volume control for logged VGMs
 2015-07-07 - 2.11
 	improved loop detection
 	fixed delay during first tick of SMPS Z80 Type 1 songs

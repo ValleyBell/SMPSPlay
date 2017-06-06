@@ -33,18 +33,6 @@
     <ClCompile Include="src\Sound.c">
       <Filter>Sound Emulation</Filter>
     </ClCompile>
-    <ClCompile Include="src\chips\sn76496.c">
-      <Filter>Sound Emulation</Filter>
-    </ClCompile>
-    <ClCompile Include="src\chips\sn764intf.c">
-      <Filter>Sound Emulation</Filter>
-    </ClCompile>
-    <ClCompile Include="src\chips\fm2612.c">
-      <Filter>Sound Emulation</Filter>
-    </ClCompile>
-    <ClCompile Include="src\chips\2612intf.c">
-      <Filter>Sound Emulation</Filter>
-    </ClCompile>
     <ClCompile Include="src\Engine\dac.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -78,9 +66,6 @@
     <ClCompile Include="src\loader_ini.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\chips\upd7759.c">
-      <Filter>Sound Emulation</Filter>
-    </ClCompile>
     <ClCompile Include="src\Engine\necpcm.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -96,18 +81,6 @@
       <Filter>Libraries</Filter>
     </ClInclude>
     <ClInclude Include="src\Sound.h">
-      <Filter>Sound Emulation</Filter>
-    </ClInclude>
-    <ClInclude Include="src\chips\fm.h">
-      <Filter>Sound Emulation</Filter>
-    </ClInclude>
-    <ClInclude Include="src\chips\2612intf.h">
-      <Filter>Sound Emulation</Filter>
-    </ClInclude>
-    <ClInclude Include="src\chips\sn76496.h">
-      <Filter>Sound Emulation</Filter>
-    </ClInclude>
-    <ClInclude Include="src\chips\sn764intf.h">
       <Filter>Sound Emulation</Filter>
     </ClInclude>
     <ClInclude Include="src\Engine\smps.h">
@@ -131,17 +104,11 @@
     <ClInclude Include="src\loader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\chips\mamedef.h">
-      <Filter>Sound Emulation</Filter>
-    </ClInclude>
     <ClInclude Include="src\ini_lib.h">
       <Filter>Libraries</Filter>
     </ClInclude>
     <ClInclude Include="src\Engine\smps_commands.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\chips\upd7759.h">
-      <Filter>Sound Emulation</Filter>
     </ClInclude>
     <ClInclude Include="src\Engine\necpcm.h">
       <Filter>Header Files</Filter>

@@ -16,9 +16,9 @@
 #include "necpcm.h"
 #endif
 
-#define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, 0x00, Reg, Data)
-#define WriteFMII(Reg, Data)	ym2612_fm_write(0x00, 0x01, Reg, Data)
-#define WritePSG(Data)			sn76496_psg_write(0x00, Data)
+#define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, Reg, Data)
+#define WriteFMII(Reg, Data)	ym2612_fm_write(0x01, Reg, Data)
+#define WritePSG(Data)			sn76496_psg_write(Data)
 
 
 #ifndef DISABLE_DEBUG_MSGS

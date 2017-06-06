@@ -22,12 +22,11 @@
 #include "necpcm.h"
 #endif
 
-UINT8 ym2612_r(UINT8 ChipID, UINT32 offset);
-#define ReadFM()				ym2612_r(0x00, 0x00)
-#define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, 0x00, Reg, Data)
-#define WriteFMII(Reg, Data)	ym2612_fm_write(0x00, 0x01, Reg, Data)
-#define WritePSG(Data)			sn76496_psg_write(0x00, Data)
-int upd7759_busy_r(UINT8 ChipID);
+#define ReadFM()				ym2612_fm_read()
+#define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, Reg, Data)
+#define WriteFMII(Reg, Data)	ym2612_fm_write(0x01, Reg, Data)
+#define WritePSG(Data)			sn76496_psg_write(Data)
+#define PicoPCMReady()			upd7759_ready()
 
 
 #ifndef DISABLE_DEBUG_MSGS
@@ -360,7 +359,7 @@ void UpdateMusic(void)
 #ifndef DISABLE_NECPCM
 	if (SmpsRAM.NecPcmOverride)
 	{
-		if (upd7759_busy_r(0x00))	// actually returns "ready"
+		if (PicoPCMReady())
 			SmpsRAM.NecPcmOverride = 0x00;	// PCM sound finished - remove PCM SFX lock
 	}
 #endif

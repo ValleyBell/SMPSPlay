@@ -6,12 +6,15 @@
 #include <stdtype.h>
 #include "dac.h"
 #include "smps.h"
-#include "../chips/mamedef.h"
 #include "../Sound.h"
-#include "../chips/2612intf.h"
 #ifdef ENABLE_VGM_LOGGING
 #include "../vgmwrite.h"
 #endif
+
+#define WriteFMIReg(Reg)		ym2612_direct_write(0x00, Reg)
+#define WriteFMIData(Data)		ym2612_direct_write(0x01, Data)
+#define WriteFMI(Reg, Data)		ym2612_fm_write(0x00, Reg, Data)
+#define WriteFMII(Reg, Data)	ym2612_fm_write(0x01, Reg, Data)
 
 #define CLOCK_Z80	3579545
 
@@ -358,7 +361,7 @@ void UpdateDAC(UINT32 Samples)
 		return;
 	
 	DacStopSignal = 0x00;
-	ym2612_w(0x00, 0x00, 0x2A);	// YM2612: Register 2A: DAC Data
+	WriteFMIReg(0x2A);	// YM2612: Register 2A: DAC Data
 	while(Samples)
 	{
 		OutSmpl = UpdateChannels(&ProcessedSmpls, &DacStopSignal);
@@ -374,7 +377,7 @@ void UpdateDAC(UINT32 Samples)
 			else if (OutSmpl > 0x7F)
 				OutSmpl = 0x7F;
 			FnlSmpl = (UINT8)(0x80 + OutSmpl);
-			ym2612_w(0x00, 0x01, FnlSmpl);	// write data directly to chip, skipping VGM logging
+			WriteFMIData(FnlSmpl);	// write data directly to chip, skipping VGM logging
 		}
 		Samples --;
 	}
@@ -652,7 +655,7 @@ UINT8 DAC_Play(UINT8 Chn, UINT16 SmplID)
 	
 	SetDACState(0x80);	// also does WriteFMI(0x2B, 0x00);
 	if (TempEntry->Pan)
-		ym2612_fm_write(0x00, 0x01, 0xB6, TempEntry->Pan);
+		WriteFMII(0xB6, TempEntry->Pan);
 #ifdef ENABLE_VGM_LOGGING
 	DACChn->VgmSmplID = 0xFFFF;
 	if (TempSmpl->UsedVolCount)

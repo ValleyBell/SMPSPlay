@@ -36,7 +36,15 @@ void ThreadSync(UINT8 PauseAndWait);
 UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel);
 
 void ym2612_timer_mask(UINT8 Mask);
-void ym2612_fm_write(UINT8 ChipID, UINT8 Port, UINT8 Register, UINT8 Data);
-void sn76496_psg_write(UINT8 ChipID, UINT8 Data);
+UINT8 ym2612_fm_read(void);
+void ym2612_direct_write(UINT8 Offset, UINT8 Data);
+void ym2612_fm_write(UINT8 Port, UINT8 Register, UINT8 Data);
+void sn76496_psg_write(UINT8 Data);
+
+#ifndef DISABLE_NECPCM
+UINT8 upd7759_ready(void);
+UINT8 upd7759_get_fifo_space(void);
+void upd7759_write(UINT8 Func, UINT8 Data);
+#endif
 
 #endif	// __SOUND_H__

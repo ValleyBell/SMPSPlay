@@ -16,12 +16,13 @@
 #include <audio/AudioStream.h>
 #include <audio/AudioStream_SpcDrvFuns.h>
 
-#include "chips/mamedef.h"
-#include "chips/2612intf.h"
-#include "chips/sn764intf.h"
-#ifndef DISABLE_NECPCM
-#include "chips/upd7759.h"
-#endif
+#include <emu/EmuStructs.h>
+#include <emu/SoundEmu.h>
+#include <emu/Resampler.h>
+#include <emu/SoundDevs.h>
+//#include <emu/EmuCores.h>
+#include <emu/cores/sn764intf.h>	// for SN76496_CFG
+
 #include "Engine/smps.h"
 #include "Engine/dac.h"
 #ifndef DISABLE_NECPCM
@@ -39,39 +40,13 @@
 #endif
 
 
-typedef void (*strm_func)(UINT8 ChipID, stream_sample_t **outputs, int samples);
-
-typedef struct waveform_16bit_stereo
-{
-	INT16 Left;
-	INT16 Right;
-} WAVE_16BS;
-typedef struct waveform_32bit_stereo
-{
-	INT32 Left;
-	INT32 Right;
-} WAVE_32BS;
-
 typedef struct chip_audio_attributes CAUD_ATTR;
 struct chip_audio_attributes
 {
-	UINT32 SmpRate;
-	UINT16 Volume;
-	UINT8 ChipType;
-	UINT8 ChipID;		// 0 - 1st chip, 1 - 2nd chip, etc.
-	// Resampler Type:
-	//	00 - Old
-	//	01 - Upsampling
-	//	02 - Copy
-	//	03 - Downsampling
-	UINT8 Resampler;
-	strm_func StreamUpdate;
-	UINT32 SmpP;		// Current Sample (Playback Rate)
-	UINT32 SmpLast;		// Sample Number Last
-	UINT32 SmpNext;		// Sample Number Next
-	WAVE_32BS LSmpl;	// Last Sample
-	WAVE_32BS NSmpl;	// Next Sample
-//	CAUD_ATTR* Paired;
+	DEV_INFO defInf;
+	RESMPL_STATE resmpl;
+	DEVFUNC_WRITE_A8D8 write8;		// write 8-bit data to 8-bit register/offset
+	DEVFUNC_READ_A8D8 read8;		// read 8-bit data to 8-bit register/offset
 };
 
 typedef struct chip_audio_struct
@@ -100,23 +75,21 @@ INLINE UINT8 Limit8Bit(INT32 Value);
 INLINE INT16 Limit16Bit(INT32 Value);
 INLINE INT32 Limit24Bit(INT32 Value);
 INLINE INT32 Limit32Bit(INT32 Value);
-static void null_update(UINT8 ChipID, stream_sample_t **outputs, int samples);
-static void ResampleChipStream(CAUD_ATTR* CAA, WAVE_32BS* RetSample, UINT32 Length);
 static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data);
 static void YM2612_Callback(void *param, int irq);
 
+//void ym2612_timer_mask(UINT8 Mask);
+//UINT8 ym2612_fm_read(UINT8 ChipID);
 //void ym2612_fm_write(UINT8 ChipID, UINT8 Port, UINT8 Register, UINT8 Data);
 //void sn76496_psg_write(UINT8 ChipID, UINT8 Data);
+//UINT8 upd7759_ready(void);
+//UINT8 upd7759_get_fifo_space(void);
+//void upd7759_write(UINT8 Func, UINT8 Data);
 
 
 #define CLOCK_YM2612	7670454
 #define CLOCK_SN76496	3579545
-
-#ifdef DISABLE_NECPCM
-#define CHIP_COUNT		0x02
-#else
-#define CHIP_COUNT		0x03
-#endif
+#define CLOCK_PICO_PCM	1280000
 
 //#define VOL_SHIFT		7	// shift X bits to the right after mixing everything together
 #define VOL_SHIFT		10	// 7 [main shift] + (8-5) [OutputVolume post-shift]
@@ -131,10 +104,6 @@ UINT8 CHIP_SAMPLING_MODE;
 INT32 CHIP_SAMPLE_RATE;
 
 static CHIP_AUDIO ChipAudio;
-
-#define SMPL_BUFSIZE	0x100
-static INT32* StreamBufs[0x02];
-stream_sample_t* DUMMYBUF[0x02] = {NULL, NULL};
 
 static UINT8 DeviceState = 0xFF;	// FF - not initialized, 00 - not running, 01 - running
 static void* audDrv;
@@ -214,55 +183,70 @@ static UINT32 GetAudioDriver(UINT8 Type, const char* PreferredDrv)
 	return idDrv;
 }
 
+static void InitOneChip(CAUD_ATTR* CAA, const DEV_GEN_CFG* devCfg, UINT8 chipID, UINT16 volume)
+{
+	UINT8 retVal;
+	
+	retVal = SndEmu_Start(chipID, devCfg, &CAA->defInf);
+	if (retVal)
+	{
+		CAA->defInf.dataPtr = NULL;
+		CAA->defInf.devDef = NULL;
+		return;
+	}
+	SndEmu_FreeDevLinkData(&CAA->defInf);	// just in case
+	
+	SndEmu_GetDeviceFunc(CAA->defInf.devDef, RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, (void**)&CAA->write8);
+	SndEmu_GetDeviceFunc(CAA->defInf.devDef, RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, (void**)&CAA->read8);
+	Resmpl_SetVals(&CAA->resmpl, 0xFF, volume, audOpts->sampleRate);
+	Resmpl_DevConnect(&CAA->resmpl, &CAA->defInf);
+	Resmpl_Init(&CAA->resmpl);
+	
+	return;
+}
+
 static void InitalizeChips(void)
 {
-	UINT8 CurChip;
+	DEV_GEN_CFG devCfg;
+	SN76496_CFG snCfg;
 	CAUD_ATTR* CAA;
 	
 	if (DeviceState)
 		return;
 	
+	memset(&ChipAudio, 0x00, sizeof(CHIP_AUDIO));
 	ResampleMode = 0x00;
 	CHIP_SAMPLING_MODE = 0x00;
 	CHIP_SAMPLE_RATE = 0x00000000;
 	SampleRate = audOpts->sampleRate;	// used by some chips as output sample rate
 	
-	for (CurChip = 0x00; CurChip < CHIP_COUNT; CurChip ++)
-	{
-		CAA = (CAUD_ATTR*)&ChipAudio + CurChip;
-		CAA->SmpRate = 0x00;
-		CAA->Volume = 0x00;
-		CAA->ChipType = 0xFF;
-		CAA->ChipID = 0x00;
-		CAA->Resampler = 0x00;
-		CAA->StreamUpdate = &null_update;
-	}
-	
-	StreamBufs[0x00] = (INT32*)malloc(SMPL_BUFSIZE * sizeof(INT32));
-	StreamBufs[0x01] = (INT32*)malloc(SMPL_BUFSIZE * sizeof(INT32));
+	devCfg.emuCore = 0x00;	// default
+	devCfg.srMode = DEVRI_SRMODE_NATIVE;
+	devCfg.smplRate = audOpts->sampleRate;
 	
 	CAA = &ChipAudio.YM2612;
-	CAA->SmpRate = device_start_ym2612(0x00, CLOCK_YM2612);
-	CAA->StreamUpdate = &ym2612_stream_update;
-	CAA->Volume = 0x100;
-	device_reset_ym2612(0x00);
-	ym2612_set_callback(0x00, &YM2612_Callback);
-	SetupResampler(CAA);
+	devCfg.clock = CLOCK_YM2612;
+	devCfg.flags = 0x00;
+	//devCfg.emuCore = FCC_GPGX;
+	InitOneChip(CAA, &devCfg, DEVID_YM2612, 0x100);
 	
 	CAA = &ChipAudio.SN76496;
-	CAA->SmpRate = device_start_sn764xx(0x00, CLOCK_SN76496, 0x10, 0x09, 1, 1, 0, 0);
-	CAA->StreamUpdate = &sn764xx_stream_update;
-	CAA->Volume = 0x80;
-	device_reset_sn764xx(0x00);
-	SetupResampler(CAA);
+	devCfg.clock = CLOCK_SN76496;
+	devCfg.flags = 0x00;
+	//devCfg.emuCore = FCC_MAME;
+	snCfg._genCfg = devCfg;
+	snCfg.noiseTaps = 0x09;	snCfg.shiftRegWidth = 16;
+	snCfg.negate = 1;		snCfg.clkDiv = 8;
+	snCfg.segaPSG = 1;		snCfg.stereo = 1;
+	snCfg.t6w28_tone = NULL;
+	InitOneChip(CAA, (DEV_GEN_CFG*)&snCfg, DEVID_SN76496, 0x80);
 	
 #ifndef DISABLE_NECPCM
 	CAA = &ChipAudio.uPD7759;
-	CAA->SmpRate = device_start_upd7759(0x00, 0x80000000 | (UPD7759_STANDARD_CLOCK * 2));
-	CAA->StreamUpdate = &upd7759_update;
-	CAA->Volume = 0x2B;	// ~0.33 * PSG according to Kega Fusion 3.64
-	device_reset_upd7759(0x00);
-	SetupResampler(CAA);
+	devCfg.clock = CLOCK_PICO_PCM;
+	devCfg.flags = 0x01;	// slave mode
+	//devCfg.emuCore = FCC_MAME;
+	InitOneChip(CAA, &devCfg, DEVID_uPD7759, 0x28);	// ~0.33 * PSG according to Kega Fusion 3.64
 #endif
 	
 	TimerExpired = 0xFF;
@@ -283,13 +267,22 @@ static void DeinitChips(void)
 	if (DeviceState != 0x01)
 		return;
 	
-	free(StreamBufs[0x00]);	StreamBufs[0x00] = NULL;
-	free(StreamBufs[0x01]);	StreamBufs[0x01] = NULL;
-	
-	device_stop_ym2612(0x00);
-	device_stop_sn764xx(0x00);
+	if (ChipAudio.YM2612.defInf.dataPtr != NULL)
+	{
+		Resmpl_Deinit(&ChipAudio.YM2612.resmpl);
+		SndEmu_Stop(&ChipAudio.YM2612.defInf);
+	}
+	if (ChipAudio.SN76496.defInf.dataPtr != NULL)
+	{
+		Resmpl_Deinit(&ChipAudio.SN76496.resmpl);
+		SndEmu_Stop(&ChipAudio.SN76496.defInf);
+	}
 #ifndef DISABLE_NECPCM
-	device_stop_upd7759(0x00);
+	if (ChipAudio.uPD7759.defInf.dataPtr != NULL)
+	{
+		Resmpl_Deinit(&ChipAudio.uPD7759.resmpl);
+		SndEmu_Stop(&ChipAudio.uPD7759.defInf);
+	}
 #endif
 	DeviceState = 0x00;
 	
@@ -525,17 +518,17 @@ UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel)
 	UINT8 result;
 	UINT32 mask = 1 << nChannel;
 	UINT32* CurrentMuteMask;
-	void(*fMuteMask)(UINT8 ChipID, UINT32 MuteMask);
+	DEV_INFO* devInf;
 	
 	switch (chip)
 	{
 	case CHIP_YM2612:
 		CurrentMuteMask = &MuteChannelMaskYm2612;
-		fMuteMask = ym2612_set_mute_mask;
+		devInf = &ChipAudio.YM2612.defInf;
 		break;
 	case CHIP_SN76496:
 		CurrentMuteMask = &MuteChannelMaskSn76496;
-		fMuteMask = sn764xx_set_mute_mask;
+		devInf = &ChipAudio.SN76496.defInf;
 		break;
 	}
 	result = *CurrentMuteMask & mask;
@@ -543,50 +536,9 @@ UINT8 ToggleMuteAudioChannel(CHIP chip, UINT8 nChannel)
 		*CurrentMuteMask &= ~mask;
 	else
 		*CurrentMuteMask |= mask;
-	fMuteMask(0, *CurrentMuteMask);
+	devInf->devDef->SetMuteMask(devInf->dataPtr, *CurrentMuteMask);
 	
 	return result;
-}
-
-static void SetupResampler(CAUD_ATTR* CAA)
-{
-	if (! CAA->SmpRate)
-	{
-		CAA->Resampler = 0xFF;
-		return;
-	}
-	
-	if (CAA->SmpRate < SampleRate)
-		CAA->Resampler = 0x01;
-	else if (CAA->SmpRate == SampleRate)
-		CAA->Resampler = 0x02;
-	else if (CAA->SmpRate > SampleRate)
-		CAA->Resampler = 0x03;
-	if (CAA->Resampler == 0x01 || CAA->Resampler == 0x03)
-	{
-		if (ResampleMode == 0x02 || (ResampleMode == 0x01 && CAA->Resampler == 0x03))
-			CAA->Resampler = 0x00;
-	}
-	
-	CAA->SmpP = 0x00;
-	CAA->SmpLast = 0x00;
-	CAA->SmpNext = 0x00;
-	CAA->LSmpl.Left = 0x00;
-	CAA->LSmpl.Right = 0x00;
-	if (CAA->Resampler == 0x01)
-	{
-		// Pregenerate first Sample (the upsampler is always one too late)
-		CAA->StreamUpdate(CAA->ChipID, StreamBufs, 1);
-		CAA->NSmpl.Left = StreamBufs[0x00][0x00];
-		CAA->NSmpl.Right = StreamBufs[0x01][0x00];
-	}
-	else
-	{
-		CAA->NSmpl.Left = 0x00;
-		CAA->NSmpl.Right = 0x00;
-	}
-	
-	return;
 }
 
 INLINE UINT8 Limit8Bit(INT32 Value)
@@ -652,249 +604,12 @@ INLINE INT32 Limit32Bit(INT32 Value)
 	return (INT32)NewValue;
 }
 
-static void null_update(UINT8 ChipID, stream_sample_t **outputs, int samples)
-{
-	memset(outputs[0x00], 0x00, sizeof(stream_sample_t) * samples);
-	memset(outputs[0x01], 0x00, sizeof(stream_sample_t) * samples);
-	
-	return;
-}
-
-// I recommend 11 bits as it's fast and accurate
-#define FIXPNT_BITS		11
-#define FIXPNT_FACT		(1 << FIXPNT_BITS)
-#if (FIXPNT_BITS <= 11)
-	typedef UINT32	SLINT;	// 32-bit is a lot faster
-#else
-	typedef UINT64	SLINT;
-#endif
-#define FIXPNT_MASK		(FIXPNT_FACT - 1)
-
-#define getfriction(x)	((x) & FIXPNT_MASK)
-#define getnfriction(x)	((FIXPNT_FACT - (x)) & FIXPNT_MASK)
-#define fpi_floor(x)	((x) & ~FIXPNT_MASK)
-#define fpi_ceil(x)		((x + FIXPNT_MASK) & ~FIXPNT_MASK)
-#define fp2i_floor(x)	((x) / FIXPNT_FACT)
-#define fp2i_ceil(x)	((x + FIXPNT_MASK) / FIXPNT_FACT)
-
-static void ResampleChipStream(CAUD_ATTR* CAA, WAVE_32BS* RetSample, UINT32 Length)
-{
-	INT32* CurBufL;
-	INT32* CurBufR;
-	INT32* StreamPnt[0x02];
-	UINT32 InBase;
-	UINT32 InPos;
-	UINT32 InPosNext;
-	UINT32 OutPos;
-	UINT32 SmpFrc;	// Sample Friction
-	UINT32 InPre;
-	UINT32 InNow;
-	SLINT InPosL;
-	INT64 TempSmpL;
-	INT64 TempSmpR;
-	INT32 TempS32L;
-	INT32 TempS32R;
-	INT32 SmpCnt;	// must be signed, else I'm getting calculation errors
-	INT32 CurSmpl;
-	UINT64 ChipSmpRate;
-	
-	CurBufL = StreamBufs[0x00];
-	CurBufR = StreamBufs[0x01];
-	
-	// This Do-While-Loop gets and resamples the chip output of one or more chips.
-	// It's a loop to support the AY8910 paired with the YM2203/YM2608/YM2610.
-	//do
-	//{
-		switch(CAA->Resampler)
-		{
-		case 0x00:	// old, but very fast resampler
-			CAA->SmpLast = CAA->SmpNext;
-			CAA->SmpP += Length;
-			CAA->SmpNext = (UINT32)((UINT64)CAA->SmpP * CAA->SmpRate / SampleRate);
-			if (CAA->SmpLast >= CAA->SmpNext)
-			{
-				RetSample->Left += CAA->LSmpl.Left * CAA->Volume;
-				RetSample->Right += CAA->LSmpl.Right * CAA->Volume;
-			}
-			else
-			{
-				SmpCnt = CAA->SmpNext - CAA->SmpLast;
-				
-				CAA->StreamUpdate(CAA->ChipID, StreamBufs, SmpCnt);
-				
-				if (SmpCnt == 1)
-				{
-					RetSample->Left += CurBufL[0x00] * CAA->Volume;
-					RetSample->Right += CurBufR[0x00] * CAA->Volume;
-					CAA->LSmpl.Left = CurBufL[0x00];
-					CAA->LSmpl.Right = CurBufR[0x00];
-				}
-				else if (SmpCnt == 2)
-				{
-					RetSample->Left += (CurBufL[0x00] + CurBufL[0x01]) * CAA->Volume >> 1;
-					RetSample->Right += (CurBufR[0x00] + CurBufR[0x01]) * CAA->Volume >> 1;
-					CAA->LSmpl.Left = CurBufL[0x01];
-					CAA->LSmpl.Right = CurBufR[0x01];
-				}
-				else
-				{
-					TempS32L = CurBufL[0x00];
-					TempS32R = CurBufR[0x00];
-					for (CurSmpl = 0x01; CurSmpl < SmpCnt; CurSmpl ++)
-					{
-						TempS32L += CurBufL[CurSmpl];
-						TempS32R += CurBufR[CurSmpl];
-					}
-					RetSample->Left += TempS32L * CAA->Volume / SmpCnt;
-					RetSample->Right += TempS32R * CAA->Volume / SmpCnt;
-					CAA->LSmpl.Left = CurBufL[SmpCnt - 1];
-					CAA->LSmpl.Right = CurBufR[SmpCnt - 1];
-				}
-			}
-			break;
-		case 0x01:	// Upsampling
-			ChipSmpRate = CAA->SmpRate;
-			InPosL = (SLINT)(FIXPNT_FACT * CAA->SmpP * ChipSmpRate / SampleRate);
-			InPre = (UINT32)fp2i_floor(InPosL);
-			InNow = (UINT32)fp2i_ceil(InPosL);
-			
-			CurBufL[0x00] = CAA->LSmpl.Left;
-			CurBufR[0x00] = CAA->LSmpl.Right;
-			CurBufL[0x01] = CAA->NSmpl.Left;
-			CurBufR[0x01] = CAA->NSmpl.Right;
-			StreamPnt[0x00] = &CurBufL[0x02];
-			StreamPnt[0x01] = &CurBufR[0x02];
-			CAA->StreamUpdate(CAA->ChipID, StreamPnt, InNow - CAA->SmpNext);
-			
-			InBase = FIXPNT_FACT + (UINT32)(InPosL - (SLINT)CAA->SmpNext * FIXPNT_FACT);
-			SmpCnt = FIXPNT_FACT;
-			CAA->SmpLast = InPre;
-			CAA->SmpNext = InNow;
-			for (OutPos = 0x00; OutPos < Length; OutPos ++)
-			{
-				InPos = InBase + (UINT32)(FIXPNT_FACT * OutPos * ChipSmpRate / SampleRate);
-				
-				InPre = fp2i_floor(InPos);
-				InNow = fp2i_ceil(InPos);
-				SmpFrc = getfriction(InPos);
-				
-				// Linear interpolation
-				TempSmpL = ((INT64)CurBufL[InPre] * (FIXPNT_FACT - SmpFrc)) +
-							((INT64)CurBufL[InNow] * SmpFrc);
-				TempSmpR = ((INT64)CurBufR[InPre] * (FIXPNT_FACT - SmpFrc)) +
-							((INT64)CurBufR[InNow] * SmpFrc);
-				RetSample[OutPos].Left += (INT32)(TempSmpL * CAA->Volume / SmpCnt);
-				RetSample[OutPos].Right += (INT32)(TempSmpR * CAA->Volume / SmpCnt);
-			}
-			CAA->LSmpl.Left = CurBufL[InPre];
-			CAA->LSmpl.Right = CurBufR[InPre];
-			CAA->NSmpl.Left = CurBufL[InNow];
-			CAA->NSmpl.Right = CurBufR[InNow];
-			CAA->SmpP += Length;
-			break;
-		case 0x02:	// Copying
-			CAA->SmpNext = CAA->SmpP * CAA->SmpRate / SampleRate;
-			CAA->StreamUpdate(CAA->ChipID, StreamBufs, Length);
-			
-			for (OutPos = 0x00; OutPos < Length; OutPos ++)
-			{
-				RetSample[OutPos].Left += CurBufL[OutPos] * CAA->Volume;
-				RetSample[OutPos].Right += CurBufR[OutPos] * CAA->Volume;
-			}
-			CAA->SmpP += Length;
-			CAA->SmpLast = CAA->SmpNext;
-			break;
-		case 0x03:	// Downsampling
-			ChipSmpRate = CAA->SmpRate;
-			InPosL = (SLINT)(FIXPNT_FACT * (CAA->SmpP + Length) * ChipSmpRate / SampleRate);
-			CAA->SmpNext = (UINT32)fp2i_ceil(InPosL);
-			
-			CurBufL[0x00] = CAA->LSmpl.Left;
-			CurBufR[0x00] = CAA->LSmpl.Right;
-			StreamPnt[0x00] = &CurBufL[0x01];
-			StreamPnt[0x01] = &CurBufR[0x01];
-			CAA->StreamUpdate(CAA->ChipID, StreamPnt, CAA->SmpNext - CAA->SmpLast);
-			
-			InPosL = (SLINT)(FIXPNT_FACT * CAA->SmpP * ChipSmpRate / SampleRate);
-			// I'm adding 1.0 to avoid negative indexes
-			InBase = FIXPNT_FACT + (UINT32)(InPosL - (SLINT)CAA->SmpLast * FIXPNT_FACT);
-			InPosNext = InBase;
-			for (OutPos = 0x00; OutPos < Length; OutPos ++)
-			{
-				//InPos = InBase + (UINT32)(FIXPNT_FACT * OutPos * ChipSmpRate / SampleRate);
-				InPos = InPosNext;
-				InPosNext = InBase + (UINT32)(FIXPNT_FACT * (OutPos+1) * ChipSmpRate / SampleRate);
-				
-				// first frictional Sample
-				SmpFrc = getnfriction(InPos);
-				if (SmpFrc)
-				{
-					InPre = fp2i_floor(InPos);
-					TempSmpL = (INT64)CurBufL[InPre] * SmpFrc;
-					TempSmpR = (INT64)CurBufR[InPre] * SmpFrc;
-				}
-				else
-				{
-					TempSmpL = TempSmpR = 0x00;
-				}
-				SmpCnt = SmpFrc;
-				
-				// last frictional Sample
-				SmpFrc = getfriction(InPosNext);
-				InPre = fp2i_floor(InPosNext);
-				if (SmpFrc)
-				{
-					TempSmpL += (INT64)CurBufL[InPre] * SmpFrc;
-					TempSmpR += (INT64)CurBufR[InPre] * SmpFrc;
-					SmpCnt += SmpFrc;
-				}
-				
-				// whole Samples in between
-				//InPre = fp2i_floor(InPosNext);
-				InNow = fp2i_ceil(InPos);
-				SmpCnt += (InPre - InNow) * FIXPNT_FACT;	// this is faster
-				while(InNow < InPre)
-				{
-					TempSmpL += (INT64)CurBufL[InNow] * FIXPNT_FACT;
-					TempSmpR += (INT64)CurBufR[InNow] * FIXPNT_FACT;
-					//SmpCnt ++;
-					InNow ++;
-				}
-				
-				RetSample[OutPos].Left += (INT32)(TempSmpL * CAA->Volume / SmpCnt);
-				RetSample[OutPos].Right += (INT32)(TempSmpR * CAA->Volume / SmpCnt);
-			}
-			
-			CAA->LSmpl.Left = CurBufL[InPre];
-			CAA->LSmpl.Right = CurBufR[InPre];
-			CAA->SmpP += Length;
-			CAA->SmpLast = CAA->SmpNext;
-			break;
-		default:
-			CAA->SmpP += SampleRate;
-			break;	// do absolutely nothing
-		}
-		
-		if (CAA->SmpLast >= CAA->SmpRate)
-		{
-			CAA->SmpLast -= CAA->SmpRate;
-			CAA->SmpNext -= CAA->SmpRate;
-			CAA->SmpP -= SampleRate;
-		}
-		
-	//	CAA = CAA->Paired;
-	//} while(CAA != NULL);
-	
-	return;
-}
-
 static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 {
 	UINT32 BufferSmpls;
 	UINT8* Buffer;
 	UINT32 CurSmpl;
 	WAVE_32BS TempBuf;
-	//UINT8 CurChip;
 	INT32 tempSmpl;
 	
 	if (data == NULL)
@@ -907,7 +622,7 @@ static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 #endif
 	Buffer = (UINT8*)data;
 	BufferSmpls = bufSize * 8 / audOpts->numBitsPerSmpl / 2;
-	for (CurSmpl = 0x00; CurSmpl < BufferSmpls; CurSmpl ++)
+	for (CurSmpl = 0; CurSmpl < BufferSmpls; CurSmpl ++)
 	{
 		if (! SmplsTilFrame)
 		{
@@ -917,10 +632,11 @@ static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 			SmplsTilFrame = SampleRate / FrameDivider;
 		}
 		SmplsTilFrame --;
+		YM2612_Callback(NULL, 0);	// need to call this here until I libvgm supports callbacks
 		if (TimerExpired)
 		{
 			UpdateAll(UPDATEEVT_TIMER);
-			TimerExpired = ym2612_r(0x00, 0x00) & TimerMask;
+			TimerExpired = ym2612_fm_read() & TimerMask;
 		}
 		UpdateDAC(1);
 #ifndef DISABLE_NECPCM
@@ -944,47 +660,45 @@ static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 			vgm_update(1);
 #endif
 		
-		TempBuf.Left = 0x00;
-		TempBuf.Right = 0x00;
+		TempBuf.L = 0;
+		TempBuf.R = 0;
 		
-		//for (CurChip = 0x00; CurChip < MAX_CHIPS; CurChip ++)
-		//	ResampleChipStream(CurChip, &TempBuf, 1);
-		ResampleChipStream(&ChipAudio.YM2612, &TempBuf, 1);
-		ResampleChipStream(&ChipAudio.SN76496, &TempBuf, 1);
+		Resmpl_Execute(&ChipAudio.YM2612.resmpl, 1, &TempBuf);
+		Resmpl_Execute(&ChipAudio.SN76496.resmpl, 1, &TempBuf);
 #ifndef DISABLE_NECPCM
-		if (! upd7759_busy_r(0x00))
-			ResampleChipStream(&ChipAudio.uPD7759, &TempBuf, 1);
+		if (ChipAudio.uPD7759.defInf.dataPtr != NULL && ! upd7759_ready())
+			Resmpl_Execute(&ChipAudio.uPD7759.resmpl, 1, &TempBuf);
 #endif
 		
-		TempBuf.Left = (TempBuf.Left >> 5) * OutputVolume;
-		TempBuf.Right = (TempBuf.Right >> 5) * OutputVolume;
+		TempBuf.L = (TempBuf.L >> 5) * OutputVolume;
+		TempBuf.R = (TempBuf.R >> 5) * OutputVolume;
 		// now done by the LimitXBit routines
-		//TempBuf.Left = TempBuf.Left >> VOL_SHIFT;
-		//TempBuf.Right = TempBuf.Right >> VOL_SHIFT;
+		//TempBuf.L = TempBuf.L >> VOL_SHIFT;
+		//TempBuf.R = TempBuf.R >> VOL_SHIFT;
 		switch(audOpts->numBitsPerSmpl)
 		{
 		case 8:	// 8-bit is unsigned
-			*Buffer++ = Limit8Bit(TempBuf.Left);
-			*Buffer++ = Limit8Bit(TempBuf.Right);
+			*Buffer++ = Limit8Bit(TempBuf.L);
+			*Buffer++ = Limit8Bit(TempBuf.R);
 			break;
 		case 16:
-			((INT16*)Buffer)[0] = Limit16Bit(TempBuf.Left);
-			((INT16*)Buffer)[1] = Limit16Bit(TempBuf.Right);
+			((INT16*)Buffer)[0] = Limit16Bit(TempBuf.L);
+			((INT16*)Buffer)[1] = Limit16Bit(TempBuf.R);
 			Buffer += sizeof(INT16) * 2;
 			break;
 		case 24:
-			tempSmpl = Limit24Bit(TempBuf.Left);
+			tempSmpl = Limit24Bit(TempBuf.L);
 			*Buffer++ = (tempSmpl >>  0) & 0xFF;
 			*Buffer++ = (tempSmpl >>  8) & 0xFF;
 			*Buffer++ = (tempSmpl >> 16) & 0xFF;
-			tempSmpl = Limit24Bit(TempBuf.Right);
+			tempSmpl = Limit24Bit(TempBuf.R);
 			*Buffer++ = (tempSmpl >>  0) & 0xFF;
 			*Buffer++ = (tempSmpl >>  8) & 0xFF;
 			*Buffer++ = (tempSmpl >> 16) & 0xFF;
 			break;
 		case 32:
-			((INT32*)Buffer)[0] = Limit32Bit(TempBuf.Left);
-			((INT32*)Buffer)[1] = Limit32Bit(TempBuf.Right);
+			((INT32*)Buffer)[0] = Limit32Bit(TempBuf.L);
+			((INT32*)Buffer)[1] = Limit32Bit(TempBuf.R);
 			Buffer += sizeof(INT32) * 2;
 			break;
 		}
@@ -1000,7 +714,7 @@ static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
 
 static void YM2612_Callback(void* param, int irq)
 {
-	TimerExpired = ym2612_r(0x00, 0x00) & TimerMask;
+	TimerExpired = ym2612_fm_read() & TimerMask;
 	
 	return;
 }
@@ -1011,17 +725,40 @@ static void YM2612_Callback(void* param, int irq)
 void ym2612_timer_mask(UINT8 Mask)
 {
 	TimerMask = Mask;
-	TimerExpired = ym2612_r(0x00, 0x00) & TimerMask;
+	TimerExpired = ym2612_fm_read() & TimerMask;
 	
 	return;
 }
 
-void ym2612_fm_write(UINT8 ChipID, UINT8 Port, UINT8 Register, UINT8 Data)
+UINT8 ym2612_fm_read(void)
+{
+	CAUD_ATTR* ym = &ChipAudio.YM2612;
+	
+	if (ym->defInf.dataPtr == NULL)
+		return 0x00;
+	return ym->read8(ym->defInf.dataPtr, 0x00);
+}
+
+void ym2612_direct_write(UINT8 Offset, UINT8 Data)
+{
+	CAUD_ATTR* ym = &ChipAudio.YM2612;
+	
+	if (ym->defInf.dataPtr == NULL)
+		return;
+	ym->write8(ym->defInf.dataPtr, Offset, Data);
+	
+	return;
+}
+
+void ym2612_fm_write(UINT8 Port, UINT8 Register, UINT8 Data)
 {
 	// Note: Don't do DAC writes with this function to prevent spamming logged VGMs.
+	CAUD_ATTR* ym = &ChipAudio.YM2612;
 	
-	ym2612_w(ChipID, 0x00 | (Port << 1), Register);
-	ym2612_w(ChipID, 0x01 | (Port << 1), Data);
+	if (ym->defInf.dataPtr == NULL)
+		return;
+	ym->write8(ym->defInf.dataPtr, 0x00 | (Port << 1), Register);
+	ym->write8(ym->defInf.dataPtr, 0x01 | (Port << 1), Data);
 	
 #ifdef ENABLE_VGM_LOGGING
 	vgm_write(VGMC_YM2612, Port, Register, Data);
@@ -1030,9 +767,13 @@ void ym2612_fm_write(UINT8 ChipID, UINT8 Port, UINT8 Register, UINT8 Data)
 	return;
 }
 
-void sn76496_psg_write(UINT8 ChipID, UINT8 Data)
+void sn76496_psg_write(UINT8 Data)
 {
-	sn764xx_w(ChipID, 0x00, Data);
+	CAUD_ATTR* sn = &ChipAudio.SN76496;
+	
+	if (sn->defInf.dataPtr == NULL)
+		return;
+	sn->write8(sn->defInf.dataPtr, 0x00, Data);
 	
 #ifdef ENABLE_VGM_LOGGING
 	vgm_write(VGMC_SN76496, 0, Data, 0);
@@ -1040,3 +781,38 @@ void sn76496_psg_write(UINT8 ChipID, UINT8 Data)
 	
 	return;
 }
+
+#ifndef DISABLE_NECPCM
+UINT8 upd7759_ready(void)
+{
+	CAUD_ATTR* upd = &ChipAudio.uPD7759;
+	
+	if (upd->defInf.dataPtr == NULL)
+		return 0x00;
+	return upd->read8(upd->defInf.dataPtr, 0x00);
+}
+
+UINT8 upd7759_get_fifo_space(void)
+{
+	CAUD_ATTR* upd = &ChipAudio.uPD7759;
+	
+	if (upd->defInf.dataPtr == NULL)
+		return 0x00;
+	return upd->read8(upd->defInf.dataPtr, 'F');
+}
+
+void upd7759_write(UINT8 Func, UINT8 Data)
+{
+	CAUD_ATTR* upd = &ChipAudio.uPD7759;
+	
+	if (upd->defInf.dataPtr == NULL)
+		return;
+	upd->write8(upd->defInf.dataPtr, Func, Data);
+	
+#ifdef ENABLE_VGM_LOGGING
+	vgm_write(VGMC_UPD7759, 0, Func, Data);
+#endif
+	
+	return;
+}
+#endif

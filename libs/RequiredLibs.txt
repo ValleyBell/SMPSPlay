@@ -3,3 +3,14 @@ Required Libraries:
   Required files:
     libs/include/audio/Audio*.h
     libs/libs/libAudio*.lib [MS Visual Studio]
+    libs/libs/libaudio.a [GCC]
+- Emulation from https://github.com/ValleyBell/libvgm
+  Required files:
+    libs/include/emu/cores/sn764intf.h
+    libs/include/emu/EmuStructs.h
+    libs/include/emu/Resampler.h
+    libs/include/emu/snddef.h
+    libs/include/emu/SoundDevs.h
+    libs/include/emu/SoundEmu.h
+    libs/libs/libEmu*.lib [MS Visual Studio]
+    libs/libs/libemu.a [GCC]

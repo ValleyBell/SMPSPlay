@@ -30,6 +30,8 @@ CPPFLAGS = -std=gnu++98
 #CFLAGS += -Wall -Wextra -Wpedantic
 
 CFLAGS += -D ENABLE_LOOP_DETECTION -D ENABLE_VGM_LOGGING
+#CFLAGS += -fstack-protector
+#LDFLAGS += -fstack-protector
 
 
 # add Library Path, if defined
@@ -87,14 +89,10 @@ OBJDIRS = \
 	$(OBJ)/chips \
 	$(OBJ)/Engine
 
-LIBS = $(LIBPATH)/libaudio.a
+LIBS = \
+	$(LIBPATH)/libaudio.a \
+	$(LIBPATH)/libemu.a
 
-EMUOBJS = \
-	$(OBJ)/chips/2612intf.o \
-	$(OBJ)/chips/fm2612.o \
-	$(OBJ)/chips/sn76496.o \
-	$(OBJ)/chips/sn764intf.o \
-	$(OBJ)/chips/upd7759.o
 ENGINEOBJS = \
 	$(OBJ)/Engine/dac.o \
 	$(OBJ)/Engine/necpcm.o \
@@ -113,11 +111,7 @@ MAINOBJS = \
 	$(OBJ)/Sound.o \
 	$(OBJ)/vgmwrite.o
 
-ALLOBJS = $(EMUOBJS) $(ENGINEOBJS) $(MAINOBJS)
-
-
-AUDEMU_MAINOBJS = \
-	$(OBJ)/audemutest.o
+ALLOBJS = $(ENGINEOBJS) $(MAINOBJS)
 
 
 
