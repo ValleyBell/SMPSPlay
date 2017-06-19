@@ -99,10 +99,6 @@ static AUDIO_OPTS* audOpts;
 UINT32 SampleRate;	// Note: also used by some sound cores to determinate the chip sample rate
 INT32 OutputVolume = 0x100;
 
-UINT8 ResampleMode;	// 00 - HQ both, 01 - LQ downsampling, 02 - LQ both
-UINT8 CHIP_SAMPLING_MODE;
-INT32 CHIP_SAMPLE_RATE;
-
 static CHIP_AUDIO ChipAudio;
 
 static UINT8 DeviceState = 0xFF;	// FF - not initialized, 00 - not running, 01 - running
@@ -215,11 +211,8 @@ static void InitalizeChips(void)
 		return;
 	
 	memset(&ChipAudio, 0x00, sizeof(CHIP_AUDIO));
-	ResampleMode = 0x00;
-	CHIP_SAMPLING_MODE = 0x00;
-	CHIP_SAMPLE_RATE = 0x00000000;
-	SampleRate = audOpts->sampleRate;	// used by some chips as output sample rate
 	
+	SampleRate = audOpts->sampleRate;	// used by dac.c, vgmwrite.c and main.c
 	devCfg.emuCore = 0x00;	// default
 	devCfg.srMode = DEVRI_SRMODE_NATIVE;
 	devCfg.smplRate = audOpts->sampleRate;

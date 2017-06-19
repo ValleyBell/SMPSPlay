@@ -77,7 +77,8 @@ static void InitTempo(UINT8 TempoVal);
 static UINT8 GetTrackIDFromChnBits(SMPS_SET* SmpsSet, UINT8 ChnBits);
 static void SetupMusicChnMasks(const SMPS_CFG* SmpsCfg);
 static void PlayPreSMPS(SMPS_SET* SmpsSet);
-static UINT8 CheckTrkRange(UINT8 TrkID, UINT8 BestTrkID, UINT8 FirstTrk, UINT8 TrkEnd);;
+void LoadPreSMPSTrack(TRK_RAM* Trk, const UINT8* Data);
+static UINT8 CheckTrkRange(UINT8 TrkID, UINT8 BestTrkID, UINT8 FirstTrk, UINT8 TrkEnd);
 static UINT8 CheckTrkID(UINT8 TrkID, UINT8 ChnBits);
 static void LoadChannelSet(UINT8 TrkIDStart, UINT8 ChnCount, UINT16* FilePos, UINT8 Mode,
 						   UINT8 ChnListSize, const UINT8* ChnList, UINT8 TickMult, UINT8 TrkBase);
@@ -127,6 +128,8 @@ void PlayDrumNote(TRK_RAM* Trk, UINT8 Note);
 static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData);
 static UINT8 LoadDrumMD(TRK_RAM* BaseTrk, TRK_RAM* DrumTrk, const DRUM_DATA* DrumData, UINT8 Mode,
 						const UINT8** RetDTrkData);
+static UINT8 LoadDrumMDPre(TRK_RAM* BaseTrk, TRK_RAM* DrumTrk, const DRUM_DATA* DrumData, UINT8 Mode,
+							const UINT8** RetDTrkData);
 static UINT8 LoadDrumMD2Op(TRK_RAM* Trk, DRUM_TRK_RAM* DrumTrk2Op, const DRUM_DATA* DrumData);
 void PlayPS4DrumNote(TRK_RAM* Trk, UINT8 Note);
 void PlaySMGP2DACNote(TRK_RAM* Trk, UINT8 Note);

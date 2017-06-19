@@ -149,6 +149,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		break;
 	case DRMTYPE_FM:
 	case DRMTYPE_FMDAC:
+		// use FM 6 track (Magical Hat no Buttobi Turbo! Daibouken relies on that)
 		DrumTrk = &SmpsRAM.MusicTrks[TRACK_MUS_FM6];
 		if (DrumTrk->PlaybkFlags & PBKFLG_OVERRIDDEN)
 			return;
@@ -174,7 +175,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 				SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument]);
 			
 			// Note: This is always called, even on SMPS drivers that play drums on another channel than FM3.
-			// Also, MegaMan Wily Wars, song 07 (MM1 Dr Wily Stage 1) relies on that behaviour.
+			// MegaMan Wily Wars, song 07 (MM1 Dr Wily Stage 1) relies on that behaviour.
 			ResetSpcFM3Mode();
 		}
 		else if (DrumData->Type == DRMTYPE_FMDAC)
@@ -244,6 +245,39 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 				Do2OpNote();	// refresh Note State (both on)
 		}
 		break;
+	case DRMTYPE_PREFM:
+		DrumTrk = &SmpsRAM.MusicTrks[TRACK_MUS_PWM1];	// preSMPS drums play on a reserved track
+		if (DrumTrk->PlaybkFlags & PBKFLG_OVERRIDDEN)
+			return;
+		// I need to use DrumTrk here, because NoteOff ignores the Drum channel
+		DrumTrk->ChannelMask = Trk->ChannelMask & 0x0F;
+		DoNoteOff(DrumTrk);
+		FreeSMPSFile(DrumTrk->SmpsSet);
+		
+		RetVal = LoadDrumMDPre(Trk, DrumTrk, DrumData, 0x00, NULL);
+		if (! RetVal)
+		{
+			const DRUM_TRK_LIB* DTrkLib;
+			
+			DTrkLib = &SmpsCfg->FMDrums;
+			if (DrumTrk->Instrument < DTrkLib->InsLib.InsCount)
+				SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument]);
+		}
+		break;
+	case DRMTYPE_PREPSG:
+		DrumTrk = &SmpsRAM.MusicTrks[TRACK_MUS_PWM2];
+		if (DrumTrk->PlaybkFlags & PBKFLG_OVERRIDDEN)
+			return;
+		if (DrumTrk->ChannelMask)
+			DoNoteOff(DrumTrk);
+		FreeSMPSFile(DrumTrk->SmpsSet);
+		
+		RetVal = LoadDrumMDPre(Trk, DrumTrk, DrumData, 0x01, NULL);
+		if (! RetVal)
+		{
+			// no additional things to do here
+		}
+		break;
 	}
 	
 	return;
@@ -305,6 +339,67 @@ static UINT8 LoadDrumMD(TRK_RAM* BaseTrk, TRK_RAM* DrumTrk, const DRUM_DATA* Dru
 		DrumTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
 	
 	// return DTrkData pointer, in case the caller needs additional parameters
+	if (RetDTrkData != NULL)
+		*RetDTrkData = DTrkData;
+	return 0x00;
+}
+
+static UINT8 LoadDrumMDPre(TRK_RAM* BaseTrk, TRK_RAM* DrumTrk, const DRUM_DATA* DrumData, UINT8 Mode,
+							const UINT8** RetDTrkData)
+{
+	const SMPS_CFG* SmpsCfg = BaseTrk->SmpsSet->Cfg;
+	const SMPS_CFG_PREHDR* PreHdr = &SmpsCfg->PreHdr;
+	const DRUM_TRK_LIB* DTrkLib;
+	SMPS_SET* DTrkSet;
+	const UINT8* DTrkData;
+	UINT16 DrumOfs;
+	UINT8 CurCMap;
+	
+	switch(Mode)
+	{
+	case 0x00:
+		DTrkLib = &SmpsCfg->FMDrums;
+		DTrkSet = &SmpsRAM.DrumSet[0x00];	// 0x00 - FM drums
+		break;
+	case 0x01:
+		DTrkLib = &SmpsCfg->PSGDrums;
+		DTrkSet = &SmpsRAM.DrumSet[0x01];	// 0x01 - PSG drums
+		break;
+	default:
+		return 0xFF;
+	}
+	if (DrumData->DrumID >= DTrkLib->DrumCount)
+		return 0x01;
+	
+	// Initialize configuration structures
+	*DTrkSet = *BaseTrk->SmpsSet;
+	DrumOfs = DTrkLib->DrumList[DrumData->DrumID] - DTrkLib->DrumBase;
+	DTrkData = &DTrkLib->File.Data[DrumOfs];
+	DTrkSet->SeqBase = DTrkLib->DrumBase;
+	DTrkSet->Seq = DTrkLib->File;
+	DTrkSet->UsageCounter = 0xFF;	// must never reach 0, since we're just reusing data.
+	DTrkSet->InsLib = DTrkLib->InsLib;
+#ifdef ENABLE_LOOP_DETECTION
+	DTrkSet->LoopPtrs = NULL;
+#endif
+	
+	memset(DrumTrk, 0x00, sizeof(TRK_RAM));
+	DrumTrk->SmpsSet = DTrkSet;
+	LoadPreSMPSTrack(DrumTrk, DTrkData);
+	for (CurCMap = 0x00; CurCMap < PreHdr->ChnMapSize; CurCMap ++)
+	{
+		if (PreHdr->ChnMap[CurCMap].from == DrumTrk->ChannelMask)
+		{
+			DrumTrk->ChannelMask = PreHdr->ChnMap[CurCMap].to;
+			break;
+		}
+	}
+	DrumTrk->ChannelMask &= ~0x10;	// remove "drum" flag
+	
+	DrumTrk->Pos -= DTrkLib->DrumBase;
+	if (DrumTrk->Pos >= DTrkSet->Seq.Len)
+		DrumTrk->PlaybkFlags &= ~PBKFLG_ACTIVE;
+	
 	if (RetDTrkData != NULL)
 		*RetDTrkData = DTrkData;
 	return 0x00;

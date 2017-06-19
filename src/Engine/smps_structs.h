@@ -95,12 +95,14 @@ typedef struct _file_data
 #define DRMMODE_NORMAL	0x00	// one note = one drum
 #define DRMMODE_DUAL	0x01	// one note = 2 drums (FM/PSG)
 
-#define DRMTYPE_FM		0x01
-#define DRMTYPE_PSG		0x02
-#define DRMTYPE_DAC		0x03
+#define DRMTYPE_FM		0x01	// FM drums, SMPS Z80 header
+#define DRMTYPE_PSG		0x02	// PSG drums, SMPS Z80 header
+#define DRMTYPE_DAC		0x03	// DAC, using fixed DAC sound ID
 #define DRMTYPE_FM2OP	0x04	// preSMPS 2op drums (using separate tracks)
 #define DRMTYPE_FMDAC	0x05	// load mini-track, similar to FM drums
 #define DRMTYPE_NECPCM	0x06	// Sega Pico NEC ADPCM drums
+#define DRMTYPE_PREFM	0x07	// FM drums, using pre-SMPS track header
+#define DRMTYPE_PREPSG	0x08	// PSG drums, using pre-SMPS track header
 #define DRMTYPE_NONE	0x00
 
 #define TRKHDR_PBFLAGS	0x00

@@ -2541,17 +2541,15 @@ static void SetupMusicChnMasks(const SMPS_CFG* SmpsCfg)
 static void PlayPreSMPS(SMPS_SET* SmpsSet)
 {
 	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;
-	const SMPS_CFG_PREHDR* PreHdr = &SmpsSet->Cfg->PreHdr;
+	const SMPS_CFG_PREHDR* PreHdr = &SmpsCfg->PreHdr;
 	const UINT8* Data;
 	UINT16 CurPos;
-	UINT16 THdrOfs;
 	UINT16 ChnBitOfs;
 	UINT8 TrkCount;
 	UINT8 CurTrk;
 	UINT8 TrkID;
 	UINT8 ChnBitsMapped;
 	UINT8 CurCMap;
-	UINT8 PbBit;
 	TRK_RAM* TempTrk;
 	
 	ChnBitOfs = 0xFF;
@@ -2563,6 +2561,8 @@ static void PlayPreSMPS(SMPS_SET* SmpsSet)
 			break;
 		}
 	}
+	if (ChnBitOfs == 0xFF)
+		return;
 	
 	Data = SmpsSet->Seq.Data;
 	if (Data[0x04] & 0x10)
@@ -2580,23 +2580,16 @@ static void PlayPreSMPS(SMPS_SET* SmpsSet)
 	CurPos ++;
 	for (CurTrk = 0x00; CurTrk < TrkCount; CurTrk ++, CurPos += PreHdr->TrkHdrSize)
 	{
-		if (ChnBitOfs == 0xFF)
+		ChnBitsMapped = Data[CurPos + ChnBitOfs];
+		for (CurCMap = 0x00; CurCMap < PreHdr->ChnMapSize; CurCMap ++)
 		{
-			TrkID = 0xFF;
-		}
-		else
-		{
-			ChnBitsMapped = Data[CurPos + ChnBitOfs];
-			for (CurCMap = 0x00; CurCMap < PreHdr->ChnMapSize; CurCMap ++)
+			if (PreHdr->ChnMap[CurCMap].from == ChnBitsMapped)
 			{
-				if (PreHdr->ChnMap[CurCMap].from == ChnBitsMapped)
-				{
-					ChnBitsMapped = PreHdr->ChnMap[CurCMap].to;
-					break;
-				}
+				ChnBitsMapped = PreHdr->ChnMap[CurCMap].to;
+				break;
 			}
-			TrkID = GetTrackIDFromChnBits(SmpsSet, ChnBitsMapped);
 		}
+		TrkID = GetTrackIDFromChnBits(SmpsSet, ChnBitsMapped);
 		if (TrkID == 0xFF)
 			continue;
 		
@@ -2606,87 +2599,15 @@ static void PlayPreSMPS(SMPS_SET* SmpsSet)
 		memset(TempTrk, 0x00, sizeof(TRK_RAM));
 		TempTrk->SmpsSet = SmpsSet;
 		SmpsSet->UsageCounter ++;
-		TempTrk->PlaybkFlags = PBKFLG_ACTIVE;
-		TempTrk->StackPtr = TRK_STACK_SIZE;
-		TempTrk->PanAFMS = 0xC0;
-		TempTrk->RemTicks = 0x01;
-		TempTrk->NStopRevMode = SmpsCfg->NStopMode;
-		TempTrk->NStopInit = SmpsCfg->NStopTimeout;
+		
+		LoadPreSMPSTrack(TempTrk, &Data[CurPos]);
+		TempTrk->ChannelMask = ChnBitsMapped;
 #ifdef ENABLE_LOOP_DETECTION
 		if (SmpsSet->LoopPtrs != NULL)
 			TempTrk->LoopOfs = SmpsSet->LoopPtrs[CurTrk];
 		else
 			TempTrk->LoopOfs.Ptr = 0x0000;
 #endif
-		
-		for (THdrOfs = 0x00; THdrOfs < PreHdr->TrkHdrSize; THdrOfs ++)
-		{
-			switch(PreHdr->TrkHdrMap[THdrOfs] & 0x7F)
-			{
-			case TRKHDR_PBFLAGS:
-				TempTrk->PlaybkFlags = 0x00;
-				for (PbBit = 0; PbBit < 8; PbBit ++)
-				{
-					if (Data[CurPos + THdrOfs] & (1 << PbBit))
-					{
-						if (PreHdr->PbFlagMap[PbBit] & 0x80)
-						{
-							switch(PreHdr->PbFlagMap[PbBit])
-							{
-							case HDR_PBBIT_PAN_ANI:
-								if (SmpsCfg->PanAnims.AniCount == 0)
-									break;
-								TempTrk->PanAni.Type = 0x01;
-								TempTrk->PanAni.Anim = 0x00;
-								TempTrk->PanAni.AniIdx = 0x01;
-								TempTrk->PanAni.AniLen = 0x04;	// TODO: actually detect
-								TempTrk->PanAni.ToutInit = 0x01;
-								TempTrk->PanAni.Timeout = 0x01;
-								break;
-							}
-						}
-						else
-						{
-							TempTrk->PlaybkFlags |= (1 << PreHdr->PbFlagMap[PbBit]);
-						}
-					}
-				}
-				break;
-			case TRKHDR_PTR:
-				if (PreHdr->TrkHdrMap[THdrOfs] & 0x80)
-				{
-					TempTrk->Pos &= ~0xFF00;
-					TempTrk->Pos |= Data[CurPos + THdrOfs] << 8;
-				}
-				else
-				{
-					TempTrk->Pos &= ~0x00FF;
-					TempTrk->Pos |= Data[CurPos + THdrOfs] << 0;
-				}
-				break;
-			case TRKHDR_CHNBITS:
-				TempTrk->ChannelMask = ChnBitsMapped;
-				break;
-			case TRKHDR_TICKMULT:
-				TempTrk->TickMult = Data[CurPos + THdrOfs];
-				break;
-			case TRKHDR_TRANSP:
-				TempTrk->Transpose = Data[CurPos + THdrOfs];
-				break;
-			case TRKHDR_MODENV:
-				TempTrk->ModEnv = Data[CurPos + THdrOfs];
-				break;
-			case TRKHDR_VOLENV:
-				TempTrk->Instrument = Data[CurPos + THdrOfs];
-				break;
-			case TRKHDR_VOLUME:
-				TempTrk->Volume = Data[CurPos + THdrOfs];
-				break;
-			case TRKHDR_PANAFMS:
-				TempTrk->PanAFMS = Data[CurPos + THdrOfs];
-				break;
-			}
-		}
 		TempTrk->Pos -= SmpsSet->SeqBase;
 		if (TempTrk->Pos >= SmpsSet->Seq.Len)
 		{
@@ -2698,6 +2619,92 @@ static void PlayPreSMPS(SMPS_SET* SmpsSet)
 			TempTrk->SpcDacMode = SmpsSet->Cfg->DrumChnMode;
 		if (TrkID == TRACK_MUS_DRUM && ! (TempTrk->ChannelMask & 0x09))
 			WriteFMMain(TempTrk, 0xB4, TempTrk->PanAFMS);	// force Pan bits to LR
+	}
+	
+	return;
+}
+
+void LoadPreSMPSTrack(TRK_RAM* Trk, const UINT8* HdrData)
+{
+	const SMPS_CFG* SmpsCfg = Trk->SmpsSet->Cfg;
+	const SMPS_CFG_PREHDR* PreHdr = &SmpsCfg->PreHdr;
+	UINT16 THdrOfs;
+	UINT8 PbBit;
+	
+	Trk->PlaybkFlags = PBKFLG_ACTIVE;
+	Trk->StackPtr = TRK_STACK_SIZE;
+	Trk->PanAFMS = 0xC0;
+	Trk->RemTicks = 0x01;
+	Trk->NStopRevMode = SmpsCfg->NStopMode;
+	Trk->NStopInit = SmpsCfg->NStopTimeout;
+	
+	for (THdrOfs = 0x00; THdrOfs < PreHdr->TrkHdrSize; THdrOfs ++)
+	{
+		switch(PreHdr->TrkHdrMap[THdrOfs] & 0x7F)
+		{
+		case TRKHDR_PBFLAGS:
+			Trk->PlaybkFlags = 0x00;
+			for (PbBit = 0; PbBit < 8; PbBit ++)
+			{
+				if (HdrData[THdrOfs] & (1 << PbBit))
+				{
+					if (PreHdr->PbFlagMap[PbBit] & 0x80)
+					{
+						switch(PreHdr->PbFlagMap[PbBit])
+						{
+						case HDR_PBBIT_PAN_ANI:
+							if (SmpsCfg->PanAnims.AniCount == 0)
+								break;
+							Trk->PanAni.Type = 0x01;
+							Trk->PanAni.Anim = 0x00;
+							Trk->PanAni.AniIdx = 0x01;
+							Trk->PanAni.AniLen = 0x04;	// TODO: actually detect
+							Trk->PanAni.ToutInit = 0x01;
+							Trk->PanAni.Timeout = 0x01;
+							break;
+						}
+					}
+					else
+					{
+						Trk->PlaybkFlags |= (1 << PreHdr->PbFlagMap[PbBit]);
+					}
+				}
+			}
+			break;
+		case TRKHDR_PTR:
+			if (PreHdr->TrkHdrMap[THdrOfs] & 0x80)
+			{
+				Trk->Pos &= ~0xFF00;
+				Trk->Pos |= HdrData[THdrOfs] << 8;
+			}
+			else
+			{
+				Trk->Pos &= ~0x00FF;
+				Trk->Pos |= HdrData[THdrOfs] << 0;
+			}
+			break;
+		case TRKHDR_CHNBITS:
+			Trk->ChannelMask = HdrData[THdrOfs];
+			break;
+		case TRKHDR_TICKMULT:
+			Trk->TickMult = HdrData[THdrOfs];
+			break;
+		case TRKHDR_TRANSP:
+			Trk->Transpose = HdrData[THdrOfs];
+			break;
+		case TRKHDR_MODENV:
+			Trk->ModEnv = HdrData[THdrOfs];
+			break;
+		case TRKHDR_VOLENV:
+			Trk->Instrument = HdrData[THdrOfs];
+			break;
+		case TRKHDR_VOLUME:
+			Trk->Volume = HdrData[THdrOfs];
+			break;
+		case TRKHDR_PANAFMS:
+			Trk->PanAFMS = HdrData[THdrOfs];
+			break;
+		}
 	}
 	
 	return;
