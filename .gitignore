@@ -1,4 +1,6 @@
-libs/
+libs/build*
+libs/download
+libs/install
 
 Data/
 dumps/

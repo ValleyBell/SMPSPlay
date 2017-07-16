@@ -1,10 +1,42 @@
-Required Libraries:
-- Audio Output from https://github.com/ValleyBell/libvgm
+Required Libraries
+------------------
+libvgm
+------
+https://github.com/ValleyBell/libvgm
+(included as a Git submodule)
+
+Visual Studio 2010:
+- Start commandline with Visual Studio environment variables set, then execute:
+	set CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
+	cmake -D CMAKE_INSTALL_PREFIX=install %CMAKE_OPTS% ..
+	msbuild /property:Configuration=Release INSTALL.vcxproj
+
+GCC (Linux/Windows)
+- execute this in a terminal:
+	CMAKE_OPTS="-D BUILD_TESTS=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON"
+	cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=install $CMAKE_OPTS ..
+	make install
+
+General notes:
+- If you have multiple compilers installed, you can use cmake's -G parameter to set the correct project generator.
+  Common values are:
+	"NMake Makefiles" (VC6 makefiles)
+	"Visual Studio 6" (VC6 projects, requires CMake 3.5 or lower)
+	"Visual Studio 10 2010"
+	"MSYS Makefiles"
+
+
+Details:
+- Audio Output library
   Required files:
     libs/include/audio/Audio*.h
     libs/libs/libAudio*.lib [MS Visual Studio]
     libs/libs/libaudio.a [GCC]
-- Emulation from https://github.com/ValleyBell/libvgm
+  CMake Options:
+    - BUILD_LIBAUDIO=ON
+    - just use the default options
+    - for Windows, these are: AUDIODRV_WAVEWRITE=ON AUDIODRV_WINMM=ON AUDIODRV_DSOUND=ON AUDIODRV_XAUDIO2=ON [AUDIODRV_WASAPI=ON]
+- Emulation library
   Required files:
     libs/include/emu/cores/sn764intf.h
     libs/include/emu/EmuStructs.h
@@ -14,3 +46,9 @@ Required Libraries:
     libs/include/emu/SoundEmu.h
     libs/libs/libEmu*.lib [MS Visual Studio]
     libs/libs/libemu.a [GCC]
+  CMake Options:
+    - BUILD_LIBEMU=ON SNDEMU_ALL=OFF
+    - basic sound emulation: SNDEMU_YM2612_GPGX=ON SNDEMU_SN76496_MAME=ON
+    - Sega Pico support: SNDEMU_UPD7759_ALL=ON
+    - Sega MegaCD support: SNDEMU_RF5C68_GENS=ON
+    - Sega 32X support: SNDEMU_32X_PWM_ALL=ON

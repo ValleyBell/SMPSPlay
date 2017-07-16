@@ -16,15 +16,15 @@ USE_ALSA = 1
 USE_LIBAO = 1
 endif
 
-INCPATH = libs/include
-LIBPATH = libs/lib
+INCPATH = libs/install/include
+LIBPATH = libs/install/lib
 
 CC = gcc
 CPP = g++
 PREFIX = /usr/local
 MANPREFIX = $(PREFIX)/share/man
 
-CFLAGS := -O3 -g0 $(CFLAGS) -I$(INCPATH)
+CFLAGS := -O3 -g0 $(CFLAGS) -I libs/include -I $(INCPATH)
 CCFLAGS = -std=gnu99
 CPPFLAGS = -std=gnu++98
 #CFLAGS += -Wall -Wextra -Wpedantic
@@ -86,12 +86,11 @@ LIBAUDOBJ = $(OBJ)/audio
 
 OBJDIRS = \
 	$(OBJ) \
-	$(OBJ)/chips \
 	$(OBJ)/Engine
 
 LIBS = \
-	$(LIBPATH)/libaudio.a \
-	$(LIBPATH)/libemu.a
+	$(LIBPATH)/libvgm-audio.a \
+	$(LIBPATH)/libvgm-emu.a
 
 ENGINEOBJS = \
 	$(OBJ)/Engine/dac.o \
