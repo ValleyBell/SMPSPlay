@@ -133,11 +133,13 @@ INSTRUMENT - sets the channel instrument
 	command F5, size 02
   INS_C_FMP - set FM/PSG instrument, behaves like INS_C_FM, but works on FM and PSG channels
 	command EF, size 82, Sonic 3K
+  INS_C_FMP2 - set FM/PSG instrument, first parameter is the FM instrument, second parameter is the PSG instrument
+	command E5, size 03, Tetris
   INS_C_COI - set FM instrument or PSG ADSR envelope (based on FM instrument data)
 	command EF, size 02, Castle of Illusion
 	
 	a can be N or C. (see notes for VOLUME)
-	If set to N, the channel mode check is disabled. (INS_N_FM on PSG channel can cause bugs and vice versa)
+	If set to N, the channel mode check is disabled. (INS_N_FM on a PSG channel can cause bugs and vice versa)
 	If set to C, the channel mode check is enabled and commands for a wrong channel are ignored.
 
 PSG_NOISE

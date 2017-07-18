@@ -75,6 +75,7 @@
 	#define CFS_INS_PSG				0x01	// F5
 	#define CFS_INS_FMP				0x02	// EF [Sonic 3K]
 	#define CFS_INS_COI				0x03	// EF [Castle of Illusion]
+	#define CFS_INS_FMP2			0x04	// E5 [Tetris]
 	#define CFS_INS_IMASK			0x0F
 	#define CFS_INS_N				0x00	// no channel check
 	#define CFS_INS_C				0x10	// with channel check
@@ -85,6 +86,7 @@
 	#define CFS_INS_C_PSG			(CFS_INS_C | CFS_INS_PSG)
 	#define CFS_INS_C_FMP			(CFS_INS_C | CFS_INS_FMP)
 	#define CFS_INS_C_COI			(CFS_INS_C | CFS_INS_COI)
+	#define CFS_INS_C_FMP2			(CFS_INS_C | CFS_INS_FMP2)
 #define CF_PSG_NOISE			0x09	// F3 (set PSG Noise)
 	#define CFS_PNOIS_SET			0x00	// F3 [SMPS 68k]
 	#define CFS_PNOIS_SET2			0x01	// F3 [early SMPS Z80]

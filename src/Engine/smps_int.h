@@ -114,6 +114,7 @@ static void cfMetaHandler(TRK_RAM* Trk, UINT8 Command);
 UINT8 IsHoldCFNext(TRK_RAM* Trk);
 static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag);
 static UINT8 GetInsRegPtrs(TRK_RAM* Trk, const UINT8** RetRegPtr, const UINT8** RetInsPtr, UINT8 Register);
+static void cfSetIns_FM(TRK_RAM* Trk, UINT8 InsID, const INS_LIB* InsLib);
 static void cfSetIns_PSG(TRK_RAM* Trk, UINT8 InsID);
 static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params);
 static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params);

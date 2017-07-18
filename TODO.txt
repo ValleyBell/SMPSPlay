@@ -1,4 +1,3 @@
-- support preSMPS Z80 T2 drums
 - add PitchSlide options (separate FM/PSG for preSMPS Z80/early SMPS Z80, customizable FM octave range)
 - add multiple DAC rates per DAC sound (used by preSMPS 68k Type 2/melodic DAC mode)
 - DAC test (play individual DAC sounds directly in SMPSPlay)

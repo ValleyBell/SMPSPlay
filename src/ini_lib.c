@@ -107,7 +107,7 @@ UINT8 GetTokenPtrs(char* Buffer, char** TokenL, char** TokenR)
 	while(*TempPtr != '\0' && isspace(*TempPtr))
 		TempPtr ++;
 	*TokenL = TempPtr;
-	if (TempPtr == '\0')
+	if (*TempPtr == '\0')
 		return 0x03;	// left token empty - line invalid
 	
 	return 0x00;

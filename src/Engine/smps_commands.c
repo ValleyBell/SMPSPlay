@@ -1567,6 +1567,24 @@ static UINT8 GetInsRegPtrs(TRK_RAM* Trk, const UINT8** RetRegPtr, const UINT8** 
 	return 0xFF;
 }
 
+static void cfSetIns_FM(TRK_RAM* Trk, UINT8 InsID, const INS_LIB* InsLib)
+{
+	if (InsLib == NULL)
+		InsLib = &Trk->SmpsSet->InsLib;
+	if (InsLib == NULL)
+		return;
+	
+	if (InsID >= InsLib->InsCount)
+	{
+		if (DebugMsgs & 0x01)
+			printf("Error: Invalid FM instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
+		return;
+	}
+	SendFMIns(Trk, InsLib->InsPtrs[InsID]);
+	
+	return;
+}
+
 static void cfSetIns_PSG(TRK_RAM* Trk, UINT8 InsID)
 {
 	const ENV_LIB* VolEnvLib = &Trk->SmpsSet->Cfg->VolEnvs;
@@ -1667,12 +1685,15 @@ static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* 
 				Trk->FMInsSong = Params[0x01];
 				InsID &= 0x7F;
 				InsLib = GetSongInsLib(Trk, Trk->FMInsSong);	// get new Instrument Library
-				if (InsLib->InsCount == 0 || Trk->FMInsSong > 0x81)
+				// Note: Dyna Brothers 1/2 use a dummy song with ID 81 to store their IDs, so I exclude it.
+				if (InsLib == NULL || InsLib->InsCount == 0 || Trk->FMInsSong > 0x81)
 				{
 					printf("Error: FM instrument cross-reference (ins %02X, song %02X) at %04X!\n",
 							Trk->Instrument, Trk->FMInsSong, Trk->Pos);
 					InsLib = NULL;
 				}
+				if (InsLib == NULL)
+					break;
 			}
 		}
 		else
@@ -1682,15 +1703,7 @@ static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* 
 			Trk->Instrument = InsID;
 		}
 		
-		if (InsLib == NULL)
-			break;
-		if (InsID >= InsLib->InsCount)
-		{
-			if (DebugMsgs & 0x01)
-				printf("Error: Invalid FM instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
-			break;
-		}
-		SendFMIns(Trk, InsLib->InsPtrs[InsID]);
+		cfSetIns_FM(Trk, InsID, InsLib);
 		break;
 	case CFS_INS_PSG:	// F5 Set PSG Instrument (Volume Envelope)
 		if ((CFlag->SubType & CFS_INS_CMASK) == CFS_INS_C)
@@ -1700,6 +1713,17 @@ static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* 
 		}
 		
 		cfSetIns_PSG(Trk, Params[0x00]);
+		break;
+	case CFS_INS_FMP2:
+		if (Trk->ChannelMask & 0x80)
+		{
+			cfSetIns_PSG(Trk, Params[0x01]);
+		}
+		else
+		{
+			Trk->Instrument = Params[0x00];
+			cfSetIns_FM(Trk, Trk->Instrument, NULL);
+		}
 		break;
 	}
 	
