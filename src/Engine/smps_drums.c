@@ -259,6 +259,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 		{
 			const DRUM_TRK_LIB* DTrkLib;
 			
+			DrumTrk->Volume = 0x00;	// preSMPS/Type 2 completely ignores the volume here
 			DTrkLib = &SmpsCfg->FMDrums;
 			if (DrumTrk->Instrument < DTrkLib->InsLib.InsCount)
 				SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument]);

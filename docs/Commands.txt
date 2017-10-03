@@ -83,6 +83,8 @@ VOLUME - change or set channel volume
 	size 02
   VOL_ACC - set volume with TL operator accumulation
 	command F0, size 02, preSMPS Z80
+  VOL_ACC2 - change volume, with additional TL operator accumulation
+	command F0, size 02, Darwin 4081
   VOL_SET_BASE - set volume base value (this value is added to the volume set by VOL_ABS_COI)
 	command FF, size 02, Castle of Illusion, World of Illusion
   VOL_ABS_PDRM - set volume of PSG Noise drums

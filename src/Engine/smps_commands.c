@@ -1951,6 +1951,21 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 				break;	// Drum/PWM/PSG channel - return
 			RefreshFMVolume(Trk);
 			break;
+		case CFS_VOL_ACC2:
+			// same as CFS_VOL_ACC, except that the value is added to Trk->Volume
+			// This means that it is even more broken, because volume changes
+			// are effectively multiplied until the next instrument change.
+			Trk->VolumeAcc += Trk->Volume;
+			Trk->Volume += Params[0x00];
+			if (Trk->SpcDacMode == DCHNMODE_VRDLX)
+			{
+				RefreshDACVolume(Trk, Trk->SpcDacMode, 0x00, Trk->Volume);
+				break;
+			}
+			if (Trk->ChannelMask & 0xF8)
+				break;	// Drum/PWM/PSG channel - return
+			RefreshFMVolume(Trk);
+			break;
 		case CFS_VOL_SET_BASE:
 			Trk->CoI_VolBase = Params[0x00];
 			break;
