@@ -435,11 +435,10 @@ static UINT8 LoadDrumMD2Op(TRK_RAM* Trk, DRUM_TRK_RAM* DrumTrk2Op, const DRUM_DA
 	DrumTrk2Op->Freq2Inc = DTrkData[0x08];
 	DrumTrk2Op->RemTicks = DTrkData[0x09];
 	
-	//DrumOfs = ReadLE16(&DTrkData[0x01]) - DTrkLib->DrumBase;
 	DrumOfs = ReadDrumPtr(&DTrkData[0x01], DTrkLib);
 	if (DrumOfs < DTrkLib->File.Len)
 	{
-		Trk->VolumeAcc = 0 - Trk->Volume;
+		Trk->Volume = 0x00;	// preSMPS/Type 2 completely ignores the volume here
 		SendFMIns(Trk, &DTrkLib->File.Data[DrumOfs], NULL);
 	}
 	

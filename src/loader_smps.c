@@ -21,6 +21,14 @@
 #include "Engine/smps_int.h"	// for RefreshDACVolume()
 
 
+typedef struct
+{
+	UINT16 Ofs;
+	UINT8 Chn;
+	UINT8 Vol;
+} PREP_TRK_HDR;
+
+
 #ifndef DISABLE_DEBUG_MSGS
 void ClearLine(void);			// from main.c
 
@@ -245,12 +253,6 @@ static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, const UINT8
 	return;
 }
 
-typedef struct
-{
-	UINT16 Ofs;
-	UINT8 Chn;
-	UINT8 Vol;
-} PREP_TRK_HDR;
 UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 {
 	const SMPS_CFG* SmpsCfg = SmpsSet->Cfg;

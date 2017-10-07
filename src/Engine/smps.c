@@ -2157,7 +2157,7 @@ void SendFMIns(TRK_RAM* Trk, const UINT8* InsData, const INS_LIB* InsLib)
 	UINT8 InsMode;
 	UINT8 HadB4;
 	
-	if (InsLib != NULL && InsLib->Mode != 0xFF)
+	if (InsLib != NULL && InsLib->Mode != INSMODE_UNDEF)
 	{
 		InsMode = InsLib->Mode;
 		OpPtr = InsLib->InsRegs;

@@ -29,6 +29,7 @@ typedef struct _file_data
 #define INSMODE_HW		0x01	// hardware order: x0 x4 x8 xC
 #define INSMODE_CST		0x10	// custom format (use InsRegs pointer)
 #define INSMODE_INT		0x80	// interleaved register/data
+#define INSMODE_UNDEF	0xFF	// undefined (for instrument libraries)
 
 #define TEMPO_TIMEOUT	0x00	// preSMPS, most SMPS 68k, SMPS Z80 Type 1
 #define TEMPO_OVERFLOW	0x01	// SMPS Z80 Type 2
