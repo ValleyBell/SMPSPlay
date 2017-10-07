@@ -1543,18 +1543,28 @@ static UINT8 GetInsRegPtrs(TRK_RAM* Trk, const UINT8** RetRegPtr, const UINT8** 
 	const SMPS_SET* SmpsSet = Trk->SmpsSet;
 	const UINT8* RegList;
 	const UINT8* InsData;
+	UINT8 RegCnt;
 	UINT8 CurReg;
 	
-	RegList = SmpsSet->Cfg->InsRegs;
-	if (RegList == NULL)
-		return 0x01;
 	if (Trk->Instrument >= SmpsSet->InsLib.InsCount)
 		return 0x02;
 	InsData = SmpsSet->InsLib.InsPtrs[Trk->Instrument];
+	if (Trk->InsLib != NULL)
+	{
+		RegCnt = Trk->InsLib->InsRegCnt;
+		RegList = Trk->InsLib->InsRegs;
+	}
+	else
+	{
+		RegCnt = SmpsSet->Cfg->InsRegCnt;
+		RegList = SmpsSet->Cfg->InsRegs;
+	}
+	if (RegList == NULL)
+		return 0x01;
 	
 	// Since we're using a user-defined Register order for the instruments,
 	// we need to search for the respective register in the instrument register list.
-	for (CurReg = 0x00; CurReg < SmpsSet->Cfg->InsRegCnt; CurReg ++)
+	for (CurReg = 0x00; CurReg < RegCnt; CurReg ++)
 	{
 		if (RegList[CurReg] == Register)
 		{
@@ -1580,7 +1590,7 @@ static void cfSetIns_FM(TRK_RAM* Trk, UINT8 InsID, const INS_LIB* InsLib)
 			printf("Error: Invalid FM instrument %02X at %04X!\n", Trk->Instrument, Trk->Pos);
 		return;
 	}
-	SendFMIns(Trk, InsLib->InsPtrs[InsID]);
+	SendFMIns(Trk, InsLib->InsPtrs[InsID], InsLib);
 	
 	return;
 }

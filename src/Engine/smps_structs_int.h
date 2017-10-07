@@ -110,6 +110,7 @@ typedef struct _track_ram
 	};
 	UINT8 NoiseMode;	// 1A - PSG Noise Mode
 	UINT8 FMAlgo;		// 1B - FM Algorithm (unused on SMPS Z80)
+	const INS_LIB* InsLib;	// [not in driver] reference to currently active instrument library
 	const UINT8* VolOpPtr;	// 1C/1D - Volume Operator Data Pointer (a real pointer this time)
 	UINT8 VolOpTLs[0x04];	// Total Level operator values
 	UINT16 NStopTout;	// 1E - Note Stop Timeout

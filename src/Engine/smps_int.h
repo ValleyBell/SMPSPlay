@@ -65,7 +65,7 @@ void Do2OpNote(void);
 static void DoCinossuPortamento(TRK_RAM* Trk);
 static UINT16 DoPitchSlide(TRK_RAM* Trk);
 const INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID);
-void SendFMIns(TRK_RAM* Trk, const UINT8* InsData);
+void SendFMIns(TRK_RAM* Trk, const UINT8* InsData, const INS_LIB* InsLib);
 void RefreshVolume(TRK_RAM* Trk);
 const UINT8* GetOperatorOrder(const SMPS_CFG* SmpsCfg);
 static UINT8 ApplyOutOperatorVol(TRK_RAM* Trk, UINT8 AlgoMask, UINT8 Reg, UINT8 CurTL);

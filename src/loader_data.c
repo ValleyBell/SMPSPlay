@@ -740,10 +740,13 @@ UINT8 LoadDrumTracks_Mem(UINT32 FileLen, const UINT8* FileData, DRUM_TRK_LIB* Dr
 			DrumLib->DrumList[CurItm] = ReadBE16(&DrumLib->File.Data[CurPos]);
 	}
 	
+	DrumLib->InsLib.Type = INSTYPE_NONE;
+	DrumLib->InsLib.Mode = 0xFF;
 	DrumLib->InsLib.InsCount = InsCount;
 	DrumLib->InsLib.InsPtrs = NULL;
 	if (InsCount)
 	{
+		DrumLib->InsLib.Type = INSTYPE_GBL;
 		DrumLib->InsLib.InsPtrs = (UINT8**)malloc(InsCount * sizeof(UINT8*));
 		CurPos = InsOfs - BaseOfs;
 		InsBaseOfs -= CurPos;
@@ -920,6 +923,9 @@ static UINT8 LoadSimpleInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* 
 	SmpsCfg->GblIns.alloc = 0x00;
 	SmpsCfg->GblIns.Len = (UINT16)FileLen;
 	SmpsCfg->GblIns.Data = FileData;
+	
+	SmpsCfg->GblInsLib.Type = INSTYPE_GBL;
+	SmpsCfg->GblInsLib.Mode = 0xFF;
 	InsCount = FileLen / SmpsCfg->InsRegCnt;
 	SmpsCfg->GblInsLib.InsCount = InsCount;
 	SmpsCfg->GblInsLib.InsPtrs = NULL;
@@ -931,17 +937,23 @@ static UINT8 LoadSimpleInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* 
 			SmpsCfg->GblInsLib.InsPtrs[CurIns] = &FileData[CurPos];
 	}
 	
+	SmpsCfg->GblInsLib.InsRegCnt = 0x00;
+	SmpsCfg->GblInsLib.InsRegs = NULL;
+	SmpsCfg->GblInsLib.InsReg_TL = NULL;
+	
 	SmpsCfg->GblInsBase = 0x0000;
 	return 0x00;
 }
 
 static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG* SmpsCfg)
 {
+	INS_LIB* InsLib = &SmpsCfg->GblInsLib;
 	UINT8 Flags;
 	UINT16 InsCount;
 	UINT16 CurIns;
 	UINT16 InsOfs;
 	UINT16 InsBase;
+	UINT16 InsRegOfs;
 	UINT16 CurPos;
 	UINT16 InsPos;
 	
@@ -951,16 +963,22 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 	
 	InsCount = FileData[0x05];
 	InsOfs = ReadLE16(&FileData[0x06]);
-	InsBase = ReadPtr16(&FileData[0x08], Flags);
-	// For now I'll ignore the Register array. It is specified in DefDrv.txt.
 	if (! InsOfs)
 		return 0xC1;	// invalid instrument list offset
+	InsBase = ReadPtr16(&FileData[0x08], Flags);
+	if ((Flags & 0x01))
+		InsRegOfs = ReadLE16(&FileData[0x0A]);
+	else
+		InsRegOfs = 0x0000;
 	
 	if (FileLen > 0xFFFF)
 		FileLen = 0xFFFF;
 	SmpsCfg->GblIns.alloc = 0x00;
 	SmpsCfg->GblIns.Len = (UINT16)FileLen;
 	SmpsCfg->GblIns.Data = FileData;
+	
+	SmpsCfg->GblInsLib.Type = INSTYPE_GBL;
+	SmpsCfg->GblInsLib.Mode = INSMODE_INT;
 	SmpsCfg->GblInsLib.InsCount = InsCount;
 	SmpsCfg->GblInsLib.InsPtrs = NULL;
 	if (InsCount)
@@ -975,6 +993,42 @@ static UINT8 LoadAdvancedInstrumentLib(UINT32 FileLen, UINT8* FileData, SMPS_CFG
 				SmpsCfg->GblInsLib.InsPtrs[CurIns] = &FileData[InsPos];
 			else
 				SmpsCfg->GblInsLib.InsPtrs[CurIns] = NULL;
+		}
+	}
+	
+	InsLib->InsRegCnt = 0x00;
+	InsLib->InsRegs = NULL;
+	InsLib->InsReg_TL = NULL;
+	if (InsRegOfs)
+	{
+		UINT16 MaxPos;
+		UINT8 CurReg;
+		
+		MaxPos = InsRegOfs + 0x100;
+		if (MaxPos > FileLen)
+			MaxPos = FileLen;
+		if (InsRegOfs < InsOfs && MaxPos > InsOfs)
+			MaxPos = InsOfs;
+		for (CurPos = InsRegOfs; CurPos < MaxPos - 0x01; CurPos ++)
+		{
+			if (FileData[CurPos] == 0x00 || FileData[CurPos] == 0x83)
+				break;
+		}
+		FileData[CurPos] = 0x00;	// enforce instrument terminator
+		InsLib->InsRegCnt = (UINT8)(CurPos - InsRegOfs);
+		
+		if (InsLib->InsRegCnt)
+		{
+			InsLib->Mode = INSMODE_CST;
+			InsLib->InsRegs = &FileData[InsRegOfs];
+			for (CurReg = 0x00; CurReg < InsLib->InsRegCnt; CurReg ++)
+			{
+				if ((InsLib->InsRegs[CurReg] & 0xF0) == 0x40)
+				{
+					InsLib->InsReg_TL = &InsLib->InsRegs[CurReg];
+					break;
+				}
+			}
 		}
 	}
 	

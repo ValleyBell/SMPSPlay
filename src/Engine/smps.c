@@ -2150,13 +2150,27 @@ const INS_LIB* GetSongInsLib(TRK_RAM* Trk, UINT8 SongID)
 	return &Trk->SmpsSet->Cfg->GblInsLib;
 }
 
-void SendFMIns(TRK_RAM* Trk, const UINT8* InsData)
+void SendFMIns(TRK_RAM* Trk, const UINT8* InsData, const INS_LIB* InsLib)
 {
-	const UINT8* OpPtr = Trk->SmpsSet->Cfg->InsRegs;
+	const UINT8* OpPtr = NULL;
 	const UINT8* InsPtr = InsData;
+	UINT8 InsMode;
 	UINT8 HadB4;
 	
-	if (! (Trk->SmpsSet->Cfg->InsMode & INSMODE_INT))
+	if (InsLib != NULL && InsLib->Mode != 0xFF)
+	{
+		InsMode = InsLib->Mode;
+		OpPtr = InsLib->InsRegs;
+		Trk->InsLib = InsLib;
+	}
+	else
+	{
+		InsMode = Trk->SmpsSet->Cfg->InsMode;
+		OpPtr = Trk->SmpsSet->Cfg->InsRegs;
+		Trk->InsLib = NULL;
+	}
+	
+	if (! (InsMode & INSMODE_INT))
 	{
 		if (OpPtr == NULL || InsData == NULL)
 			return;
@@ -2298,6 +2312,7 @@ void RefreshFMVolume(TRK_RAM* Trk)
 {
 	const UINT8* OpPtr;
 	const UINT8* VolPtr;
+	UINT8 InsMode;
 	UINT8 AlgoMask;
 	UINT8 CurOp;
 	UINT8 CurTL;
@@ -2305,8 +2320,19 @@ void RefreshFMVolume(TRK_RAM* Trk)
 //	if (Trk->ChannelMask & 0x10)
 //		return;	// don't refresh on DAC/Drum tracks
 	
+	if (Trk->InsLib != NULL)
+	{
+		InsMode = Trk->InsLib->Mode;
+		OpPtr = Trk->InsLib->InsReg_TL;
+	}
+	else
+	{
+		InsMode = Trk->SmpsSet->Cfg->InsMode;
+		OpPtr = Trk->SmpsSet->Cfg->InsReg_TL;
+	}
+	
 	AlgoMask = AlgoOutMask[Trk->FMAlgo & 0x07];
-	if (! (Trk->SmpsSet->Cfg->InsMode & INSMODE_INT))
+	if (! (InsMode & INSMODE_INT))
 	{
 		OpPtr = Trk->SmpsSet->Cfg->InsReg_TL;
 		VolPtr = Trk->VolOpPtr;
@@ -3712,7 +3738,7 @@ void RestoreBGMChannel(TRK_RAM* Trk)
 		if (InsLib != NULL && InsID < InsLib->InsCount)
 		{
 			InsPtr = InsLib->InsPtrs[InsID];
-			SendFMIns(Trk, InsPtr);
+			SendFMIns(Trk, InsPtr, InsLib);
 		}
 		
 		if (Trk->SSGEG.Type & 0x80)

@@ -172,7 +172,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 			
 			DTrkLib = &SmpsCfg->FMDrums;
 			if (DrumTrk->Instrument < DTrkLib->InsLib.InsCount)
-				SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument]);
+				SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument], &DTrkLib->InsLib);
 			
 			// Note: This is always called, even on SMPS drivers that play drums on another channel than FM3.
 			// MegaMan Wily Wars, song 07 (MM1 Dr Wily Stage 1) relies on that behaviour.
@@ -262,7 +262,7 @@ static void DoDrum(TRK_RAM* Trk, const DRUM_DATA* DrumData)
 			DrumTrk->Volume = 0x00;	// preSMPS/Type 2 completely ignores the volume here
 			DTrkLib = &SmpsCfg->FMDrums;
 			if (DrumTrk->Instrument < DTrkLib->InsLib.InsCount)
-				SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument]);
+				SendFMIns(DrumTrk, DTrkLib->InsLib.InsPtrs[DrumTrk->Instrument], &DTrkLib->InsLib);
 		}
 		break;
 	case DRMTYPE_PREPSG:
@@ -440,7 +440,7 @@ static UINT8 LoadDrumMD2Op(TRK_RAM* Trk, DRUM_TRK_RAM* DrumTrk2Op, const DRUM_DA
 	if (DrumOfs < DTrkLib->File.Len)
 	{
 		Trk->VolumeAcc = 0 - Trk->Volume;
-		SendFMIns(Trk, &DTrkLib->File.Data[DrumOfs]);
+		SendFMIns(Trk, &DTrkLib->File.Data[DrumOfs], NULL);
 	}
 	
 	if (Trk->VolOpPtr != NULL && DrumData->PitchOvr)

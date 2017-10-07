@@ -207,9 +207,16 @@ static void DuplicateInsTable(const INS_LIB* InsLibSrc, INS_LIB* InsLibDst)
 {
 	free(InsLibDst->InsPtrs);
 	
+	InsLibDst->Type = InsLibSrc->Type;
+	InsLibDst->Mode = InsLibSrc->Mode;
+	
 	InsLibDst->InsPtrs = (UINT8**)malloc(InsLibSrc->InsCount * sizeof(UINT8*));
 	memcpy(InsLibDst->InsPtrs, InsLibSrc->InsPtrs, InsLibSrc->InsCount * sizeof(UINT8*));
 	InsLibDst->InsCount = InsLibSrc->InsCount;
+	
+	InsLibDst->InsRegCnt = InsLibSrc->InsRegCnt;
+	InsLibDst->InsRegs = InsLibSrc->InsRegs;
+	InsLibDst->InsReg_TL = InsLibSrc->InsReg_TL;
 	
 	return;
 }
@@ -230,6 +237,10 @@ static void CreateInstrumentTable(SMPS_SET* SmpsSet, UINT32 FileLen, const UINT8
 	CurPos = StartOfs;
 	for (TempOfs = 0; TempOfs < InsLib->InsCount; TempOfs ++, CurPos += SmpsCfg->InsRegCnt)
 		InsLib->InsPtrs[TempOfs] = (UINT8*)&FileData[CurPos];
+	
+	InsLib->InsRegCnt = 0x00;
+	InsLib->InsRegs = NULL;
+	InsLib->InsReg_TL = NULL;
 	
 	return;
 }
@@ -422,15 +433,15 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	{
 		// interleaved instruments ALWAYS use external files
 		// (requires instrument pointers due to variable instrument size)
-		SmpsSet->InsLib.Type = INSTYPE_GBL;
 		SmpsSet->InsBase = 0x0000;
 		DuplicateInsTable(&SmpsCfg->GblInsLib, &SmpsSet->InsLib);
 	}
 	else if (InsPtr && (UINT32)InsPtr + SmpsCfg->InsRegCnt <= FileLen)
 	{
-		SmpsSet->InsLib.Type = INSTYPE_SEQ;
 		SmpsSet->InsBase = InsPtr;
 		CreateInstrumentTable(SmpsSet, FileLen, FileData, InsPtr);
+		SmpsSet->InsLib.Type = INSTYPE_SEQ;
+		SmpsSet->InsLib.Mode = 0xFF;
 	}
 	else if (SmpsCfg->GblInsLib.InsCount)
 	{
@@ -438,7 +449,6 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 		if (SmpsCfg->GblInsBase == 0x0000)	// an instrument set offset of 0 enforces "use always the full table"
 			InsPtr = 0x0000;
 		
-		SmpsSet->InsLib.Type = INSTYPE_GBL;
 		if (InsPtr > SmpsCfg->GblInsBase && InsPtr < SmpsCfg->GblInsBase + SmpsCfg->GblIns.Len)
 		{
 			// read from the middle of the Instrument Table, if the song's Table Offset is
@@ -446,6 +456,8 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 			// (TblStart == SongTblOfs is done in the else block)
 			SmpsSet->InsBase = InsPtr - SmpsCfg->GblInsBase;
 			CreateInstrumentTable(SmpsSet, SmpsCfg->GblIns.Len, SmpsCfg->GblIns.Data, SmpsSet->InsBase);
+			SmpsSet->InsLib.Type = INSTYPE_GBL;
+			SmpsSet->InsLib.Mode = SmpsCfg->GblInsLib.Mode;
 		}
 		else
 		{
@@ -456,8 +468,12 @@ UINT8 PreparseSMPSFile(SMPS_SET* SmpsSet)
 	else
 	{
 		SmpsSet->InsLib.Type = INSTYPE_NONE;
+		SmpsSet->InsLib.Mode = 0x00;
 		SmpsSet->InsLib.InsCount = 0x00;
 		SmpsSet->InsLib.InsPtrs = NULL;
+		SmpsSet->InsLib.InsRegCnt = 0x00;
+		SmpsSet->InsLib.InsRegs = NULL;
+		SmpsSet->InsLib.InsReg_TL = NULL;
 	}
 	SmpsSet->UsageCounter = 0x01;
 #ifdef ENABLE_LOOP_DETECTION

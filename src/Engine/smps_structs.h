@@ -157,8 +157,13 @@ typedef struct _command_flag_library
 typedef struct _instrument_library
 {
 	UINT8 Type;
+	UINT8 Mode;
 	UINT16 InsCount;
 	UINT8** InsPtrs;
+	
+	UINT8 InsRegCnt;
+	const UINT8* InsRegs;
+	const UINT8* InsReg_TL;
 } INS_LIB;
 typedef struct _fade_configuration
 {
@@ -288,7 +293,7 @@ typedef struct _smps_configuration	// global SMPS driver configuration
 	UINT8 AddChnList[0x10];
 	UINT8 InsRegCnt;
 	UINT8* InsRegs;
-	UINT8* InsReg_TL;
+	const UINT8* InsReg_TL;
 	
 	UINT8 FMFreqCnt;
 	UINT16* FMFreqs;
