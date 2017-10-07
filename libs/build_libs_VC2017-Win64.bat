@@ -2,10 +2,11 @@
 
 @if "%VCINSTALLDIR%" == "" goto patherr
 
-set BUILD_DIR=build_VC2010_Win32
+set BUILD_DIR=build_VC2017_Win64
 set BASE_DIR=%CD%\download
 set INST_DIR=%CD%\install
-set GENERATOR=Visual Studio 10 2010
+set GENERATOR=Visual Studio 15 2017 Win64
+set TOOLSET=v141_xp
 
 pushd .
 
@@ -21,7 +22,7 @@ mkdir %LIBVGM_DIR%
 cd %LIBVGM_DIR%
 
 set LIBVGM_CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
-cmake -G "%GENERATOR%" -D CMAKE_INSTALL_PREFIX="%INST_DIR%" %LIBVGM_CMAKE_OPTS% "%BASE_DIR%\%LIBVGM_DIR%"
+cmake -G "%GENERATOR%" -T "%TOOLSET%" -D CMAKE_INSTALL_PREFIX="%INST_DIR%" %LIBVGM_CMAKE_OPTS% "%BASE_DIR%\%LIBVGM_DIR%"
 if errorlevel 1 goto builderror
 msbuild /property:Configuration=Debug INSTALL.vcxproj
 if errorlevel 1 goto builderror

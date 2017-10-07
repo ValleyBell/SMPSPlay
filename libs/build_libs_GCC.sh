@@ -3,8 +3,8 @@
 # set GNUMAKEFLAGS=-j4 before running the script to speed up the build on multicore systems
 
 BUILD_DIR="build_GCC"
-BASE_DIR="download"
-INST_DIR="../../install"
+BASE_DIR="$PWD/download"
+INST_DIR="$PWD/install"
 if test -n "$MSYSTEM"; then
 	GENERATOR="MSYS Makefiles"
 fi
@@ -21,9 +21,9 @@ cd libvgm
 
 LIBVGM_CMAKE_OPTS="-D CMAKE_BUILD_TYPE=Release -D BUILD_TESTS=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON"
 if test -z "$GENERATOR"; then
-	cmake -D CMAKE_INSTALL_PREFIX="$INST_DIR" $LIBVGM_CMAKE_OPTS ../../$BASE_DIR/libvgm
+	cmake -D CMAKE_INSTALL_PREFIX="$INST_DIR" $LIBVGM_CMAKE_OPTS "$BASE_DIR/libvgm"
 else
-	cmake -G "$GENERATOR" -D CMAKE_INSTALL_PREFIX="$INST_DIR" $LIBVGM_CMAKE_OPTS ../../$BASE_DIR/libvgm
+	cmake -G "$GENERATOR" -D CMAKE_INSTALL_PREFIX="$INST_DIR" $LIBVGM_CMAKE_OPTS "$BASE_DIR/libvgm"
 fi
 make install
 

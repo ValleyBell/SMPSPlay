@@ -222,6 +222,7 @@ static void InitalizeChips(void)
 	devCfg.flags = 0x00;
 	//devCfg.emuCore = FCC_GPGX;
 	InitOneChip(CAA, &devCfg, DEVID_YM2612, 0x100);
+	//ym2612_set_callback(ChipAudio.YM2612.defInf.dataPtr, &YM2612_Callback);
 	
 	CAA = &ChipAudio.SN76496;
 	devCfg.clock = CLOCK_SN76496;

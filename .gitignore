@@ -1,4 +1,4 @@
-libs/build*
+libs/build*/
 libs/download
 libs/install
 

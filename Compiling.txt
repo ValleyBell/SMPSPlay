@@ -1,0 +1,30 @@
+Compiling Instructions
+======================
+
+Requirements
+------------
+- Git + CMake (for building libraries)
+- Compiler:
+    - Linux: GCC
+    - Windows: MinGW (GCC for Windows) + MSYS or Microsoft Visual Studio
+
+Visual Studio
+-------------
+1. In the SMPSPlay\ folder, execute "git submodule update --init" to download the "libvgm" submodule.
+2. Open the "Visual Studio command prompt" and go to the SMPSPlay\libs\ folder.
+   Then execute the "build_libs_VC*.bat" file that matches your version of Visual Studio.
+   Notes:
+    - In order to build with VC 2005 or VC 2008, you need to edit the GENERATOR line in build_libs_VC2010-*.bat.
+    - In order to build with VC 2012 and higher, you need to edit the GENERATOR and TOOLSET lines in build_libs_VC2017-*.bat.
+    - You may run both, the Win32 and Win64 .bat files, in order to compile 32 and 64 bit versions of the libraries.
+   The .bat files will build the required libraries and install their .h and .lib files into the "install" folder.
+3. Open SMPSPlay.dsw (VC6) / SMPSPlay.sln (VC 2010 and higher) and compile.
+   Note: In order to build with VC 2005/2008, you will need to convert one of the other projects.
+         If you convert from the VC6 project, you have to fix the file names of the linked libraries.
+
+GCC/MinGW
+---------
+1. In the SMPSPlay/ folder, execute "git submodule update --init" to download the "libvgm" submodule.
+2. Go to the SMPSPlay/libs/ folder and run build_libs_GCC.sh.
+   The script will build the required libraries and install their .h and .lib files into the "install" folder.
+3. Go back to the SMPSPlay/ folder and run "make".
