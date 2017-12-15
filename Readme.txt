@@ -82,6 +82,7 @@ History
 	add preSMPS support
 	make "CompressVGM" option work
 	add DAC volume control for logged VGMs
+	add support for separate instrument formats for instrument libraries
 2015-07-07 - 2.11
 	improved loop detection
 	fixed delay during first tick of SMPS Z80 Type 1 songs

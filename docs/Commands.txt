@@ -139,6 +139,8 @@ INSTRUMENT - sets the channel instrument
 	command E5, size 03, Tetris
   INS_C_COI - set FM instrument or PSG ADSR envelope (based on FM instrument data)
 	command EF, size 02, Castle of Illusion
+  INS_C_FM_V0 - set FM instrument, also set channel volume to 0
+	command EF, size 02, Atomic Robo-Kid
 	
 	a can be N or C. (see notes for VOLUME)
 	If set to N, the channel mode check is disabled. (INS_N_FM on a PSG channel can cause bugs and vice versa)

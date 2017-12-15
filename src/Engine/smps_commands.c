@@ -1,6 +1,6 @@
 // SMPS Command Handler
 // --------------------
-// Written by Valley Bell, 2014-2015
+// Written by Valley Bell, 2014-2017
 
 #include <stdio.h>
 #include <stdlib.h>	// for rand()
@@ -1658,6 +1658,10 @@ static UINT8 cfSetInstrument(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* 
 		Trk->ADSR.DecLvl = CoI_PSG_SusLevels[(InsData[0x11] & 0xF0) >> 4];
 		Trk->ADSR.RelRate = CoI_PSG_RelRates[(InsData[0x11] & 0x0F) >> 0];
 		Trk->ADSR.Level = 0xFF;
+		break;
+	case CFS_INS_FM_V0:
+		Trk->Volume = 0x00;
+		CFInsType = CFS_INS_FM;
 		break;
 	}
 	
