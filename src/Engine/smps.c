@@ -158,6 +158,7 @@ void InitDriver(void)
 	SmpsRAM.LockTimingMode = 0xFF;
 	ym2612_timer_mask(0x00);
 	StopAllSound();
+	ClearSavedStates();
 	
 	return;
 }
@@ -167,6 +168,7 @@ void DeinitDriver(void)
 	UINT8 CurSet;
 	
 	StopAllSound();
+	ClearSavedStates();
 	
 	FreeSMPSFileRef_Zero(&SmpsRAM.MusSet);
 	for (CurSet = 0; CurSet < SFX_TRKCNT + SPCSFX_TRKCNT; CurSet ++)
@@ -3125,6 +3127,7 @@ static void DoPause(void)
 		UINT8 CurTrk;
 		TRK_RAM* TempTrk;
 		
+		SmpsRAM.PauseMode = 0x00;
 		if (SmpsRAM.FadeOut.Steps)
 		{
 			StopAllSound();
@@ -3251,6 +3254,16 @@ static void DoTempo(void)
 	return;
 }
 
+void PauseResumeMusic(UINT8 pause)
+{
+	if (pause)
+		SmpsRAM.PauseMode = 0x01;
+	else
+		SmpsRAM.PauseMode = 0x80;
+	
+	return;
+}
+
 void FadeOutMusic(void)
 {
 	const SMPS_CFG* SmpsCfg = (SmpsRAM.MusSet != NULL) ? SmpsRAM.MusSet->Cfg : NULL;
@@ -3272,6 +3285,37 @@ void FadeOutMusic(void)
 }
 
 void FadeOutMusic_Custom(UINT8 StepCnt, UINT8 DelayFrames)
+{
+	FADE_INF* Fade = &SmpsRAM.FadeIn;
+	
+	Fade->Steps = StepCnt | 0x80;
+	Fade->DlyInit = DelayFrames;
+	Fade->DlyCntr = Fade->DlyInit;
+	
+	return;
+}
+
+void FadeInMusic(void)
+{
+	const SMPS_CFG* SmpsCfg = (SmpsRAM.MusSet != NULL) ? SmpsRAM.MusSet->Cfg : NULL;
+	FADE_INF* Fade = &SmpsRAM.FadeIn;
+	
+	if (SmpsCfg != NULL)
+	{
+		Fade->Steps = SmpsCfg->FadeIn.Steps | 0x80;
+		Fade->DlyInit = SmpsCfg->FadeIn.Delay;
+	}
+	else
+	{
+		Fade->Steps = 0x28 | 0x80;
+		Fade->DlyInit = 0x06;
+	}
+	Fade->DlyCntr = Fade->DlyInit;
+	
+	return;
+}
+
+void FadeInMusic_Custom(UINT8 StepCnt, UINT8 DelayFrames)
 {
 	FADE_INF* Fade = &SmpsRAM.FadeOut;
 	
@@ -3593,12 +3637,33 @@ void StopAllSound(void)
 	Extra_SongStop(0);
 	
 	CleanSmpsFiles();
+	return;
+}
+
+void GenerateSavedState(void)
+{
+	if (SmpsRAM.MusSet != NULL)
+		BackupMusic(&MusicSaveState);
+	
+	return;
+}
+
+void RestoreSavedState(void)
+{
+	RestoreMusic(&MusicSaveState);
+	
+	return;
+}
+
+void ClearSavedStates(void)
+{
 	if (MusicSaveState.MusSet != NULL)
 	{
 		MusicSaveState.InUse = 0x00;
 		MusicSaveState.MusSet->UsageCounter = 0;
 		FreeSMPSFileRef_Zero(&MusicSaveState.MusSet);
 	}
+	
 	return;
 }
 

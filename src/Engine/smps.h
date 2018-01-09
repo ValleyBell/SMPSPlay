@@ -16,10 +16,16 @@ void UpdateAll(UINT8 Event);
 void PlayMusic(SMPS_SET* SmpsFileSet);
 void PlaySFX(SMPS_SET* SmpsFileSet, UINT8 SpecialSFX);
 
+void PauseResumeMusic(UINT8 pause);
 void FadeOutMusic(void);
 void FadeOutMusic_Custom(UINT8 StepCnt, UINT8 DelayFrames);
+void FadeInMusic(void);
+void FadeInMusic_Custom(UINT8 StepCnt, UINT8 DelayFrames);
 
 void StopAllSound(void);
+void GenerateSavedState(void);
+void RestoreSavedState(void);
+void ClearSavedStates(void);
 
 void SetDACState(UINT8 DacOn);
 UINT8 SmpsIsRunning(void);

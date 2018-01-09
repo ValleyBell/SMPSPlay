@@ -416,6 +416,7 @@ int main(int argc, char* argv[])
 		case 'S':
 			ThreadSync(1);
 			StopAllSound();
+			//ClearSavedStates();
 			ThreadSync(0);
 			SMPS_CountdownTimer = 0;
 			break;
@@ -441,11 +442,15 @@ int main(int argc, char* argv[])
 		case ' ':
 			PauseMode = ! PauseMode;
 			PauseStream(PauseMode);
+			//PauseResumeMusic(PauseMode);
 			DisplayFileID(cursor);
 			break;
 		case 'F':
 			FadeOutMusic();
 			break;
+		//case 'I':
+		//	FadeInMusic();
+		//	break;
 		case 'J':
 			(*CondJumpVar) ^= 0x01;
 			ClearLine();
