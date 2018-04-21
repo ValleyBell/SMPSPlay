@@ -1833,10 +1833,10 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 			Trk->Volume = TempVol & 0xFF;
 			if (Trk->Volume & 0x80)
 			{
-				if (TempVol & 0x100)
-					Trk->Volume = 0x00;
+				if (Params[0x00] & 0x80)	// the actual driver checks for the carry flag after the addition
+					Trk->Volume = 0x00;	// param is negative - underflow, clip to 00
 				else
-					Trk->Volume = 0x7F;
+					Trk->Volume = 0x7F;	// param is positive - overflow, clip to 7F
 			}
 			if (Trk->SpcDacMode == DCHNMODE_VRDLX)
 			{

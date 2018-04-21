@@ -789,6 +789,8 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 				SmpsCfg->FadeOut.AddFM = (UINT8)ParseNumber(RToken1, NULL, NULL);
 			else if (! stricmp(LToken, "FadeOutVolAddPSG"))
 				SmpsCfg->FadeOut.AddPSG = (UINT8)ParseNumber(RToken1, NULL, NULL);
+			else if (! stricmp(LToken, "NoteBase"))
+				SmpsCfg->NoteBase = (UINT8)strtoul(RToken1, NULL, 0x10);
 			else if (! stricmp(LToken, "DrumChMode"))
 				SmpsCfg->DrumChnMode = GetOptionValue(OPT_DRMCHNMODE, RToken1);
 			else if (! stricmp(LToken, "DACChns"))
