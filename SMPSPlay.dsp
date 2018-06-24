@@ -223,55 +223,11 @@ SOURCE=.\src\ini_lib.h
 # PROP Default_Filter "c;h"
 # Begin Source File
 
-SOURCE=.\src\chips\2612intf.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\2612intf.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\fm.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\fm2612.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\mamedef.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\sn76496.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\sn76496.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\sn764intf.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\sn764intf.h
-# End Source File
-# Begin Source File
-
 SOURCE=.\src\Sound.c
 # End Source File
 # Begin Source File
 
 SOURCE=.\src\sound.h
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\upd7759.c
-# End Source File
-# Begin Source File
-
-SOURCE=.\src\chips\upd7759.h
 # End Source File
 # Begin Source File
 

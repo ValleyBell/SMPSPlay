@@ -1,8 +1,8 @@
 // SMPS Player
 // -----------
-// Written by Valley Bell, 2014-2015
+// Written by Valley Bell, 2014-2018
 
-#define SMPSPLAY_VER	"2.11"
+#define SMPSPLAY_VER	"2.20"
 //#define BETA
 
 #define _CRTDBG_MAP_ALLOC	// note: no effect in Release builds

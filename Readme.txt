@@ -2,7 +2,7 @@ SMPS Player
 ===========
 by Valley Bell
 
-Version 2.11 (2015-07-07)
+Version 2.20 (2018-06-24)
 
 
 This program plays SMPS music files, a format commonly used in games for the Sega MegaDrive/Genesis.
@@ -10,7 +10,7 @@ This program plays SMPS music files, a format commonly used in games for the Seg
 
 Features
 --------
-- accurate playback of SMPS files used in MegaDrive and Master System games (maybe not 100% accurate for a few special driver variations, but the differences should be inaudible)
+- accurate playback of SMPS files used in MegaDrive, Sega Pico and Master System games (maybe not 100% accurate for a few special driver variations, but the differences should be inaudible)
 - fully customizable SMPS commands and drums
 - many SMPS driver settings, incl. FM/PSG frequencies and modulation/volume envelope commands
 - separate SMPS settings for every file extention
@@ -72,17 +72,18 @@ Thanks to Xeeynamo for contributing.
 
 History
 -------
-2017-xx-xx - 2.20
+2018-06-24 - 2.20
 	fixed bug where a "Communication Variable" event prevented automatically going to the next song until a key is pressed
 	replaced sound output and emulation system with libvgm's Audio Output and Emulation libraries
 	added option to select audio API (previously only WinMM was supported)
 	fixed auto-advance after stopping by pressing 'S'
-	add .ini option to configure output volume
+	added .ini option to configure output volume
 	fixed various bugs regarding 1-up save states
-	add preSMPS support
-	make "CompressVGM" option work
-	add DAC volume control for logged VGMs
-	add support for separate instrument formats for instrument libraries
+	added preSMPS support
+	made "CompressVGM" option work
+	added DAC volume control for logged VGMs
+	added support for separate instrument formats for instrument libraries
+	fixed Quackshot and S3K volume commands
 2015-07-07 - 2.11
 	improved loop detection
 	fixed delay during first tick of SMPS Z80 Type 1 songs
