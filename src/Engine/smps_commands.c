@@ -1748,7 +1748,6 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 {
 	UINT8 CmdLen;
 	UINT8 TempByt;
-	UINT16 TempVol;
 	
 	CmdLen = CFlag->Len;
 //	switch(CFlag->SubType & 0xF0)
@@ -1829,8 +1828,7 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 		case CFS_VOL_CC_FM:	// E6 [Note: Only S3K is known to clip the FM volume]
 			if (Trk->ChannelMask & 0x80)
 				break;	// PSG channel - return
-			TempVol = Trk->Volume + Params[0x00];
-			Trk->Volume = TempVol & 0xFF;
+			Trk->Volume = Trk->Volume + Params[0x00];
 			if (Trk->Volume & 0x80)
 			{
 				if (Params[0x00] & 0x80)	// the actual driver checks for the carry flag after the addition

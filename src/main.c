@@ -82,7 +82,7 @@ static void SmpsStopSignal(void);
 static void SmpsLoopSignal(void);
 static void SmpsCountdownSignal(void);
 static void CommVarChangeCallback(void);
-#ifndef WIN32
+#ifndef _WIN32
 static void changemode(bool);
 static int _kbhit(void);
 static int _getch(void);
@@ -130,7 +130,7 @@ static UINT8* CommunicationVar;
 CONFIG_DATA Config;
 extern AUDIO_CFG AudioCfg;
 
-#ifndef WIN32
+#ifndef _WIN32
 static struct termios oldterm;
 static bool termmode;
 #endif
@@ -150,7 +150,7 @@ int main(int argc, char* argv[])
 	
 	setlocale(LC_CTYPE, "");
 	
-#ifndef WIN32
+#ifndef _WIN32
 	tcgetattr(STDIN_FILENO, &oldterm);
 	termmode = false;
 #endif
@@ -240,7 +240,7 @@ int main(int argc, char* argv[])
 #endif
 #endif	// _WIN32
 	
-#ifndef WIN32
+#ifndef _WIN32
 	changemode(true);
 #endif
 	
@@ -321,6 +321,7 @@ int main(int argc, char* argv[])
 			DisplayFileID(cursor);
 			break;
 		case 0x1B:
+		case 'Q':
 			quitPrgm = 1;
 			break;
 		case 0xE0:
@@ -515,7 +516,7 @@ int main(int argc, char* argv[])
 		else if (_kbhit())
 		{
 			inkey = _getch();
-#ifdef WIN32
+#ifdef _WIN32
 			if (inkey == 0x00 || inkey == 0xE0)
 #else
 			if (inkey == 0x1B)
@@ -555,7 +556,7 @@ FinishProgram:
 		_getch();
 #endif
 	
-#ifndef WIN32
+#ifndef _WIN32
 	changemode(false);
 #endif
 	
@@ -566,7 +567,7 @@ static int getch_special(void)
 {
 	int KeyCode;
 	
-#ifdef WIN32
+#ifdef _WIN32
 	// Cursor-Key Table
 	// Shift + Cursor results in the usual value for the Cursor Key
 	// Alt + Cursor results in 0x00 + (0x50 + CursorKey) (0x00 instead of 0xE0)
@@ -987,7 +988,7 @@ static void CommVarChangeCallback(void)
 }
 
 
-#ifndef WIN32
+#ifndef _WIN32
 static void changemode(bool dir)
 {
 	static struct termios newterm;

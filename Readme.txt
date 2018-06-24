@@ -35,7 +35,7 @@ S - stop and mute music (calls the StopAllSound SMPS routine)
 F - fade music out (calls FadeOutMusic SMPS routine)
 V - enable/disable VGM logging
 J - toggle Conditional Jump variable
-ESC - quit
+ESC / Q - quit
 
 Channel Muting
 --------------
