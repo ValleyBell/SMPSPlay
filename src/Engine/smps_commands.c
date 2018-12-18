@@ -1306,12 +1306,18 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		break;
 	case CF_TRK_END:		// E3/F2 Track End
 		if (CFlag->SubType == CFS_TEND_MUTE)
-			SilenceFMChn(Trk);
+		{
+			// Neither SMPS Z80 nor SMPS 68k check for PSG channels here and may end up writing garbage.
+			// However, I also use TEND_MUTE for the Track End command (F2) in SMPS 68k/Type 1a,
+			// which has it behind a check for FM channels. Having an additional check is safer anyway.
+			if (! (Trk->ChannelMask & 0xF8))
+				SilenceFMChn(Trk);
+		}
 		
 		// Note: SMPS Z80 keeps the PBKFLG_HOLD. This can cause notes to hang. (Example: 9A 04 E7 F2)
 		Trk->PlaybkFlags &= ~(PBKFLG_ACTIVE | PBKFLG_HOLD);
 		if (Trk->ChannelMask & 0x10)
-			Trk->ChannelMask &= ~0x10;	// make drum channels stop FM notes (fixed DJ Boy: Game Over)
+			Trk->ChannelMask &= ~0x10;	// make drum channels stop FM notes (fixes DJ Boy: Game Over)
 		DoNoteOff(Trk);
 		Extra_StopCheck();
 		

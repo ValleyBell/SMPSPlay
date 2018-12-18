@@ -3624,6 +3624,7 @@ void StopAllSound(void)
 			continue;
 		TempTrack.ChannelMask = CurChn;
 		SilenceFMChn(&TempTrack);
+		WriteFMI(0x28, CurChn);
 		DisableSSGEG(&TempTrack);
 	}
 	
@@ -3696,7 +3697,8 @@ void SilenceFMChn(TRK_RAM* Trk)
 	for (CurOp = 0x00; CurOp < 0x10; CurOp += 0x04)
 		WriteFMMain(Trk, 0x40 | CurOp, 0x7F);
 	
-	WriteFMI(0x28, Trk->ChannelMask);
+	// SMPS Z80 does a Note Off here, SMPS 68k doesn't
+	//WriteFMI(0x28, Trk->ChannelMask);
 	
 	return;
 }
