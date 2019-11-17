@@ -1,6 +1,6 @@
 // SMPS Command Handler
 // --------------------
-// Written by Valley Bell, 2014-2017
+// Written by Valley Bell, 2014-2019
 
 #include <stdio.h>
 #include <stdlib.h>	// for rand()
@@ -772,6 +772,18 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 		case CFS_MODS_OFF:	// F4/FD Modulation Off
 			Trk->ModEnv &= ~0x80;
 			break;
+		case CFS_MODS_ON_S3P:	// E9 (Sonic 3 proto 1993-11-03)
+			if (! Trk->ModEnv)
+			{
+				// someone really screwed up the here
+				CmdLen = 0x02;
+			}
+			else
+			{
+				Trk->ModEnv |= 0x80;
+				CmdLen = 0x01;
+			}
+			break;
 		}
 		break;
 	case CF_MOD_ENV:
@@ -788,6 +800,16 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 			break;
 		case CFS_MENV_GEN2:	// F1 Set Modulation Envelope (broken, Tempo 32x)
 			Trk->ModEnv = Data[0x01];
+			break;
+		case CFS_MENV_1GEN:	// F4 Set Modulation Envelope (Sonic 3 proto 1993-11-03)
+			// This is actually used by the Game Over tune.
+			Trk->ModEnv = 0x01 + Data[0x00];
+			break;
+		case CFS_MENV_1FMP:	// F1 Set FM/PSG Modulation Envelope (Sonic 3 proto 1993-11-03)
+			if (Trk->ChannelMask & 0x80)
+				Trk->ModEnv = 0x01 + Data[0x00];	// PSG channel
+			else
+				Trk->ModEnv = 0x01 + Data[0x01];	// FM channel
 			break;
 		}
 		break;

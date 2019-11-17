@@ -183,6 +183,8 @@ MOD_SET - enable/disable "Custom Modulation"
 	command FC/F1, size 01, SMPS 68k
   MODS_OFF - disable
 	command FD/F4, size 01, SMPS 68k
+  MODS_ON_S3P - enable (broken)
+	command E9, size 01/02, Sonic 3 proto 1993-11-03
 
 MOD_ENV - set Modulation Envelope
   MENV_GEN - set envelope (all channel types)
@@ -191,6 +193,10 @@ MOD_ENV - set Modulation Envelope
 	command F1, size 03, parameters are PSG (first) and FM (second)
   MENV_GEN2 - set envelope to second parameter (all channel types)
 	command F1, size 03, Tempo 32x
+  MENV_1GEN - like MENV_GEN, but 1-based (value 0 results in envelope type 1=
+	command F4, size 02
+  MENV_1FMP - like MENV_FMP, but 1-based
+	command F1, size 03, parameters are PSG (first) and FM (second)
 
 FM_VOLENV - set FM volume envelope (second parameter is the Total Level operator mask)
 	command FF 07/06, size 03, SMPS Z80

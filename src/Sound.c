@@ -343,7 +343,7 @@ UINT8 StartAudioOutput(void)
 	if (RetVal)
 	{
 		audDrv = NULL;
-		printf("Error loading Audio Driver!\n");
+		printf("Error loading Audio Driver! (Error Code %02X)\n", RetVal);
 		StopAudioOutput();
 		return 0xC0;
 	}
