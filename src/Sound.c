@@ -75,7 +75,7 @@ INLINE UINT8 Limit8Bit(INT32 Value);
 INLINE INT16 Limit16Bit(INT32 Value);
 INLINE INT32 Limit24Bit(INT32 Value);
 INLINE INT32 Limit32Bit(INT32 Value);
-static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data);
+static UINT32 FillBuffer(void* Params, void* userParam, UINT32 bufSize, void* data);
 static void YM2612_Callback(void *param, int irq);
 
 //void ym2612_timer_mask(UINT8 Mask);
@@ -387,7 +387,7 @@ UINT8 StartAudioOutput(void)
 		*optsLog = *audOpts;
 	}
 	
-	AudioDrv_SetCallback(audDrv, FillBuffer);
+	AudioDrv_SetCallback(audDrv, FillBuffer, NULL);
 	if (audDrvLog != NULL)
 	{
 		AudioDrv_DataForward_Add(audDrv, audDrvLog);
@@ -598,7 +598,7 @@ INLINE INT32 Limit32Bit(INT32 Value)
 	return (INT32)NewValue;
 }
 
-static UINT32 FillBuffer(void* Params, UINT32 bufSize, void* data)
+static UINT32 FillBuffer(void* Params, void* userParam, UINT32 bufSize, void* data)
 {
 	UINT32 BufferSmpls;
 	UINT8* Buffer;

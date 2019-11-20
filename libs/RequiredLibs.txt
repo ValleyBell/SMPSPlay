@@ -7,13 +7,13 @@ https://github.com/ValleyBell/libvgm
 
 Visual Studio 2010:
 - Start commandline with Visual Studio environment variables set, then execute:
-	set CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
+	set CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
 	cmake -D CMAKE_INSTALL_PREFIX=install %CMAKE_OPTS% ..
 	msbuild /property:Configuration=Release INSTALL.vcxproj
 
 GCC (Linux/Windows)
 - execute this in a terminal:
-	CMAKE_OPTS="-D BUILD_TESTS=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON"
+	CMAKE_OPTS="-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON"
 	cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=install $CMAKE_OPTS ..
 	make install
 
@@ -31,7 +31,9 @@ Details:
   Required files:
     libs/install/include/audio/Audio*.h
     libs/install/libs/vgm-audio_*.lib [MS Visual Studio]
+    libs/install/libs/vgm-utils_*.lib [MS Visual Studio]
     libs/install/libs/libvgm-audio.a [GCC]
+    libs/install/libs/libvgm-utils.a [GCC]
   CMake Options:
     - BUILD_LIBAUDIO=ON
     - just use the default options
@@ -52,3 +54,8 @@ Details:
     - Sega Pico support: SNDEMU_UPD7759_ALL=ON
     - Sega MegaCD support: SNDEMU_RF5C68_GENS=ON
     - Sega 32X support: SNDEMU_32X_PWM_ALL=ON
+- Player library
+  Required files:
+    none, because we won't be using this part of libvgm
+  CMake Options:
+    - BUILD_LIBPLAYER=OFF
