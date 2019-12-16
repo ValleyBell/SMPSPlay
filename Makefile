@@ -90,6 +90,7 @@ OBJDIRS = \
 
 LIBS = \
 	$(LIBPATH)/libvgm-audio.a \
+	$(LIBPATH)/libvgm-utils.a \
 	$(LIBPATH)/libvgm-emu.a
 
 ENGINEOBJS = \

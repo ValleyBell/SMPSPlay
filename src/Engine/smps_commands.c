@@ -1956,6 +1956,17 @@ static UINT8 cfVolume(TRK_RAM* Trk, const CMD_FLAGS* CFlag, const UINT8* Params)
 				RefreshFMVolume(Trk);
 			}
 			break;
+		case CFS_VOL_ABS_SHSQ:
+			if (Trk->ChannelMask & 0x80)
+			{
+				Trk->Volume = Params[0x00] >> 4;
+			}
+			else
+			{
+				Trk->Volume = Params[0x00];
+				RefreshFMVolume(Trk);
+			}
+			break;
 		case CFS_VOL_ABS_PERC:
 			// scale 00 (min) .. 63 (max)
 			if (Trk->ChannelMask & 0x80)

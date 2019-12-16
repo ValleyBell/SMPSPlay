@@ -50,6 +50,7 @@
 	#define CFS_VOL_ABS_PERC		0x87	// (absolute Volume, 00..63 min...max scale for FM and PSG)
 	#define CFS_VOL_ACC				0x88	// F0 [preSMPS] (absolute volume, added to TL levels)
 	#define CFS_VOL_ACC2			0x89	// F0 [Darwin 4081] (change volume, added to TL levels)
+	#define CFS_VOL_ABS_SHSQ		0x8A	// E4 [Shadow Squadron/Stellar Assault]
 	#define CFS_VOL_ABS_PDRM		0xC0
 	#define CFS_VOL_CHG_PDRM		0xC1	// E4 [Master System SMPS]
 	#define CFS_VOL_ABS_2OPDRM		0xC2	// E7 [preSMPS Z80 Type 1]

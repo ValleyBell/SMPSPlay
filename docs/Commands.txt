@@ -79,6 +79,8 @@ VOLUME - change or set channel volume
 	command E6, size 02, Tempo 32x
   VOL_ABS_COI - set volume
 	command F1, size 02, Castle of Illusion
+  VOL_ABS_SHSQ - set volume
+	command E4, size 02, Stellar Assault/Shadow Squadron
   VOL_ABS_PERC - set volume percent, range is 00 (min) .. 63 (max, decimal) and is scaled to match the FM/PSG volume range
 	size 02
   VOL_ACC - set volume with TL operator accumulation
@@ -164,9 +166,11 @@ PLAY_DAC - play DAC sound
 	command EA, size 02, SMPS Z80 Type 2
 	command EA, size 03, Zaxxon Motherbase 2000 32X, sets DAC bank to first parameter, second parameter is the DAC sound
 	command E4, size 04, Mercs (DAC sound, speed, pan bits)
+  DACHN_1 - play sound on first DAC channel (default when no sub-command is specified)
+  DACHN_2 - play sound on second DAC channel
 
 PLAY_PWM - play PWM sample
-	command FD, size 03, Tempo 32x
+	command FD, size 03, Tempo 32x (2 parameters: volume, channel)
 
 DAC_BANK - set DAC Bank
 	command ED, size 02, Mighty Morphin Power Rangers

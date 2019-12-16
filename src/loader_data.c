@@ -175,7 +175,7 @@ void LoadDACData(const char* FileName, DAC_CFG* DACDrv)
 				}
 				else if (CurAlgoID > DACDrv->Cfg.AlgoCount)
 				{
-					printf("Warning: Ignoring DAC algorithm %s! (must be defined consecutively)\n");
+					printf("Warning: Ignoring DAC algorithm %s! (must be defined consecutively)\n", RToken1);
 					RToken2 = RToken1;
 				}
 				
