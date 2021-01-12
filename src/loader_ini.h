@@ -22,6 +22,7 @@ struct _smps_extention_definition
 	char* CmdFile;
 	char* DrumDefFile;
 	char* PSGDrumDefFile;
+	char* ModPrsFile;
 	char* ModEnvFile;
 	char* VolEnvFile;
 	char* PanAniFile;

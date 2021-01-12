@@ -747,16 +747,26 @@ static void DoCoordinationFlag(TRK_RAM* Trk, const CMD_FLAGS* CFlag)
 	// Modulation Flags
 	// ----------------
 	case CF_MOD_SETUP:	// F0 Modulation Setup
+		Trk->CstMod.DataSrc = 0;
 		Trk->CstMod.DataPtr = Trk->Pos + 0x01;
 		if ((SmpsCfg->ModAlgo & 0xF0) == MODALGO_68K)
 		{
-			// unconditional inlined PrepareModulat()
+			Trk->ModEnv |= 0x80;	// SMPS 68k just sets the high bit
+			LoadModulation(Trk);
+		}
+		else
+		{
+			Trk->ModEnv = 0x80;	// SMPS Z80 writes the value 0x80
+		}
+		break;
+	case CF_MOD_PRESET:	// FD Load Modulation Preset
+		Trk->CstMod.DataSrc = 1;
+		Trk->CstMod.DataIdx = Data[0x00] - 1;	// possible underflow matches the driver
+		// Note: There is no check for DataIdx == 0xFF in the driver.
+		if ((SmpsCfg->ModAlgo & 0xF0) == MODALGO_68K)
+		{
 			Trk->ModEnv |= 0x80;
-			Trk->CstMod.Delay = Data[0x00];
-			Trk->CstMod.Rate = Data[0x01];
-			Trk->CstMod.Delta = Data[0x02];
-			Trk->CstMod.RemSteps = Data[0x03] / 2;
-			Trk->CstMod.Freq = 0;
+			LoadModulation(Trk);
 		}
 		else
 		{

@@ -182,6 +182,9 @@ Modulation Flags
 MOD_SETUP - enable "Custom Modulation" and set its parameters
 	command F0, size 05
 
+MOD_PRESET - enable "Custom Modulation" and set its parameters based on a global list of 4-byte presets
+	command FD, size 02
+
 MOD_SET - enable/disable "Custom Modulation"
   MODS_ON - enable
 	command FC/F1, size 01, SMPS 68k

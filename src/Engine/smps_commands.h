@@ -105,19 +105,20 @@
 // Modulation Flags
 // ----------------
 #define CF_MOD_SETUP			0x20	// F0
-#define CF_MOD_SET				0x21	// F1/F4 [SMPS 68k]
-	#define CFS_MODS_ON				0x00	// F1/FC (SMPS 68k)
-	#define CFS_MODS_OFF			0x01	// F4/FD (SMPS 68k)
+#define CF_MOD_PRESET			0x21	// FD [SMPS 68k Type 1]
+#define CF_MOD_SET				0x22
+	#define CFS_MODS_ON				0x00	// F1/FC [SMPS 68k]
+	#define CFS_MODS_OFF			0x01	// F4/FD [SMPS 68k]
 	#define CFS_MODS_ON_S3P			0x02	// E9 [Sonic 3 proto 1993-11-03]
-#define CF_MOD_ENV				0x22	// F1/F4 [SMPS 68k/Z80] (set Modulation Type)
+#define CF_MOD_ENV				0x23	// F1/F4 [SMPS 68k/Z80] (set Modulation Type)
 	#define CFS_MENV_GEN			0x00	// F4
 	#define CFS_MENV_FMP			0x01	// F1 (separate params for FM and PSG tracks)
 	#define CFS_MENV_GEN2			0x02	// F1 (broken, always uses second param) [Tempo 32x]
 	#define CFS_MENV_1GEN			0x03	// F4 [Sonic 3 proto 1993-11-03]
 	#define CFS_MENV_1FMP			0x04	// F1 [Sonic 3 proto 1993-11-03]
-#define CF_FM_VOLENV			0x23	// FF 07 [SMPS Z80] (enable FM volume envelope)
-#define CF_LFO_MOD				0x24	// E2 [Ghostbusters]
-#define CF_ADSR					0x25
+#define CF_FM_VOLENV			0x24	// FF 07 [SMPS Z80] (enable FM volume envelope)
+#define CF_LFO_MOD				0x25	// E2 [Ghostbusters]
+#define CF_ADSR					0x26
 	#define CFS_ADSR_SETUP			0x00	// E0 [Sonic 2 SMS]
 	#define CFS_ADSR_MODE			0x01	// E5 [Sonic 2 SMS]
 

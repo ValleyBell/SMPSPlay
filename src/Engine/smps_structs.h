@@ -307,6 +307,7 @@ typedef struct _smps_configuration	// global SMPS driver configuration
 	FADE_CFG FadeOut;
 	FADE_CFG FadeIn;
 	
+	FILE_DATA ModPresets;
 	UINT8 EnvCmds[0x80];
 	ENV_LIB ModEnvs;
 	ENV_LIB VolEnvs;

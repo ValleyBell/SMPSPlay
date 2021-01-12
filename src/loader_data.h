@@ -7,6 +7,8 @@
 
 #ifndef DISABLE_DLOAD_FILE	// disable loading data from files
 void LoadDACData(const char* FileName, DAC_CFG* DACDrv);
+UINT8 LoadFileData(const char* FileName, UINT32* RetFileLen, UINT8** RetFileData,
+				   UINT16 MinSize, UINT16 SigLen, const void* SigStr);
 UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib);
 UINT8 LoadDrumTracks_File(const char* FileName, DRUM_TRK_LIB* DrumLib, UINT8 DrumMode);
 UINT8 LoadPanAniData_File(const char* FileName, PAN_ANI_LIB* PAniLib);

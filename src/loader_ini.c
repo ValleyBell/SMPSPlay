@@ -82,6 +82,7 @@ static SMPS_EXT_DEF* GetNewExtentionData(EXT_LIST* ExtList, const char* ExtStr)
 	TempExt->CmdFile = NULL;
 	TempExt->DrumDefFile = NULL;
 	TempExt->PSGDrumDefFile = NULL;
+	TempExt->ModPrsFile = NULL;
 	TempExt->ModEnvFile = NULL;
 	TempExt->VolEnvFile = NULL;
 	TempExt->PanAniFile = NULL;
@@ -260,6 +261,8 @@ UINT8 LoadConfigurationFiles(CONFIG_DATA* CfgData, const char* FileName)
 					strdup_free(&ExtData->DrumDefFile, PathBuf);
 				else if (! stricmp(LToken, "PSGDrumDef"))
 					strdup_free(&ExtData->PSGDrumDefFile, PathBuf);
+				else if (! stricmp(LToken, "ModPresets"))
+					strdup_free(&ExtData->ModPrsFile, PathBuf);
 				else if (! stricmp(LToken, "ModEnv"))
 					strdup_free(&ExtData->ModEnvFile, PathBuf);
 				else if (! stricmp(LToken, "VolEnv"))
@@ -325,6 +328,8 @@ void FreeConfigurationFiles(CONFIG_DATA* CfgData)
 			free(ExtDef->DrumDefFile);
 		if (ExtDef->PSGDrumDefFile != NULL)
 			free(ExtDef->PSGDrumDefFile);
+		if (ExtDef->ModPrsFile != NULL)
+			free(ExtDef->ModPrsFile);
 		if (ExtDef->ModEnvFile != NULL)
 			free(ExtDef->ModEnvFile);
 		if (ExtDef->VolEnvFile != NULL)
@@ -384,6 +389,18 @@ static void LoadExtData_Single(SMPS_EXT_DEF* ExtDef)
 	if (ExtDef->PSGDrumDefFile != NULL)
 	{
 		LoadPSGDrumDefinition(ExtDef->PSGDrumDefFile, &SmpsCfg->PSGDrumLib);
+	}
+	if (ExtDef->ModPrsFile != NULL)
+	{
+		UINT32 fileSize;
+		RetVal = LoadFileData(ExtDef->ModPrsFile, &fileSize, &SmpsCfg->ModPresets.Data, 0, 0, NULL);
+		if (! RetVal)
+		{
+			SmpsCfg->ModPresets.Len = (fileSize <= 0xFFFF) ? (UINT16)fileSize : 0xFFFF;
+			SmpsCfg->ModPresets.alloc = 0x01;
+		}
+		else
+			printf("Error loading %s %s: Code 0x%02X\n", "Modulation", "Envelopes", RetVal);
 	}
 	if (ExtDef->ModEnvFile != NULL)
 	{
@@ -448,6 +465,7 @@ void FreeSMPSConfiguration(SMPS_CFG* SmpsCfg)
 	FreeCommandDefinition(SmpsCfg);
 	FreeDrumDefinition(&SmpsCfg->DrumLib);
 	FreePSGDrumDefinition(&SmpsCfg->PSGDrumLib);
+	FreeFileData(&SmpsCfg->ModPresets);
 	FreeEnvelopeData(&SmpsCfg->ModEnvs);
 	FreeEnvelopeData(&SmpsCfg->VolEnvs);
 	FreePanAniData(&SmpsCfg->PanAnims);

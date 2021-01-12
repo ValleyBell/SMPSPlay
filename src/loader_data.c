@@ -60,8 +60,8 @@ static UINT8 GetDACAlgoID(const DAC_SETTINGS* DACCfg, const DAC_NSMPL* SmplData)
 //void FreeDACData(DAC_CFG* DACDrv);
 
 #ifndef DISABLE_DLOAD_FILE
-static UINT8 LoadFileData(const char* FileName, UINT32* RetFileLen, UINT8** RetFileData,
-						  UINT16 MinSize, UINT16 SigLen, const void* SigStr);
+//UINT8 LoadFileData(const char* FileName, UINT32* RetFileLen, UINT8** RetFileData,
+//				   UINT16 MinSize, UINT16 SigLen, const void* SigStr);
 #endif
 //UINT8 LoadEnvelopeData_File(const char* FileName, ENV_LIB* EnvLib);
 //UINT8 LoadEnvelopeData_Mem(UINT32 FileLen, const UINT8* FileData, ENV_LIB* EnvLib);
@@ -513,8 +513,8 @@ void FreeDACData(DAC_CFG* DACDrv)
 
 
 #ifndef DISABLE_DLOAD_FILE
-static UINT8 LoadFileData(const char* FileName, UINT32* RetFileLen, UINT8** RetFileData,
-						  UINT16 MinSize, UINT16 SigLen, const void* SigStr)
+UINT8 LoadFileData(const char* FileName, UINT32* RetFileLen, UINT8** RetFileData,
+				   UINT16 MinSize, UINT16 SigLen, const void* SigStr)
 {
 	FILE* hFile;
 	size_t FileLen;

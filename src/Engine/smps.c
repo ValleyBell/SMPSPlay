@@ -481,7 +481,7 @@ static void UpdateFMTrack(TRK_RAM* Trk)
 		if (Trk->PlaybkFlags & PBKFLG_ATREST)
 			return;
 		
-		PrepareModulat(Trk);
+		PrepareModulation(Trk);
 		if (SmpsCfg->DelayFreq == DLYFREQ_RESET && ! Trk->Frequency)
 		{
 			Trk->PlaybkFlags |= PBKFLG_ATREST;
@@ -561,7 +561,7 @@ static void UpdatePSGTrack(TRK_RAM* Trk)
 		if (Trk->PlaybkFlags & PBKFLG_ATREST)
 			return;
 		
-		PrepareModulat(Trk);
+		PrepareModulation(Trk);
 		PrepareADSR(Trk);
 		if (SmpsCfg->DelayFreq == DLYFREQ_RESET && (Trk->Frequency & 0x8000))
 		{
@@ -799,7 +799,7 @@ static void UpdateDrumTrack(TRK_RAM* Trk)
 				}
 				break;
 			case DCHNMODE_S2R:
-				PrepareModulat(Trk);
+				PrepareModulation(Trk);
 				if (Trk->PlaybkFlags & (PBKFLG_ATREST | PBKFLG_OVERRIDDEN))
 					break;
 				
@@ -1551,11 +1551,8 @@ static void DoFMVolEnv(TRK_RAM* Trk)
 	return;
 }
 
-static void PrepareModulat(TRK_RAM* Trk)
+static void PrepareModulation(TRK_RAM* Trk)
 {
-	const UINT8* Data = Trk->SmpsSet->Seq.Data;
-	const UINT8* ModData;
-	
 	if (Trk->PlaybkFlags & PBKFLG_HOLD)
 		return;
 	if (! (Trk->ModEnv & 0x80))
@@ -1564,8 +1561,32 @@ static void PrepareModulat(TRK_RAM* Trk)
 		return;	// no Custom Modulation - reset cache
 	}
 	
-	ModData = &Data[Trk->CstMod.DataPtr];
+	LoadModulation(Trk);
+	return;
+}
+
+void LoadModulation(TRK_RAM* Trk)
+{
+	const UINT8* ModData;
+	
+	if (Trk->CstMod.DataSrc == 0)
+	{
+		const FILE_DATA* FData = &Trk->SmpsSet->Seq;
+		ModData = (Trk->CstMod.DataPtr < FData->Len) ? &FData->Data[Trk->CstMod.DataPtr] : NULL;
+	}
+	else
+	{
+		const FILE_DATA* FData = &Trk->SmpsSet->Cfg->ModPresets;
+		UINT16 modOfs = Trk->CstMod.DataIdx * 0x04;
+		ModData = (modOfs < FData->Len) ? &FData->Data[modOfs] : NULL;
+	}
 	SmpsRAM.ModData = ModData;	// save IY register value
+	if (ModData == NULL)	// safety check [not in driver]
+	{
+		Trk->ModEnv &= ~0x80;
+		Trk->CstMod.Freq = 0;
+		return;
+	}
 	Trk->CstMod.Delay = ModData[0x00];
 	Trk->CstMod.Rate = ModData[0x01];
 	Trk->CstMod.Delta = ModData[0x02];
@@ -1636,11 +1657,15 @@ static UINT8 DoModulation(TRK_RAM* Trk, UINT16* Freq)
 static INT16 DoCustomModulation(TRK_RAM* Trk)
 {
 	const UINT8* Data = Trk->SmpsSet->Seq.Data;
-	const UINT8* ModData = &Data[Trk->CstMod.DataPtr];
+	const UINT8* ModData;
 	
 	if (! (Trk->ModEnv & 0x80))
 		return 0x8000;
 	
+	if (Trk->CstMod.DataSrc == 0)
+		ModData = &Data[Trk->CstMod.DataPtr];
+	else
+		ModData = &Trk->SmpsSet->Cfg->ModPresets.Data[Trk->CstMod.DataIdx * 0x04];
 	if ((Trk->SmpsSet->Cfg->ModAlgo & 0xF0) == MODALGO_68K)
 	{
 		if (Trk->CstMod.Delay)

@@ -19,6 +19,8 @@ typedef struct _pan_animation
 } PAN_ANIM;
 typedef struct _custom_modulation
 {
+	UINT8 DataSrc;		// [not in driver] 0 - SMPS data, 1 - global
+	UINT8 DataIdx;		// [driver sets DataPtr instead] modulation preset index
 	UINT16 DataPtr;		// 20/21 - Modulation Settings Pointer
 	UINT16 Freq;		// 22/23 - Modulation Frequency (added to Note Frequency)
 	UINT8 Delay;		// 24 - initial Delay
