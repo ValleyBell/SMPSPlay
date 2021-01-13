@@ -24,7 +24,7 @@ CPP = g++
 PREFIX = /usr/local
 MANPREFIX = $(PREFIX)/share/man
 
-CFLAGS := -O3 -g0 $(CFLAGS) -I libs/include -I $(INCPATH)
+CFLAGS := -O3 -g0 $(CFLAGS) -I libs/include -I $(INCPATH)/vgm
 CCFLAGS = -std=gnu99
 CPPFLAGS = -std=gnu++98
 #CFLAGS += -Wall -Wextra -Wpedantic

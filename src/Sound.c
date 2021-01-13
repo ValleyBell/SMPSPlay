@@ -12,6 +12,7 @@
 #endif
 
 #include <stdtype.h>
+#include <common_def.h>	// for INLINE
 #include "Sound.h"
 #include <audio/AudioStream.h>
 #include <audio/AudioStream_SpcDrvFuns.h>
