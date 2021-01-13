@@ -4,11 +4,8 @@
 #include <string.h>
 #include <stddef.h>
 
-// mutex functions/types
 #ifdef _WIN32
-#include <windows.h>
-#else
-#include <pthread.h>
+#include <windows.h>	// for HWND
 #endif
 
 #include <stdtype.h>
@@ -16,6 +13,7 @@
 #include "Sound.h"
 #include <audio/AudioStream.h>
 #include <audio/AudioStream_SpcDrvFuns.h>
+#include <utils/OSMutex.h>
 
 #include <emu/EmuStructs.h>
 #include <emu/SoundEmu.h>
@@ -120,12 +118,9 @@ volatile INT32 SMPS_CountdownTimer;
 extern SMPS_CB_SIGNAL CB_Signal;
 
 #ifdef _WIN32
-HANDLE hMutex = NULL;
-HWND hWndSnd = NULL;
-#else
-UINT8 useMutex = 0;
-pthread_mutex_t hMutex = PTHREAD_MUTEX_INITIALIZER;
+static HWND hWndSnd = NULL;
 #endif
+static OS_MUTEX* hMutex = NULL;
 static UINT8 lastMutexLockMode;
 
 void InitAudioOutput(void)
@@ -396,12 +391,7 @@ UINT8 StartAudioOutput(void)
 		if (RetVal)
 			AudioDrv_Deinit(&audDrvLog);
 	}
-#ifdef _WIN32
-	hMutex = CreateMutex(NULL, FALSE, NULL);
-#else
-	pthread_mutex_init(&hMutex, NULL);
-	useMutex = 1;
-#endif
+	OSMutex_Init(&hMutex, 0);
 	lastMutexLockMode = 0;
 	InitalizeChips();
 	RetVal = AudioDrv_Start(audDrv, AudioCfg.AudAPIDev);
@@ -419,31 +409,19 @@ UINT8 StopAudioOutput(void)
 {
 	UINT8 RetVal;
 	
-#ifdef _WIN32
-	if (hMutex != NULL)
-	{
-		ReleaseMutex(hMutex);
-		CloseHandle(hMutex);
-		hMutex = NULL;
-	}
-#else
-	if (useMutex)
-	{
-		pthread_mutex_unlock(&hMutex);
-		pthread_mutex_destroy(&hMutex);
-		useMutex = 0;
-	}
-#endif
+	OSMutex_Deinit(hMutex);	hMutex = NULL;
 	
 	if (audDrv != NULL)
 	{
 		RetVal = AudioDrv_Stop(audDrv);
 		RetVal = AudioDrv_Deinit(&audDrv);
+		audDrv = NULL;
 	}
 	if (audDrvLog != NULL)
 	{
 		RetVal = AudioDrv_Stop(audDrvLog);
 		RetVal = AudioDrv_Deinit(&audDrvLog);
+		audDrvLog = NULL;
 	}
 	
 	DeinitChips();
@@ -469,39 +447,18 @@ void ThreadSync(UINT8 PauseAndWait)
 	if (PauseAndWait == lastMutexLockMode)
 		return;
 	
-#ifdef _WIN32
 	if (PauseAndWait)
 	{
-		DWORD RetVal;
-		
-		RetVal = WaitForSingleObject(hMutex, INFINITE);
-		if (RetVal == WAIT_OBJECT_0)	// success
-			lastMutexLockMode = 1;
-	}
-	else
-	{
-		BOOL RetVal;
-		
-		RetVal = ReleaseMutex(hMutex);
-		if (RetVal)
-			lastMutexLockMode = 0;
-	}
-#else
-	int RetVal;
-	
-	if (PauseAndWait)
-	{
-		RetVal = pthread_mutex_lock(&hMutex);
+		UINT8 RetVal = OSMutex_Lock(hMutex);
 		if (! RetVal)
 			lastMutexLockMode = 1;
 	}
 	else
 	{
-		RetVal = pthread_mutex_unlock(&hMutex);
+		UINT8 RetVal = OSMutex_Unlock(hMutex);
 		if (! RetVal)
 			lastMutexLockMode = 0;
 	}
-#endif
 	
 	return;
 }
@@ -610,11 +567,7 @@ static UINT32 FillBuffer(void* Params, void* userParam, UINT32 bufSize, void* da
 	if (data == NULL)
 		return 0x00;
 	
-#ifdef _WIN32
-	WaitForSingleObject(hMutex, INFINITE);
-#else
-	pthread_mutex_lock(&hMutex);
-#endif
+	OSMutex_Lock(hMutex);
 	Buffer = (UINT8*)data;
 	BufferSmpls = bufSize * 8 / audOpts->numBitsPerSmpl / 2;
 	for (CurSmpl = 0; CurSmpl < BufferSmpls; CurSmpl ++)
@@ -698,11 +651,7 @@ static UINT32 FillBuffer(void* Params, void* userParam, UINT32 bufSize, void* da
 			break;
 		}
 	}
-#ifdef _WIN32
-	ReleaseMutex(hMutex);
-#else
-	pthread_mutex_unlock(&hMutex);
-#endif
+	OSMutex_Unlock(hMutex);
 	
 	return CurSmpl * audOpts->numBitsPerSmpl * 2 / 8;
 }
