@@ -1,7 +1,5 @@
 @echo off
 
-@if "%MSVCDir%" == "" goto patherr
-
 set BUILD_DIR=build_VC6
 set BASE_DIR=%CD%\download
 set INST_DIR=%CD%\install
@@ -23,11 +21,12 @@ set LIBVGM_DIR=libvgm
 mkdir %LIBVGM_DIR%
 cd %LIBVGM_DIR%
 
-set LIBVGM_CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_VGM2WAV=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
+set LIBVGM_CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_VGM2WAV=OFF -D UTIL_CHARSET_CONV=OFF -D UTIL_LOADERS=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU__ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
 cmake -G "%GENERATOR%" -D CMAKE_INSTALL_PREFIX="%INST_DIR%" -D CMAKE_BUILD_TYPE=Release %LIBVGM_CMAKE_OPTS% "%BASE_DIR%\%LIBVGM_DIR%"
 if errorlevel 1 goto builderror
-rem for %%f in (*.dsw) do msdev.exe "%%f" /MAKE "INSTALL - Win32 Debug" "INSTALL - Win32 Release"
-nmake /NOLOGO install
+rem cmake --build . --config Debug --target INSTALL
+rem cmake --build . --config Release --target INSTALL
+cmake --build . --target install
 if errorlevel 1 goto builderror
 
 cd ..\..\
@@ -36,12 +35,6 @@ cd ..\..\
 popd
 echo Done.
 
-exit /b
-
-:patherr
-@echo Error: MSVC path not set!
-@echo Please run VCVARS32.BAT first to set up the required directories.
-pause
 exit /b
 
 :builderror

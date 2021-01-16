@@ -7,13 +7,13 @@ https://github.com/ValleyBell/libvgm
 
 Visual Studio 2010:
 - Start commandline with Visual Studio environment variables set, then execute:
-	set CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_VGM2WAV=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
+	set CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_VGM2WAV=OFF -D UTIL_CHARSET_CONV=OFF -D UTIL_LOADERS=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU__ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
 	cmake -D CMAKE_INSTALL_PREFIX=install %CMAKE_OPTS% ..
 	msbuild /property:Configuration=Release INSTALL.vcxproj
 
 GCC (Linux/Windows)
 - execute this in a terminal:
-	CMAKE_OPTS="-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_VGM2WAV=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON"
+	CMAKE_OPTS="-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_VGM2WAV=OFF -D UTIL_CHARSET_CONV=OFF -D UTIL_LOADERS=OFF -D BUILD_LIBAUDIO=ON -D AUDIODRV_PULSE=OFF -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU__ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON"
 	cmake -D CMAKE_BUILD_TYPE=Release -D CMAKE_INSTALL_PREFIX=install $CMAKE_OPTS ..
 	make install
 
@@ -27,25 +27,31 @@ General notes:
 
 
 Details:
+- Utilities library
+  Required files:
+    libs/install/include/vgm/utils/OSMutex.h
+    libs/install/libs/vgm-utils_*.lib [MS Visual Studio]
+    libs/install/libs/libvgm-utils.a [GCC]
+  CMake Options:
+    - UTIL_CHARSET_CONV=OFF UTIL_LOADERS=OFF
 - Audio Output library
   Required files:
-    libs/install/include/audio/Audio*.h
+    libs/install/include/vgm/audio/Audio*.h
     libs/install/libs/vgm-audio_*.lib [MS Visual Studio]
-    libs/install/libs/vgm-utils_*.lib [MS Visual Studio]
     libs/install/libs/libvgm-audio.a [GCC]
-    libs/install/libs/libvgm-utils.a [GCC]
   CMake Options:
     - BUILD_LIBAUDIO=ON
     - just use the default options
     - for Windows, these are: AUDIODRV_WAVEWRITE=ON AUDIODRV_WINMM=ON AUDIODRV_DSOUND=ON AUDIODRV_XAUDIO2=ON [AUDIODRV_WASAPI=ON]
+    - for Linux, if you build SMPSPlay using the Makefile instead of CMake, use: AUDIODRV_PULSE=OFF
 - Emulation library
   Required files:
-    libs/install/include/emu/cores/sn764intf.h
-    libs/install/include/emu/EmuStructs.h
-    libs/install/include/emu/Resampler.h
-    libs/install/include/emu/snddef.h
-    libs/install/include/emu/SoundDevs.h
-    libs/install/include/emu/SoundEmu.h
+    libs/install/include/vgm/emu/cores/sn764intf.h
+    libs/install/include/vgm/emu/EmuStructs.h
+    libs/install/include/vgm/emu/Resampler.h
+    libs/install/include/vgm/emu/snddef.h
+    libs/install/include/vgm/emu/SoundDevs.h
+    libs/install/include/vgm/emu/SoundEmu.h
     libs/install/libs/vgm-emu_*.lib [MS Visual Studio]
     libs/install/libs/libvgm-emu.a [GCC]
   CMake Options:
@@ -54,8 +60,7 @@ Details:
     - Sega Pico support: SNDEMU_UPD7759_ALL=ON
     - Sega MegaCD support: SNDEMU_RF5C68_GENS=ON
     - Sega 32X support: SNDEMU_32X_PWM_ALL=ON
-- Player library
-  Required files:
-    none, because we won't be using this part of libvgm
+- parts of libvgm we don't need:
   CMake Options:
     - BUILD_LIBPLAYER=OFF
+    - BUILD_TESTS=OFF BUILD_PLAYER=OFF BUILD_VGM2WAV=OFF

@@ -1,7 +1,5 @@
 @echo off
 
-@if "%VCINSTALLDIR%" == "" goto patherr
-
 set BUILD_DIR=build_VC2010_Win32
 set BASE_DIR=%CD%\download
 set INST_DIR=%CD%\install
@@ -20,12 +18,12 @@ set LIBVGM_DIR=libvgm
 mkdir %LIBVGM_DIR%
 cd %LIBVGM_DIR%
 
-set LIBVGM_CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_VGM2WAV=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU_ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
+set LIBVGM_CMAKE_OPTS=-D BUILD_TESTS=OFF -D BUILD_PLAYER=OFF -D BUILD_VGM2WAV=OFF -D UTIL_CHARSET_CONV=OFF -D UTIL_LOADERS=OFF -D BUILD_LIBAUDIO=ON -D BUILD_LIBEMU=ON -D BUILD_LIBPLAYER=OFF -D SNDEMU__ALL=OFF -D SNDEMU_YM2612_GPGX=ON -D SNDEMU_SN76496_MAME=ON -D SNDEMU_UPD7759_ALL=ON
 cmake -G "%GENERATOR%" -D CMAKE_INSTALL_PREFIX="%INST_DIR%" %LIBVGM_CMAKE_OPTS% "%BASE_DIR%\%LIBVGM_DIR%"
 if errorlevel 1 goto builderror
-msbuild /property:Configuration=Debug INSTALL.vcxproj
+cmake --build . --config Debug --target INSTALL
 if errorlevel 1 goto builderror
-msbuild /property:Configuration=Release INSTALL.vcxproj
+cmake --build . --config Release --target INSTALL
 if errorlevel 1 goto builderror
 
 cd ..\..\
@@ -34,12 +32,6 @@ cd ..\..\
 popd
 echo Done.
 
-exit /b
-
-:patherr
-@echo Error: MSVC path not set!
-@echo Please run within a Visual Studio command line or use vcvarsall.bat.
-pause
 exit /b
 
 :builderror
