@@ -1,5 +1,8 @@
 @echo off
 
+@rem The MSVC6 compiler must be in the PATH variable for Makefile generation.
+@if "%MSVCDir%" == "" goto patherr
+
 set BUILD_DIR=build_VC6
 set BASE_DIR=%CD%\download
 set INST_DIR=%CD%\install
@@ -35,6 +38,12 @@ cd ..\..\
 popd
 echo Done.
 
+exit /b
+
+:patherr
+@echo Error: MSVC path not set!
+@echo Please run VCVARS32.BAT first to set up the required directories.
+pause
 exit /b
 
 :builderror
