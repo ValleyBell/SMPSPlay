@@ -12,14 +12,14 @@ find_package(libvgm REQUIRED)
 
 if(MSVC)
 	if(NOT MSVC_VERSION LESS 1400)
-		add_definitions("/D _CRT_SECURE_NO_WARNINGS")
+		add_compile_definitions("_CRT_SECURE_NO_WARNINGS")
 	endif()
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCC)
 	# assume Windows 2000 and later for GetConsoleWindow API call
 	if(WIN32)
-		add_definitions("-D _WIN32_WINNT=0x500")
+		add_compile_definitions("_WIN32_WINNT=0x500")
 	endif()
 	
 	set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -D_DEBUG")
@@ -49,7 +49,6 @@ set(ENGINE_SOURCES
 	src/Engine/smps_extra.c
 )
 set(MAIN_HEADERS
-	src/dirent.h
 	src/ini_lib.h
 	src/loader.h
 	src/loader_data.h
@@ -60,7 +59,6 @@ set(MAIN_HEADERS
 	src/vgmwrite.h
 )
 set(MAIN_SOURCES
-	src/dirent.c
 	src/ini_lib.c
 	src/loader_data.c
 	src/loader_def.c
@@ -70,6 +68,12 @@ set(MAIN_SOURCES
 	src/Sound.c
 	src/vgmwrite.c
 )
+
+if(MSVC)
+	# for POSIX directory browsing functions
+	set(MAIN_HEADERS ${MAIN_HEADERS} src/dirent.h)
+	set(MAIN_SOURCES ${MAIN_SOURCES} src/dirent.c)
+endif()
 
 add_executable(${PROJECT_NAME} ${ENGINE_HEADERS} ${ENGINE_SOURCES} ${MAIN_HEADERS} ${MAIN_SOURCES})
 #target_include_directories(${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/src)
