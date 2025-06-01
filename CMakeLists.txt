@@ -30,6 +30,16 @@ if(CMAKE_COMPILER_IS_GNUCC)
 	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
+option(LOOP_DETECTION "enable loop detection" ON)
+option(VGM_LOGGING "enable VGM logging feature" ON)
+
+if(LOOP_DETECTION)
+	add_compile_definitions("ENABLE_LOOP_DETECTION")
+endif(LOOP_DETECTION)
+
+if(VGM_LOGGING)
+	add_compile_definitions("ENABLE_VGM_LOGGING")
+endif(VGM_LOGGING)
 
 set(ENGINE_HEADERS
 	src/Engine/dac.h
