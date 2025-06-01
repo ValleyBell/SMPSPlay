@@ -540,7 +540,7 @@ void LoadDriverDefinition(const char* FileName, SMPS_CFG* SmpsCfg)
 	char* RToken2;
 	UINT8 Group;
 	UINT8 RetVal;
-	UINT8 CstRegCnt;
+	UINT8 CstRegCnt = 0;
 	UINT8* CstRegList;
 	
 	hFile = fopen(FileName, "rt");
