@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)	# should work with >=3.1
+cmake_minimum_required(VERSION 3.12)	# due to add_compile_definitions
 if(POLICY CMP0042)
 	cmake_policy(SET CMP0042 NEW)
 endif()
@@ -29,6 +29,11 @@ if(CMAKE_COMPILER_IS_GNUCC)
 	set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG}")
 	set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE}")
 endif(CMAKE_COMPILER_IS_GNUCC)
+
+check_include_file("stdint.h" HAVE_STDINT)
+if(HAVE_STDINT)
+	add_compile_definitions("HAVE_STDINT_H")
+endif()
 
 option(LOOP_DETECTION "enable loop detection" ON)
 option(VGM_LOGGING "enable VGM logging feature" ON)

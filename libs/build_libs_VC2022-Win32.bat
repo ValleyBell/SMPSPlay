@@ -1,6 +1,6 @@
 @echo off
 
-set BUILD_DIR=build_VC2022_Win64
+set BUILD_DIR=build_VC2022_Win32
 set BASE_DIR=%CD%\download
 set INST_DIR=%CD%\install
 set GENERATOR=Visual Studio 17 2022
