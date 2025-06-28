@@ -190,7 +190,7 @@ static void InitOneChip(CAUD_ATTR* CAA, const DEV_GEN_CFG* devCfg, UINT8 chipID,
 	
 	SndEmu_GetDeviceFunc(CAA->defInf.devDef, RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, (void**)&CAA->write8);
 	SndEmu_GetDeviceFunc(CAA->defInf.devDef, RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, (void**)&CAA->read8);
-	Resmpl_SetVals(&CAA->resmpl, 0xFF, volume, audOpts->sampleRate);
+	Resmpl_SetVals(&CAA->resmpl, RSMODE_LINEAR, volume, audOpts->sampleRate);
 	Resmpl_DevConnect(&CAA->resmpl, &CAA->defInf);
 	Resmpl_Init(&CAA->resmpl);
 	
