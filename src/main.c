@@ -830,7 +830,7 @@ void RedrawStatusLine(void)
 
 static void ReDisplayFileID(int FileID)
 {
-	char TempBuf[0x20];	// maximum is 0x18 chars (for 2 loop digits) + '\0' (without Z80 offset)
+	char TempBuf[0x21];	// maximum is 0x19 chars (for 2 loop digits & '+') + '\0' (without Z80 offset)
 	char* TempPnt;
 	UINT8 NewLineState;
 	
@@ -875,15 +875,16 @@ static void ReDisplayFileID(int FileID)
 		}
 		else
 		{
-			NewLineState = PauseMode ? 0x03 : (SMPS_LoopCntr > 99 ? 0x02 : 0x01);
+			NewLineState = PauseMode ? 0x02 : 0x01;
 			TempPnt += sprintf(TempPnt, " %s", PauseMode ? "paused" : "playing");
 			if (SMPS_LoopCntr > 0)
 			{
-			    TempPnt += sprintf(TempPnt, " L");
-				// the buffer is only enough for 2 digits by design, so hide
-				// the loop counter if it exceeds that limit
-				if (SMPS_LoopCntr <= 99)
-				    TempPnt += sprintf(TempPnt, " %d", SMPS_LoopCntr);
+			    // the buffer is only enough for printing 3 digits at best
+			    // instead of doing so, we try to print only 2 digits, along with '+'
+				// if the counter would've exceeded 2 digits
+			    TempPnt += sprintf(TempPnt, " L %d", min(SMPS_LoopCntr, 99));
+				if (SMPS_LoopCntr > 99)
+				    TempPnt += sprintf(TempPnt, "+");
 			}
 		}
 		strcpy(TempPnt, ")");	TempPnt += 0x01;
@@ -896,9 +897,9 @@ static void ReDisplayFileID(int FileID)
 	}
 	
 	// The console under Windows displays 80 chars in a line.
-	// I calc with 78 chars per line and 4 chars for the track number.
-	// So I limit the file name length to: 79 - 4 - Len(time + "playing" + etc.)
-	printf("%2d %.*s%s\r", FileID + 1, 75 - strlen(TempBuf), FileList[FileID].Title, TempBuf);
+	// I calc with 79 chars per line and 4 chars for the track number.
+	// So I limit the file name length to: 80 - 4 - Len(time + "playing" + etc.)
+	printf("%2d %.*s%s\r", FileID + 1, 76 - strlen(TempBuf), FileList[FileID].Title, TempBuf);
 	
 	return;
 }
