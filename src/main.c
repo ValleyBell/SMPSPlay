@@ -875,10 +875,16 @@ static void ReDisplayFileID(int FileID)
 		}
 		else
 		{
-			NewLineState = PauseMode ? 0x02 : 0x01;
+			NewLineState = PauseMode ? 0x03 : (SMPS_LoopCntr > 99 ? 0x02 : 0x01);
 			TempPnt += sprintf(TempPnt, " %s", PauseMode ? "paused" : "playing");
 			if (SMPS_LoopCntr > 0)
-				TempPnt += sprintf(TempPnt, " L %d", SMPS_LoopCntr);
+			{
+			    TempPnt += sprintf(TempPnt, " L");
+				// the buffer is only enough for 2 digits by design, so hide
+				// the loop counter if it exceeds that limit
+				if (SMPS_LoopCntr <= 99)
+				    TempPnt += sprintf(TempPnt, " %d", SMPS_LoopCntr);
+			}
 		}
 		strcpy(TempPnt, ")");	TempPnt += 0x01;
 	}
