@@ -830,7 +830,7 @@ void RedrawStatusLine(void)
 
 static void ReDisplayFileID(int FileID)
 {
-	char TempBuf[0x20];	// maximum is 0x18 chars (for 2 loop digits) + '\0' (without Z80 offset)
+	char TempBuf[0x30];	// maximum is 0x22 chars (for 3 loop digits) + '\0' (including Z80 offset)
 	char* TempPnt;
 	UINT8 NewLineState;
 	
@@ -851,7 +851,7 @@ static void ReDisplayFileID(int FileID)
 		UINT8 DSec;	// deciseconds
 		
 		TempPnt = TempBuf + strlen(TempBuf);
-		strcpy(TempPnt, " (");	TempPnt += 0x02;
+		strcpy(TempPnt, " (");	TempPnt += 2;
 		
 		PbTime = SMPS_PlayingTimer;
 		if (PbTime == -1)
@@ -880,7 +880,7 @@ static void ReDisplayFileID(int FileID)
 			if (SMPS_LoopCntr > 0)
 				TempPnt += sprintf(TempPnt, " L %d", SMPS_LoopCntr);
 		}
-		strcpy(TempPnt, ")");	TempPnt += 0x01;
+		strcpy(TempPnt, ")");	TempPnt += 1;
 	}
 	if (LastLineState != NewLineState)
 	{
@@ -890,7 +890,8 @@ static void ReDisplayFileID(int FileID)
 	}
 	
 	// The console under Windows displays 80 chars in a line.
-	// I calc with 78 chars per line and 4 chars for the track number.
+	// Drawing the 80th character causes a line wrap,
+	// so I calculate with 79 chars per line and 4 chars for the track number.
 	// So I limit the file name length to: 79 - 4 - Len(time + "playing" + etc.)
 	printf("%2d %.*s%s\r", FileID + 1, 75 - strlen(TempBuf), FileList[FileID].Title, TempBuf);
 	
